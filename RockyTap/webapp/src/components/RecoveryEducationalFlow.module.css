@@ -1,0 +1,432 @@
+.container {
+  max-width: 56rem;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.header {
+  margin-bottom: 2rem;
+}
+
+.titleRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.titleGroup {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.title {
+  font-size: 1.75rem;
+  font-weight: bold;
+  color: white;
+  margin: 0;
+}
+
+.titleIcon {
+  width: 2rem;
+  height: 2rem;
+  color: #10b981;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  transition: color 0.2s;
+}
+
+.closeButton:hover {
+  color: white;
+}
+
+.progressBar {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.progressSegment {
+  flex: 1;
+  height: 0.5rem;
+  background-color: #374151;
+  border-radius: 0.25rem;
+  transition: background-color 0.3s;
+}
+
+.progressSegmentActive {
+  background-color: #10b981;
+}
+
+.stepIndicator {
+  text-align: center;
+  color: #9ca3af;
+  font-size: 0.875rem;
+}
+
+.content {
+  background-color: #1a1d24;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 2rem;
+  margin-bottom: 1.5rem;
+}
+
+.stepContent {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.sectionTitle {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: white;
+  margin: 0;
+}
+
+.paragraph {
+  color: #d1d5db;
+  line-height: 1.7;
+  margin: 0;
+}
+
+.exampleBox {
+  padding: 1rem;
+  background-color: rgba(59, 130, 246, 0.1);
+  border-left: 4px solid #3b82f6;
+  border-radius: 0.5rem;
+}
+
+.exampleTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #93c5fd;
+  margin: 0 0 0.5rem 0;
+}
+
+.exampleText {
+  font-size: 0.875rem;
+  color: #d1d5db;
+  margin: 0;
+  font-style: italic;
+}
+
+.infoGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.infoCard {
+  text-align: center;
+  padding: 1rem;
+  background-color: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 0.5rem;
+}
+
+.infoIcon {
+  width: 1.5rem;
+  height: 1.5rem;
+  color: #10b981;
+  margin: 0 auto 0.5rem;
+}
+
+.infoCardTitle {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  margin: 0 0 0.25rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.infoCardValue {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #10b981;
+  margin: 0;
+}
+
+.securityList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.securityItem {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  background-color: rgba(255, 255, 255, 0.03);
+  border-radius: 0.5rem;
+}
+
+.securityIcon {
+  width: 1.5rem;
+  height: 1.5rem;
+  color: #10b981;
+  flex-shrink: 0;
+  margin-top: 0.25rem;
+}
+
+.securityItemTitle {
+  font-size: 0.938rem;
+  font-weight: 600;
+  color: white;
+  margin: 0 0 0.25rem 0;
+}
+
+.securityItemText {
+  font-size: 0.875rem;
+  color: #9ca3af;
+  margin: 0;
+  line-height: 1.6;
+}
+
+.methodsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.methodCard {
+  position: relative;
+  padding: 1.5rem;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.75rem;
+  transition: all 0.3s;
+}
+
+.methodCard:hover {
+  border-color: rgba(16, 185, 129, 0.5);
+  transform: translateY(-2px);
+}
+
+.methodRecommended {
+  border-color: rgba(16, 185, 129, 0.5);
+  background-color: rgba(16, 185, 129, 0.05);
+}
+
+.methodBadge {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  padding: 0.25rem 0.75rem;
+  background-color: #10b981;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 0.375rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.methodBadgeWarning {
+  background-color: #f59e0b;
+}
+
+.methodIcon {
+  width: 3rem;
+  height: 3rem;
+  color: #10b981;
+  margin-bottom: 1rem;
+}
+
+.methodIconWarning {
+  color: #f59e0b;
+}
+
+.methodTitle {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: white;
+  margin: 0 0 0.75rem 0;
+}
+
+.methodDescription {
+  font-size: 0.875rem;
+  color: #9ca3af;
+  line-height: 1.6;
+  margin: 0 0 1rem 0;
+}
+
+.methodFeatures {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.5rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.methodFeatures li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #d1d5db;
+}
+
+.methodButton {
+  width: 100%;
+  padding: 0.75rem;
+  background-color: #10b981;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.methodButton:hover {
+  background-color: #059669;
+}
+
+.methodButtonSecondary {
+  width: 100%;
+  padding: 0.75rem;
+  background-color: transparent;
+  color: #f59e0b;
+  border: 2px solid #f59e0b;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.methodButtonSecondary:hover {
+  background-color: rgba(245, 158, 11, 0.1);
+}
+
+.securityNote {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  background-color: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 0.5rem;
+  margin-top: 1.5rem;
+}
+
+.securityNoteTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #93c5fd;
+  margin: 0 0 0.25rem 0;
+}
+
+.securityNoteText {
+  font-size: 0.813rem;
+  color: #d1d5db;
+  margin: 0;
+  line-height: 1.6;
+}
+
+.alertBox {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  background-color: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 0.5rem;
+}
+
+.alertTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fca5a5;
+  margin: 0 0 0.5rem 0;
+}
+
+.alertText {
+  font-size: 0.875rem;
+  color: #d1d5db;
+  margin: 0 0 0.5rem 0;
+}
+
+.alertList {
+  font-size: 0.875rem;
+  color: #d1d5db;
+  margin: 0;
+  padding-left: 1.5rem;
+}
+
+.navigation {
+  margin-bottom: 1.5rem;
+}
+
+.navigationButtons {
+  display: flex;
+  gap: 1rem;
+}
+
+.navButton {
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.navButtonBack {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #d1d5db;
+}
+
+.navButtonBack:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+.navButtonNext {
+  background-color: #10b981;
+  color: white;
+}
+
+.navButtonNext:hover {
+  background-color: #059669;
+}
+
+.securityReminder {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.5rem;
+}
+
+.securityReminderIcon {
+  width: 1.5rem;
+  height: 1.5rem;
+  color: #9ca3af;
+  flex-shrink: 0;
+  margin-top: 0.25rem;
+}
+
+.securityReminderTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #d1d5db;
+  margin: 0 0 0.25rem 0;
+}
+
+.securityReminderText {
+  font-size: 0.813rem;
+  color: #9ca3af;
+  margin: 0;
+  line-height: 1.6;
+}
+

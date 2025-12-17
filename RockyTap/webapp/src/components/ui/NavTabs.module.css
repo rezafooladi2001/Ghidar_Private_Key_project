@@ -1,0 +1,111 @@
+.nav {
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-subtle);
+  padding: 6px 8px;
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+}
+
+.navContent {
+  display: flex;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+  background: none;
+  border: none;
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  font-family: inherit;
+  position: relative;
+}
+
+.tab:hover {
+  background: var(--bg-tertiary);
+}
+
+.tab:active {
+  transform: scale(0.95);
+}
+
+.iconWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+}
+
+.icon {
+  transition: transform var(--transition-fast), color var(--transition-fast);
+}
+
+.activeIndicator {
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  background: var(--brand-primary);
+  border-radius: 50%;
+  animation: fadeInScale 0.2s ease-out;
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) scale(0);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+}
+
+.label {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+  transition: color var(--transition-fast);
+  letter-spacing: 0.2px;
+}
+
+.active {
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.active .icon {
+  transform: scale(1.05);
+}
+
+.active .label {
+  color: var(--brand-primary);
+  font-weight: 600;
+}
+
+/* Ripple effect on tap */
+.tab::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-lg);
+  background: var(--brand-primary);
+  opacity: 0;
+  transform: scale(0);
+  transition: none;
+}
+
+.tab:active::after {
+  opacity: 0.1;
+  transform: scale(1);
+  transition: all 0.2s ease-out;
+}
