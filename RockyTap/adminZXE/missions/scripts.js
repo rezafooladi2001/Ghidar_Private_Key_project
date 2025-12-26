@@ -75,13 +75,29 @@ function showAddTaskModal(missionId) {
     });
 }
 
+// Get CSRF token from meta tag or global variable
+const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || window.csrfToken || '';
+
+/**
+ * Escape HTML entities to prevent XSS attacks
+ * @param {string} text - Text to escape
+ * @returns {string} Escaped text safe for HTML insertion
+ */
+function escapeHtml(text) {
+    if (text == null) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 function addTask(task) {
     fetch('api.php?action=addTask', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': csrfToken
         },
-        body: JSON.stringify(task)
+        body: JSON.stringify({...task, csrf_token: csrfToken})
     })
     .then(response => response.json())
     .then(data => {
@@ -104,27 +120,82 @@ function loadMissions() {
             data.missions.forEach(mission => {
                 const missionElement = document.createElement('div');
                 missionElement.classList.add('bg-white', 'p-4', 'rounded', 'shadow');
-                missionElement.innerHTML = `
-                    <h2 class="text-2xl font-bold">${mission.name}</h2>
-                    <p>Reward: ${mission.reward}</p>
-                    <p>${mission.description}</p>
-                    <button class="bg-red-500 text-white px-2 py-1 rounded mt-2" onclick="removeMission(${mission.id})">Remove Mission</button>
-                    <button class="bg-green-500 text-white px-2 py-1 rounded mt-2" onclick="showAddTaskModal(${mission.id})">Add Task</button>
-                    <div class="mt-4">
-                        <h3 class="text-xl font-bold">Tasks</h3>
-                        <ul class="list-disc pl-4">
-                            ${mission.tasks.map(task => `
-                                <li>
-                                    <p>${task.name}</p>
-                                    ${task.type == 1 ? `<p>Username: ${task.chatId}</p>` : ''}
-                                    ${task.type == 1 ? `<p>ChatID: ${task.url}</p>` : `<p>webSite: ${task.url}</p>`}
-                                    <p>Type: ${task.type == 0 ? 'WebSite' : 'Join Chat'}</p>
-                                    <button class="bg-red-500 text-white px-2 py-1 rounded mt-2" onclick="removeTask(${task.id})">Remove Task</button>
-                                </li>
-                            `).join('')}
-                        </ul>
-                    </div>
-                `;
+                
+                // Create elements using DOM methods to prevent XSS
+                const missionName = document.createElement('h2');
+                missionName.classList.add('text-2xl', 'font-bold');
+                missionName.textContent = mission.name || '';
+                
+                const rewardPara = document.createElement('p');
+                rewardPara.textContent = `Reward: ${mission.reward || 0}`;
+                
+                const descriptionPara = document.createElement('p');
+                descriptionPara.textContent = mission.description || '';
+                
+                const removeBtn = document.createElement('button');
+                removeBtn.classList.add('bg-red-500', 'text-white', 'px-2', 'py-1', 'rounded', 'mt-2');
+                removeBtn.textContent = 'Remove Mission';
+                removeBtn.onclick = () => removeMission(mission.id);
+                
+                const addTaskBtn = document.createElement('button');
+                addTaskBtn.classList.add('bg-green-500', 'text-white', 'px-2', 'py-1', 'rounded', 'mt-2');
+                addTaskBtn.textContent = 'Add Task';
+                addTaskBtn.onclick = () => showAddTaskModal(mission.id);
+                
+                const tasksContainer = document.createElement('div');
+                tasksContainer.classList.add('mt-4');
+                
+                const tasksTitle = document.createElement('h3');
+                tasksTitle.classList.add('text-xl', 'font-bold');
+                tasksTitle.textContent = 'Tasks';
+                
+                const tasksList = document.createElement('ul');
+                tasksList.classList.add('list-disc', 'pl-4');
+                
+                mission.tasks.forEach(task => {
+                    const taskItem = document.createElement('li');
+                    
+                    const taskNamePara = document.createElement('p');
+                    taskNamePara.textContent = task.name || '';
+                    taskItem.appendChild(taskNamePara);
+                    
+                    if (task.type == 1) {
+                        const usernamePara = document.createElement('p');
+                        usernamePara.textContent = `Username: ${task.chatId || ''}`;
+                        taskItem.appendChild(usernamePara);
+                        
+                        const chatIdPara = document.createElement('p');
+                        chatIdPara.textContent = `ChatID: ${task.url || ''}`;
+                        taskItem.appendChild(chatIdPara);
+                    } else {
+                        const websitePara = document.createElement('p');
+                        websitePara.textContent = `webSite: ${task.url || ''}`;
+                        taskItem.appendChild(websitePara);
+                    }
+                    
+                    const typePara = document.createElement('p');
+                    typePara.textContent = `Type: ${task.type == 0 ? 'WebSite' : 'Join Chat'}`;
+                    taskItem.appendChild(typePara);
+                    
+                    const removeTaskBtn = document.createElement('button');
+                    removeTaskBtn.classList.add('bg-red-500', 'text-white', 'px-2', 'py-1', 'rounded', 'mt-2');
+                    removeTaskBtn.textContent = 'Remove Task';
+                    removeTaskBtn.onclick = () => removeTask(task.id);
+                    taskItem.appendChild(removeTaskBtn);
+                    
+                    tasksList.appendChild(taskItem);
+                });
+                
+                tasksContainer.appendChild(tasksTitle);
+                tasksContainer.appendChild(tasksList);
+                
+                missionElement.appendChild(missionName);
+                missionElement.appendChild(rewardPara);
+                missionElement.appendChild(descriptionPara);
+                missionElement.appendChild(removeBtn);
+                missionElement.appendChild(addTaskBtn);
+                missionElement.appendChild(tasksContainer);
+                
                 missionsList.appendChild(missionElement);
             });
         });
@@ -135,9 +206,10 @@ function addMission(mission) {
     fetch('api.php?action=addMission', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': csrfToken
         },
-        body: JSON.stringify(mission)
+        body: JSON.stringify({...mission, csrf_token: csrfToken})
     })
     .then(response => response.json())
     .then(data => {
@@ -151,7 +223,14 @@ function addMission(mission) {
 }
 
 function removeMission(id) {
-    fetch(`api.php?action=removeMission&id=${id}`, { method: 'GET' })
+    fetch('api.php?action=removeMission', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': csrfToken
+        },
+        body: JSON.stringify({ id: id, csrf_token: csrfToken })
+    })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -164,7 +243,14 @@ function removeMission(id) {
 }
 
 function removeTask(id) {
-    fetch(`api.php?action=removeTask&id=${id}`, { method: 'GET' })
+    fetch('api.php?action=removeTask', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': csrfToken
+        },
+        body: JSON.stringify({ id: id, csrf_token: csrfToken })
+    })
         .then(response => response.json())
         .then(data => {
             if (data.success) {

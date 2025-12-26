@@ -1,0 +1,128 @@
+.container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm, 10px);
+  justify-content: center;
+  align-items: center;
+}
+
+/* Compact variant */
+.compact {
+  flex-direction: row;
+}
+
+.compact .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs, 6px);
+  padding: var(--space-xs, 6px) var(--space-sm, 10px);
+  background: var(--bg-elevated, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--border-default, rgba(255, 255, 255, 0.1));
+  border-radius: var(--radius-full, 9999px);
+  font-size: var(--text-xs, 12px);
+  transition: all var(--transition-normal, 0.2s);
+}
+
+.compact .badge:hover {
+  background: var(--bg-elevated-hover, rgba(255, 255, 255, 0.08));
+  border-color: var(--border-hover, rgba(255, 255, 255, 0.15));
+  transform: translateY(-1px);
+}
+
+.compact .icon {
+  font-size: 14px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+}
+
+.compact .label {
+  color: var(--text-secondary, #9ca3af);
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+/* Full variant */
+.full {
+  flex-direction: column;
+  gap: var(--space-md, 16px);
+}
+
+.full .badgeFull {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs, 6px);
+  padding: var(--space-md, 16px);
+  background: var(--bg-card, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--border-default, rgba(255, 255, 255, 0.1));
+  border-radius: var(--radius-md, 8px);
+  transition: all var(--transition-normal, 0.2s);
+  min-width: 200px;
+  flex: 1;
+}
+
+.full .badgeFull:hover {
+  border-color: var(--border-hover, rgba(255, 255, 255, 0.15));
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md, 0 4px 6px rgba(0, 0, 0, 0.1));
+}
+
+.full .badgeHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm, 10px);
+}
+
+.full .icon {
+  font-size: 24px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+}
+
+.full .label {
+  font-size: var(--text-base, 16px);
+  font-weight: 600;
+  color: var(--text-primary, #ffffff);
+  margin: 0;
+}
+
+.full .description {
+  font-size: var(--text-sm, 14px);
+  color: var(--text-secondary, #9ca3af);
+  margin: 0;
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .compact {
+    gap: var(--space-xs, 6px);
+  }
+
+  .compact .badge {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+
+  .compact .icon {
+    font-size: 12px;
+  }
+
+  .full .badgeFull {
+    min-width: auto;
+    padding: var(--space-sm, 10px);
+  }
+
+  .full .icon {
+    font-size: 20px;
+  }
+
+  .full .label {
+    font-size: var(--text-sm, 14px);
+  }
+
+  .full .description {
+    font-size: var(--text-xs, 12px);
+  }
+}
+

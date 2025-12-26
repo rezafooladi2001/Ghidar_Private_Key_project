@@ -17,16 +17,22 @@ export function Button({
   disabled,
   children,
   className = '',
+  'aria-label': ariaLabel,
   ...props
 }: ButtonProps) {
   return (
     <button
       className={`${styles.button} ${styles[variant]} ${styles[size]} ${fullWidth ? styles.fullWidth : ''} ${className}`}
       disabled={disabled || loading}
+      aria-label={ariaLabel || (loading ? 'Loading...' : undefined)}
+      aria-busy={loading}
       {...props}
     >
       {loading ? (
-        <span className={styles.spinner} />
+        <>
+          <span className={styles.spinner} aria-hidden="true" />
+          <span className="sr-only">Loading...</span>
+        </>
       ) : (
         children
       )}

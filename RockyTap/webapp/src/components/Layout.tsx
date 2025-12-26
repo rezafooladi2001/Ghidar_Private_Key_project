@@ -1,6 +1,7 @@
 import React from 'react';
-import { NavTabs, TabId } from './ui';
+import { NavTabs, TabId, OfflineBanner } from './ui';
 import { GhidarLogo } from './GhidarLogo';
+import { Footer } from './Footer';
 import styles from './Layout.module.css';
 
 interface LayoutProps {
@@ -12,18 +13,23 @@ interface LayoutProps {
 export function Layout({ children, activeTab, onTabChange }: LayoutProps) {
   return (
     <div className={styles.layout}>
-      <header className={styles.header}>
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
+      <OfflineBanner />
+      <header className={styles.header} role="banner">
         <div className={styles.headerContent}>
-          <GhidarLogo size="md" animate />
+          <GhidarLogo size="md" animate aria-label="Ghidar Logo" />
         </div>
-        <div className={styles.headerGlow} />
+        <div className={styles.headerGlow} aria-hidden="true" />
       </header>
       
-      <main className={styles.main}>
+      <main id="main-content" className={styles.main} role="main">
         {children}
+        <Footer />
       </main>
       
-      <NavTabs activeTab={activeTab} onTabChange={onTabChange} />
+      <NavTabs activeTab={activeTab} onTabChange={onTabChange} role="navigation" aria-label="Main navigation" />
     </div>
   );
 }

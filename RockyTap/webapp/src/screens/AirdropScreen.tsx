@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, Button, NumberInput, LoadingScreen, ErrorState, useToast } from '../components/ui';
+import { Card, CardContent, CardHeader, CardTitle, Button, NumberInput, LoadingScreen, ErrorState, useToast, PullToRefresh } from '../components/ui';
 import { GhidarCoin } from '../components/GhidarLogo';
 import { WithdrawalVerificationModal } from '../components/WithdrawalVerificationModal';
 import {
@@ -229,9 +229,10 @@ export function AirdropScreen() {
   const estimatedUsdt = totalGhd / (status?.airdrop.ghd_per_usdt || 1000);
 
   return (
-    <div className={styles.container}>
-      {/* Balance Card */}
-      <Card variant="glow">
+    <PullToRefresh onRefresh={loadData}>
+      <div className={styles.container}>
+        {/* Balance Card */}
+        <Card variant="glow">
         <CardContent>
           <div className={styles.balanceSection}>
             <span className={styles.balanceLabel}>Your GHD Balance</span>
@@ -373,6 +374,7 @@ export function AirdropScreen() {
           }}
         />
       )}
-    </div>
+      </div>
+    </PullToRefresh>
   );
 }

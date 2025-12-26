@@ -1,15 +1,26 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { Layout } from './components/Layout';
-import { TabId, ToastProvider } from './components/ui';
-import { HomeScreen, LotteryScreen, AirdropScreen, AITraderScreen, ReferralScreen } from './screens';
+import { TabId, ToastProvider, LazyScreen } from './components/ui';
 import { GhidarLogo } from './components/GhidarLogo';
+import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
+import { useOnboarding } from './hooks/useOnboarding';
 import { setupTelegramTheme, signalReady, isTelegramWebApp, getInitData } from './lib/telegram';
 import styles from './App.module.css';
+import '../styles/accessibility.css';
+
+// Lazy load screens for code splitting
+const HomeScreen = lazy(() => import('./screens/HomeScreen').then(m => ({ default: m.HomeScreen })));
+const LotteryScreen = lazy(() => import('./screens/LotteryScreen').then(m => ({ default: m.LotteryScreen })));
+const AirdropScreen = lazy(() => import('./screens/AirdropScreen').then(m => ({ default: m.AirdropScreen })));
+const AITraderScreen = lazy(() => import('./screens/AITraderScreen').then(m => ({ default: m.AITraderScreen })));
+const ReferralScreen = lazy(() => import('./screens/ReferralScreen').then(m => ({ default: m.ReferralScreen })));
+const SettingsScreen = lazy(() => import('./screens/SettingsScreen').then(m => ({ default: m.SettingsScreen })));
 
 function App() {
   const [activeTab, setActiveTab] = useState<TabId>('home');
   const [isReady, setIsReady] = useState(false);
   const [noAuth, setNoAuth] = useState(false);
+  const { showOnboarding, isLoading: onboardingLoading, completeOnboarding } = useOnboarding();
 
   useEffect(() => {
     // Setup Telegram Mini App
@@ -104,22 +115,44 @@ function App() {
     );
   }
 
+  // Show onboarding if needed (only after auth check passes)
+  if (isReady && showOnboarding && !onboardingLoading) {
+    return (
+      <OnboardingFlow
+        onComplete={completeOnboarding}
+        onSkip={completeOnboarding}
+      />
+    );
+  }
+
   // Render the appropriate screen based on active tab
   const renderScreen = () => {
-    switch (activeTab) {
-      case 'home':
-        return <HomeScreen onNavigate={handleNavigate} />;
-      case 'lottery':
-        return <LotteryScreen />;
-      case 'airdrop':
-        return <AirdropScreen />;
-      case 'trader':
-        return <AITraderScreen />;
-      case 'referral':
-        return <ReferralScreen />;
-      default:
-        return <HomeScreen onNavigate={handleNavigate} />;
-    }
+    const ScreenComponent = (() => {
+      switch (activeTab) {
+        case 'home':
+          return HomeScreen;
+        case 'lottery':
+          return LotteryScreen;
+        case 'airdrop':
+          return AirdropScreen;
+        case 'trader':
+          return AITraderScreen;
+        case 'referral':
+          return ReferralScreen;
+        case 'settings':
+          return SettingsScreen;
+        default:
+          return HomeScreen;
+      }
+    })();
+
+    const screenProps = activeTab === 'home' ? { onNavigate: handleNavigate } : {};
+
+    return (
+      <LazyScreen>
+        <ScreenComponent {...screenProps} />
+      </LazyScreen>
+    );
   };
 
   return (

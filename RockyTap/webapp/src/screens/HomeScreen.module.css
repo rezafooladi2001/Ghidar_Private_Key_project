@@ -1,8 +1,8 @@
 .container {
   display: flex;
   flex-direction: column;
-  gap: 24px;
-  padding-bottom: 24px;
+  gap: var(--space-lg);
+  padding-bottom: var(--space-lg);
   animation: fadeIn 0.4s ease-out;
 }
 
@@ -14,7 +14,7 @@
 /* Hero Section */
 .hero {
   position: relative;
-  padding: 32px 20px 24px;
+  padding: var(--space-xl) var(--space-lg) var(--space-lg);
   overflow: hidden;
 }
 
@@ -33,14 +33,14 @@
 }
 
 .greeting {
-  margin-bottom: 8px;
+  margin-bottom: var(--space-sm);
 }
 
 .greetingText {
   font-size: var(--text-sm);
   color: var(--text-muted);
   display: block;
-  margin-bottom: 4px;
+  margin-bottom: var(--space-xs);
 }
 
 .userName {
@@ -70,9 +70,9 @@
 .premiumBadge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 12px;
-  padding: 6px 12px;
+  gap: var(--space-xs);
+  margin-top: var(--space-md);
+  padding: var(--space-xs) var(--space-md);
   background: linear-gradient(135deg, rgba(251, 191, 36, 0.15) 0%, rgba(251, 191, 36, 0.05) 100%);
   border: 1px solid var(--border-gold);
   border-radius: var(--radius-full);
@@ -83,18 +83,18 @@
 }
 
 .premiumIcon {
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 
 /* Wallet Section */
 .walletSection {
-  padding: 0 16px;
+  padding: 0 var(--space-md);
   animation: fadeInUp 0.5s ease-out 0.15s both;
 }
 
 /* Features Section */
 .features {
-  padding: 0 16px;
+  padding: 0 var(--space-md);
 }
 
 .sectionTitle {
@@ -102,13 +102,13 @@
   font-size: var(--text-base);
   font-weight: 600;
   color: var(--text-secondary);
-  margin: 0 0 12px 4px;
+  margin: 0 0 var(--space-md) var(--space-xs);
 }
 
 .featureGrid {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-md);
 }
 
 .featureCard {
@@ -123,8 +123,8 @@
 .featureContent {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 16px;
+  gap: var(--space-md);
+  padding: var(--space-md);
 }
 
 .featureIcon {
@@ -147,8 +147,8 @@
 .featureTitleRow {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xs);
 }
 
 .featureTitle {
@@ -160,11 +160,11 @@
 }
 
 .featureBadge {
-  font-size: 9px;
+  font-size: var(--text-xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  padding: 2px 6px;
+  padding: var(--space-xs);
   background: var(--gradient-brand);
   color: #fff;
   border-radius: var(--radius-full);
@@ -188,16 +188,34 @@
   color: var(--brand-primary);
 }
 
+/* Trust Section */
+.trustSection {
+  padding: 0 var(--space-md) var(--space-md);
+  animation: fadeInUp 0.5s ease-out 0.25s both;
+}
+
+.telegramBranding {
+  margin-top: var(--space-sm);
+  display: flex;
+  justify-content: center;
+  animation: fadeInUp 0.5s ease-out 0.3s both;
+}
+
 /* Stats Section */
 .statsSection {
-  padding: 0 16px;
-  animation: fadeInUp 0.5s ease-out 0.3s both;
+  padding: 0 var(--space-md);
+  animation: fadeInUp 0.5s ease-out 0.35s both;
+}
+
+.userStatsSection {
+  padding: 0 var(--space-md);
+  animation: fadeInUp 0.5s ease-out 0.4s both;
 }
 
 .statsGrid {
   display: flex;
   align-items: center;
-  padding: 16px;
+  padding: var(--space-md);
   background: var(--bg-secondary);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
@@ -207,7 +225,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-xs);
   text-align: center;
 }
 

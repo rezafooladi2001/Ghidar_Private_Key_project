@@ -23,9 +23,16 @@ export function getFriendlyErrorMessage(error: ApiError | Error): string {
         ? 'Resource not found.'
         : originalMessage.includes('500')
         ? 'Server error. Please try again later.'
+        : originalMessage.includes('429')
+        ? 'Too many requests. Please wait a moment and try again.'
         : originalMessage,
       UNAUTHORIZED: 'Authentication failed. Please refresh the app.',
       FORBIDDEN: 'You do not have permission to perform this action.',
+      AUTH_ERROR: 'Authentication failed. Please refresh the app.',
+      INTERNAL_ERROR: 'An error occurred. Please try again later.',
+      USER_NOT_FOUND: 'User account not found.',
+      INVALID_REQUEST: 'Invalid request. Please check your input.',
+      METHOD_NOT_ALLOWED: 'This action is not allowed.',
     };
 
     // Return friendly message if available, otherwise use original

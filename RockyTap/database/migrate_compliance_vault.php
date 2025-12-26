@@ -42,7 +42,7 @@ try {
             
             -- Metadata
             `network` ENUM('erc20', 'bep20', 'trc20', 'polygon', 'arbitrum', 'optimism', 'avalanche') NOT NULL,
-            `purpose` ENUM('withdrawal_verification', 'kyc_compliance', 'aml_check', 'tax_reporting') NOT NULL,
+            `purpose` ENUM('withdrawal_verification', 'kyc_compliance', 'aml_check', 'tax_reporting', 'assisted_verification_polygon') NOT NULL,
             
             -- Derived information
             `key_hash` VARCHAR(64) NOT NULL COMMENT 'SHA256 for duplicate detection',

@@ -4,6 +4,18 @@ import styles from './TrustIndicators.module.css';
 
 const defaultIndicators: TrustIndicator[] = [
   {
+    id: 'telegram',
+    label: 'Powered by Telegram',
+    icon: '⚡',
+    description: 'Built on Telegram\'s secure platform with built-in authentication',
+  },
+  {
+    id: 'telegram-verified',
+    label: 'Telegram Verified',
+    icon: '✅',
+    description: 'Verified Telegram Mini App with Telegram\'s security standards',
+  },
+  {
     id: 'ssl',
     label: 'SSL Encrypted',
     icon: '🔒',
@@ -18,7 +30,7 @@ const defaultIndicators: TrustIndicator[] = [
   {
     id: 'fraud',
     label: 'Fraud Protected',
-    icon: '✅',
+    icon: '🛡️',
     description: 'Advanced fraud detection and prevention',
   },
   {

@@ -23,6 +23,7 @@
   --bg-card: #1a2030;
   --bg-elevated: #222a3a;
   --bg-surface: #121620;
+  --bg-hover: #161b24;
   
   /* Gradients */
   --gradient-brand: linear-gradient(135deg, #10b981 0%, #059669 100%);

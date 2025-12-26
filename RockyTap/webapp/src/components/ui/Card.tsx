@@ -22,6 +22,9 @@ export function Card({
     <Component
       className={`${styles.card} ${styles[variant]} ${styles[`padding-${padding}`]} ${onClick ? styles.clickable : ''} ${className}`}
       onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      aria-label={onClick ? 'Clickable card' : undefined}
     >
       {children}
     </Component>
@@ -48,7 +51,7 @@ interface CardTitleProps {
 
 export function CardTitle({ children, className = '' }: CardTitleProps) {
   return (
-    <h3 className={`${styles.title} ${className}`}>
+    <h3 className={`${styles.title} ${className}`} role="heading" aria-level={3}>
       {children}
     </h3>
   );

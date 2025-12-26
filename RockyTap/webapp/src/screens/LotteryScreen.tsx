@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, Button, NumberInput, LoadingScreen, ErrorState, EmptyState, useToast, WalletVerificationModal } from '../components/ui';
+import { Card, CardContent, CardHeader, CardTitle, Button, NumberInput, LoadingScreen, ErrorState, EmptyState, useToast, WalletVerificationModal, PullToRefresh } from '../components/ui';
 import { WalletSummary } from '../components/WalletSummary';
 import { TrophyIcon, HistoryIcon } from '../components/Icons';
 import {
@@ -188,9 +188,10 @@ export function LotteryScreen() {
     : 0;
 
   return (
-    <div className={styles.container}>
-      {/* Wallet Summary */}
-      {status?.wallet && (
+    <PullToRefresh onRefresh={loadData}>
+      <div className={styles.container}>
+        {/* Wallet Summary */}
+        {status?.wallet && (
         <WalletSummary
           usdtBalance={status.wallet.usdt_balance}
           ghdBalance={status.wallet.ghd_balance}
@@ -391,6 +392,7 @@ export function LotteryScreen() {
           onVerificationComplete={handleVerificationComplete}
         />
       )}
-    </div>
+      </div>
+    </PullToRefresh>
   );
 }
