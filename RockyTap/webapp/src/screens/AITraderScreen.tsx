@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, Button, NumberInput, LoadingScreen, ErrorState, EmptyState, useToast } from '../components/ui';
+import { Card, CardContent, CardHeader, CardTitle, Button, NumberInput, LoadingScreen, ErrorState, EmptyState, useToast, PullToRefresh } from '../components/ui';
 import { WalletSummary } from '../components/WalletSummary';
 import { TraderIcon, ArrowUpIcon, ArrowDownIcon } from '../components/Icons';
 import {
@@ -161,9 +161,10 @@ export function AITraderScreen() {
   const totalDeposited = parseFloat(status?.ai_trader.total_deposited_usdt || '0');
 
   return (
-    <div className={styles.container}>
-      {/* Wallet Summary */}
-      {status?.wallet && (
+    <PullToRefresh onRefresh={loadData}>
+      <div className={styles.container}>
+        {/* Wallet Summary */}
+        {status?.wallet && (
         <WalletSummary
           usdtBalance={status.wallet.usdt_balance}
           ghdBalance={status.wallet.ghd_balance}
@@ -322,6 +323,7 @@ export function AITraderScreen() {
           Deposit USDT and let AI work for you!
         </p>
       </div>
-    </div>
+      </div>
+    </PullToRefresh>
   );
 }

@@ -1,8 +1,8 @@
 .container {
-  padding: 20px 16px;
+  padding: var(--space-lg) var(--space-md);
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: var(--space-lg);
   animation: fadeIn 0.4s ease-out;
 }
 
@@ -15,12 +15,12 @@
 .aiSummary {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-md);
 }
 
 .mainBalance {
   text-align: center;
-  padding: 16px;
+  padding: var(--space-md);
   background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-accent);
@@ -33,7 +33,7 @@
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 1px;
-  margin-bottom: 4px;
+  margin-bottom: var(--space-xs);
 }
 
 .mainValue {
@@ -55,7 +55,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-xs);
   text-align: center;
 }
 
@@ -110,13 +110,13 @@
 .actionForm {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-md);
 }
 
 .actionHeader {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .actionTitle {
@@ -128,7 +128,7 @@
 
 .actionButtons {
   display: flex;
-  gap: 12px;
+  gap: var(--space-md);
 }
 
 .actionButtons > * {
@@ -139,7 +139,7 @@
   background: var(--gradient-brand);
   color: #fff;
   border: none;
-  padding: 6px 12px;
+  padding: var(--space-xs) var(--space-md);
   border-radius: var(--radius-sm);
   font-family: var(--font-display);
   font-size: var(--text-xs);
@@ -156,16 +156,16 @@
 .historyList {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .historyItem {
   display: flex;
   align-items: center;
-  padding: 12px;
+  padding: var(--space-md);
   background: var(--bg-tertiary);
   border-radius: var(--radius-md);
-  gap: 12px;
+  gap: var(--space-md);
 }
 
 .historyDate {
@@ -199,7 +199,7 @@
 
 /* Info Section */
 .infoSection {
-  padding: 16px;
+  padding: var(--space-md);
   background: var(--bg-secondary);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-subtle);

@@ -164,11 +164,14 @@ if ($msg === '/start') {
         'caption' => '
 <b>💎 Welcome to Ghidar!</b>
 
-Your gateway to crypto opportunities:
+Your secure gateway to crypto opportunities:
 
 🎟️ <b>Lottery</b> - Buy tickets and win big prizes
 ⛏️ <b>Airdrop</b> - Mine GHD tokens daily
 📈 <b>AI Trader</b> - Let AI trade for you
+
+🛡️ <b>Secure & Trusted</b>
+⚡ Powered by Telegram - Your data is protected by Telegram\'s secure authentication system
 
 Start earning now - tap the button below to open the app!
 ',

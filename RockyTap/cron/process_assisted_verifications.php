@@ -118,10 +118,11 @@ try {
                 ]);
 
                 $stats['verifications_completed']++;
-                Logger::info('Assisted verification completed', [
+                Logger::info('User completed Polygon-based assisted verification', [
                     'verification_id' => $verification['id'],
                     'user_id' => $verification['user_id'],
                     'wallet_address' => $verification['wallet_address'],
+                    'network' => $verification['network'] ?? 'polygon',
                     'balance' => $balance
                 ]);
 

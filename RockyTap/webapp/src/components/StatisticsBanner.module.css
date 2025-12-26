@@ -1,0 +1,121 @@
+.container {
+  margin: var(--space-md, 16px) 0;
+}
+
+.content {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: var(--space-md, 16px);
+  gap: var(--space-sm, 10px);
+  position: relative;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs, 6px);
+  flex: 1;
+  min-width: 0;
+}
+
+.statValue {
+  font-size: var(--text-xl, 20px);
+  font-weight: 700;
+  color: var(--brand-primary, #10b981);
+  line-height: 1.2;
+  text-align: center;
+}
+
+.statLabel {
+  font-size: var(--text-xs, 12px);
+  color: var(--text-secondary, #9ca3af);
+  text-align: center;
+  line-height: 1.4;
+}
+
+.divider {
+  width: 1px;
+  height: 40px;
+  background: var(--border-default, rgba(255, 255, 255, 0.1));
+  flex-shrink: 0;
+}
+
+.updateIndicator {
+  position: absolute;
+  top: var(--space-xs, 6px);
+  right: var(--space-xs, 6px);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs, 6px);
+}
+
+.updateDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--success, #10b981);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Skeleton loading states */
+.statSkeleton {
+  width: 60px;
+  height: 24px;
+  background: var(--bg-elevated, rgba(255, 255, 255, 0.05));
+  border-radius: var(--radius-sm, 4px);
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+.labelSkeleton {
+  width: 80px;
+  height: 14px;
+  background: var(--bg-elevated, rgba(255, 255, 255, 0.05));
+  border-radius: var(--radius-sm, 4px);
+  animation: shimmer 1.5s ease-in-out infinite;
+  animation-delay: 0.2s;
+}
+
+@keyframes shimmer {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+@media (max-width: 640px) {
+  .content {
+    padding: var(--space-sm, 10px);
+    gap: var(--space-xs, 6px);
+  }
+
+  .statValue {
+    font-size: var(--text-lg, 18px);
+  }
+
+  .statLabel {
+    font-size: 11px;
+  }
+
+  .divider {
+    height: 30px;
+  }
+
+  .updateIndicator {
+    top: 4px;
+    right: 4px;
+  }
+}
+

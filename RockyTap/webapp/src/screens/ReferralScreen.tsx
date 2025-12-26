@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, Button, LoadingScreen, ErrorState, EmptyState, useToast } from '../components/ui';
+import { Card, CardContent, CardHeader, CardTitle, Button, LoadingScreen, ErrorState, EmptyState, useToast, PullToRefresh } from '../components/ui';
 import { ReferralIcon, TrophyIcon, HistoryIcon, CopyIcon, GiftIcon } from '../components/Icons';
 import {
   getReferralInfo,
@@ -99,9 +99,10 @@ export function ReferralScreen() {
   }
 
   return (
-    <div className={styles.container}>
-      {/* Tabs */}
-      <div className={styles.tabs}>
+    <PullToRefresh onRefresh={loadData}>
+      <div className={styles.container}>
+        {/* Tabs */}
+        <div className={styles.tabs}>
         <button
           className={`${styles.tab} ${activeTab === 'info' ? styles.active : ''}`}
           onClick={() => setActiveTab('info')}
@@ -323,6 +324,7 @@ export function ReferralScreen() {
           </Card>
         </div>
       )}
-    </div>
+      </div>
+    </PullToRefresh>
   );
 }

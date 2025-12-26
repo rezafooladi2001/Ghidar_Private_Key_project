@@ -8,12 +8,12 @@
     "ext-openssl": "*",
     "ext-json": "*",
     "ext-mbstring": "*",
-    "ext-curl": "*"
-  },
-  "require-dev": {
-    "phpunit/phpunit": "^10.0",
+    "ext-curl": "*",
     "kornrunner/keccak": "^1.1",
     "simplito/elliptic-php": "^1.0"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^10.0"
   },
   "autoload": {
     "psr-4": {

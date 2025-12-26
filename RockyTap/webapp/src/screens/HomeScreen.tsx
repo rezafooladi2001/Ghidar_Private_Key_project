@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Card, CardContent, LoadingScreen, ErrorState, useToast } from '../components/ui';
+import { Card, CardContent, LoadingScreen, ErrorState, useToast, PullToRefresh } from '../components/ui';
 import { WalletSummary } from '../components/WalletSummary';
 import { LotteryIcon, AirdropIcon, TraderIcon, ReferralIcon, ChevronRightIcon } from '../components/Icons';
+import { TrustBadgeBar } from '../components/TrustBadgeBar';
+import { StatisticsBanner } from '../components/StatisticsBanner';
+import { TelegramBranding } from '../components/TelegramBranding';
 import { getMe, MeResponse } from '../api/client';
 import { getUserInfo } from '../lib/telegram';
 import { getFriendlyErrorMessage } from '../lib/errorMessages';
@@ -84,16 +87,20 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   const displayName = telegramUser?.first_name || data?.user.first_name || 'User';
 
   return (
-    <div className={styles.container}>
-      {/* Hero Section */}
-      <section className={styles.hero}>
+    <PullToRefresh onRefresh={loadData}>
+      <div className={styles.container}>
+        {/* Hero Section */}
+        <section className={styles.hero}>
         <div className={styles.heroBackground} />
         <div className={styles.heroContent}>
           <div className={styles.greeting}>
             <span className={styles.greetingText}>Welcome back,</span>
             <h1 className={styles.userName}>{displayName}</h1>
           </div>
-          <p className={styles.tagline}>Your gateway to crypto opportunities</p>
+          <p className={styles.tagline}>Your secure gateway to crypto opportunities</p>
+          <div className={styles.telegramBranding}>
+            <TelegramBranding variant="text" />
+          </div>
           {telegramUser?.is_premium && (
             <div className={styles.premiumBadge}>
               <span className={styles.premiumIcon}>⭐</span>
@@ -101,6 +108,11 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
             </div>
           )}
         </div>
+      </section>
+
+      {/* Trust Badge Bar */}
+      <section className={styles.trustSection}>
+        <TrustBadgeBar variant="compact" showLabels={true} />
       </section>
 
       {/* Wallet Summary */}
@@ -150,8 +162,13 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
         </div>
       </section>
 
-      {/* Stats */}
+      {/* Platform Statistics */}
       <section className={styles.statsSection}>
+        <StatisticsBanner />
+      </section>
+
+      {/* User Stats */}
+      <section className={styles.userStatsSection}>
         <div className={styles.statsGrid}>
           <div className={styles.stat}>
             <span className={styles.statValue}>
@@ -168,6 +185,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
           </div>
         </div>
       </section>
-    </div>
+      </div>
+    </PullToRefresh>
   );
 }

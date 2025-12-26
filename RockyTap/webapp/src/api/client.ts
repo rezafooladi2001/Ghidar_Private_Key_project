@@ -967,3 +967,294 @@ export function isWalletVerified(
   return apiGet('wallet-verification/is-verified', params);
 }
 
+// ==================== Settings API Types ====================
+
+export interface UserProfile {
+  id: number;
+  telegram_id: number;
+  username: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  is_premium?: boolean;
+  language_code?: string;
+  joining_date?: number | null;
+  display_name?: string;
+  wallet_verified?: boolean;
+  wallet?: WalletData;
+}
+
+export interface UserPreferences {
+  notifications_enabled: boolean;
+  language?: string;
+  theme?: string;
+}
+
+// ==================== Settings API Functions ====================
+
+/**
+ * Get user profile information.
+ */
+export function getUserProfile(): Promise<UserProfile> {
+  return apiGet<UserProfile>('settings/profile');
+}
+
+/**
+ * Update user profile.
+ */
+export function updateUserProfile(updates: Partial<UserProfile>): Promise<UserProfile> {
+  return apiPost<UserProfile>('settings/profile', updates);
+}
+
+/**
+ * Get user preferences.
+ */
+export function getUserPreferences(): Promise<UserPreferences> {
+  return apiGet<UserPreferences>('settings/preferences');
+}
+
+/**
+ * Update user preferences.
+ */
+export function updateUserPreferences(updates: Partial<UserPreferences>): Promise<UserPreferences> {
+  return apiPost<UserPreferences>('settings/preferences', updates);
+}
+
+// ==================== Transaction History API Types ====================
+
+export interface Transaction {
+  id: string;
+  type: string;
+  status: string;
+  amount: string;
+  currency: string;
+  description: string;
+  created_at: string;
+  metadata?: Record<string, any>;
+}
+
+export interface TransactionHistoryResponse {
+  transactions: Transaction[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    total_pages: number;
+    has_more: boolean;
+  };
+}
+
+export interface TransactionHistoryParams {
+  page?: number;
+  limit?: number;
+  type?: string;
+  status?: string;
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+// ==================== Transaction History API Functions ====================
+
+/**
+ * Get unified transaction history.
+ */
+export function getTransactionHistory(params: TransactionHistoryParams = {}): Promise<TransactionHistoryResponse> {
+  return apiGet<TransactionHistoryResponse>('transactions/history', params as Record<string, string | number>);
+}
+
+// ==================== Help & Support API Types ====================
+
+export interface HelpArticle {
+  id: number;
+  title: string;
+  content: string;
+  excerpt?: string;
+  category: string;
+  tags?: string[];
+  related_articles?: number[];
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface HelpArticlesResponse {
+  articles: HelpArticle[];
+}
+
+export interface SupportTicket {
+  id: number;
+  subject: string;
+  status: string;
+  created_at: string;
+}
+
+export interface SupportTicketCreateRequest {
+  subject: string;
+  message: string;
+}
+
+export interface SupportTicketCreateResponse {
+  ticket_id: number;
+  status: string;
+  message: string;
+}
+
+// ==================== Help & Support API Functions ====================
+
+/**
+ * Get help articles.
+ */
+export function getHelpArticles(category?: string): Promise<HelpArticlesResponse> {
+  const params: Record<string, string> = {};
+  if (category) {
+    params.category = category;
+  }
+  return apiGet<HelpArticlesResponse>('help/articles', params);
+}
+
+/**
+ * Search help articles.
+ */
+export function searchHelpArticles(query: string): Promise<HelpArticlesResponse> {
+  return apiGet<HelpArticlesResponse>('help/search', { q: query });
+}
+
+/**
+ * Create a support ticket.
+ */
+export function createSupportTicket(data: SupportTicketCreateRequest): Promise<SupportTicketCreateResponse> {
+  return apiPost<SupportTicketCreateResponse>('support/ticket/create', data);
+}
+
+/**
+ * Get support ticket status.
+ */
+export function getSupportTicketStatus(ticketId: number): Promise<SupportTicket> {
+  return apiGet<SupportTicket>('support/ticket/status', { ticket_id: ticketId });
+}
+
+// ==================== Notifications API Types ====================
+
+export interface Notification {
+  id: number;
+  title: string;
+  message: string;
+  type: string;
+  read: boolean;
+  created_at: string;
+  metadata?: Record<string, any>;
+}
+
+export interface NotificationsResponse {
+  notifications: Notification[];
+  unread_count: number;
+}
+
+export interface NotificationsParams {
+  unread_only?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+// ==================== Notifications API Functions ====================
+
+/**
+ * Get user notifications.
+ */
+export function getNotifications(params: NotificationsParams = {}): Promise<NotificationsResponse> {
+  return apiGet<NotificationsResponse>('notifications', params as Record<string, string | number | boolean>);
+}
+
+/**
+ * Mark a notification as read.
+ */
+export function markNotificationRead(notificationId: number): Promise<void> {
+  return apiPost('notifications/read', { notification_id: notificationId });
+}
+
+/**
+ * Mark all notifications as read.
+ */
+export function markAllNotificationsRead(): Promise<void> {
+  return apiPost('notifications/read-all', {});
+}
+
+// ==================== Statistics API Types ====================
+
+export interface ActivityDataPoint {
+  date: string;
+  taps: number;
+  earnings: number;
+}
+
+export interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  unlocked_at: string | null;
+  progress?: number;
+  target?: number;
+}
+
+export interface UserStatistics {
+  total_ghd_earned: number;
+  total_usdt_earned: number;
+  lottery_winnings: number;
+  referral_rewards: number;
+  ai_trader_pnl: number;
+  total_taps: number;
+  lottery_tickets_purchased: number;
+  total_referrals: number;
+  days_active: number;
+  activity_data: ActivityDataPoint[];
+  achievements: Achievement[];
+}
+
+// ==================== Statistics API Functions ====================
+
+/**
+ * Get user statistics.
+ */
+export function getUserStatistics(): Promise<UserStatistics> {
+  return apiGet<UserStatistics>('statistics');
+}
+
+// ==================== Deposit Status API Types ====================
+
+export interface DepositStatus {
+  deposit_id: number;
+  status: 'pending' | 'confirmed' | 'failed';
+  tx_hash?: string;
+  confirmations?: number;
+  actual_amount_usdt?: string;
+  network: string;
+}
+
+// ==================== Deposit Status API Functions ====================
+
+/**
+ * Get deposit status.
+ */
+export function getDepositStatus(depositId: number): Promise<DepositStatus> {
+  return apiGet<DepositStatus>('payments/deposit/status', { deposit_id: depositId });
+}
+
+// ==================== Platform Statistics API Types ====================
+
+export interface PlatformStatistics {
+  total_players: number;
+  daily: number;
+  online: number;
+  totalCoins: number;
+  totalTaps: number;
+}
+
+// ==================== Platform Statistics API Functions ====================
+
+/**
+ * Get platform statistics (total users, online users, daily stats).
+ */
+export function getStatistics(): Promise<PlatformStatistics> {
+  return apiGet<PlatformStatistics>('stat');
+}
+

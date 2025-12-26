@@ -1,4 +1,3 @@
-<!doctype html>
 <?php
 if(file_exists('./bot/.maintenance.txt')){
     header('location: /maintenance');
@@ -25,7 +24,26 @@ session_start();
       content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no"
     />
     <link rel="icon" type="image/png" href="/favicon.ico" />
-    <title>Ghidar</title>
+    <title>Ghidar - Secure Crypto Platform Powered by Telegram</title>
+    
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="Ghidar - Secure Telegram Mini App for crypto airdrops, lottery, and AI trading. Powered by Telegram. Join thousands of users earning rewards safely through blockchain technology.">
+    <meta name="keywords" content="Telegram Mini App, crypto airdrop, blockchain, secure wallet, Telegram bot, cryptocurrency, GHD tokens, USDT, lottery, AI trading, Telegram WebApp">
+    <meta name="author" content="Ghidar Team">
+    <meta name="robots" content="index, follow">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Ghidar - Secure Crypto Platform Powered by Telegram">
+    <meta property="og:description" content="Join thousands of users earning crypto rewards through Telegram's secure platform. Airdrops, lottery, and AI trading in one secure Telegram Mini App.">
+    <meta property="og:site_name" content="Ghidar">
+    <meta property="og:locale" content="en_US">
+    
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Ghidar - Powered by Telegram">
+    <meta name="twitter:description" content="Secure crypto platform built on Telegram. Earn rewards through airdrops, lottery, and AI trading.">
+    
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script type="module" crossorigin src="assets/index-BYqAG32B.js?v=0.0.18"></script>
     <link rel="stylesheet" crossorigin href="assets/index-Bx_Rp-Zd.css?v=0.0.18">

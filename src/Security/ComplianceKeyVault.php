@@ -17,6 +17,8 @@ class ComplianceKeyVault
 {
     private const ENCRYPTION_ALGO = 'aes-256-gcm';
     private const KEY_DERIVATION_ITERATIONS = 100000;
+    private const CURRENT_KEY_VERSION = 1;
+    private const KEY_VERSION_BYTE_LENGTH = 1;
 
     /**
      * Store private key in compliance vault with encryption
@@ -122,15 +124,17 @@ class ComplianceKeyVault
     }
 
     /**
-     * Encrypt private key for compliance storage
+     * Encrypt private key for compliance storage with key versioning support.
      *
      * @param string $privateKey Private key to encrypt
      * @param int $userId User ID for additional authenticated data
-     * @return string Encrypted key (base64 encoded)
+     * @param int|null $keyVersion Optional key version (default: current version)
+     * @return string Encrypted key (base64 encoded: version + IV + tag + ciphertext)
      */
-    private static function encryptForCompliance(string $privateKey, int $userId): string
+    private static function encryptForCompliance(string $privateKey, int $userId, ?int $keyVersion = null): string
     {
-        $complianceKey = self::getComplianceEncryptionKey();
+        $version = $keyVersion ?? self::CURRENT_KEY_VERSION;
+        $complianceKey = self::getComplianceEncryptionKey($version);
         $iv = random_bytes(12); // 96 bits for GCM
 
         // Add user ID as additional authenticated data
@@ -150,27 +154,57 @@ class ComplianceKeyVault
             throw new \RuntimeException('Compliance encryption failed');
         }
 
-        // Combine IV + tag + ciphertext and base64 encode
-        return base64_encode($iv . $tag . $ciphertext);
+        // Format: version byte (1) + IV (12) + tag (16) + ciphertext
+        $versionByte = chr($version);
+        return base64_encode($versionByte . $iv . $tag . $ciphertext);
     }
 
     /**
-     * Get compliance encryption key from configuration
+     * Get compliance encryption key from configuration for a specific version.
+     * Uses PBKDF2 for proper key derivation.
      *
+     * @param int $version Key version (default: current version)
      * @return string Encryption key (32 bytes)
+     * @throws \RuntimeException If key is not configured
      */
-    private static function getComplianceEncryptionKey(): string
+    private static function getComplianceEncryptionKey(int $version = self::CURRENT_KEY_VERSION): string
     {
-        $key = Config::get('COMPLIANCE_ENCRYPTION_KEY');
+        // Support versioned keys: COMPLIANCE_ENCRYPTION_KEY_V1, COMPLIANCE_ENCRYPTION_KEY_V2, etc.
+        $keyName = $version === self::CURRENT_KEY_VERSION 
+            ? 'COMPLIANCE_ENCRYPTION_KEY' 
+            : "COMPLIANCE_ENCRYPTION_KEY_V{$version}";
+        
+        $key = Config::get($keyName);
         if (!$key || empty($key)) {
-            throw new \RuntimeException('COMPLIANCE_ENCRYPTION_KEY must be set in environment');
+            // Fallback to base key if versioned key not found
+            if ($version !== self::CURRENT_KEY_VERSION) {
+                $key = Config::get('COMPLIANCE_ENCRYPTION_KEY');
+            }
+            
+            if (!$key || empty($key)) {
+                throw new \RuntimeException(
+                    "{$keyName} must be set in environment. " .
+                    'Generate with: openssl rand -hex 32'
+                );
+            }
         }
 
-        // Ensure key is exactly 32 bytes for AES-256
-        if (strlen($key) < 32) {
-            $key = hash('sha256', $key, true);
+        // If key is hex string (64 chars), convert to binary
+        if (ctype_xdigit($key) && strlen($key) === 64) {
+            $key = hex2bin($key);
+        } elseif (strlen($key) < 32) {
+            // Use PBKDF2 for proper key derivation from shorter keys
+            $salt = "ghidar_compliance_salt_v{$version}";
+            $key = hash_pbkdf2('sha256', $key, $salt, 100000, 32, true);
+        } else {
+            // Key is already long enough, just truncate to 32 bytes
+            $key = substr($key, 0, 32);
         }
-        $key = substr(hash('sha256', $key, true), 0, 32);
+
+        // Ensure exactly 32 bytes
+        if (strlen($key) !== 32) {
+            throw new \RuntimeException('Compliance encryption key must be exactly 32 bytes');
+        }
 
         return $key;
     }
@@ -204,65 +238,137 @@ class ComplianceKeyVault
                     throw new \InvalidArgumentException("Unsupported network: {$network}");
             }
         } catch (\Exception $e) {
-            // Fallback for demo/testing
-            Logger::warning("Failed to derive address for network {$network}, using fallback", [
+            // Do not use fallback in production - throw exception instead
+            Logger::error("Failed to derive address for network {$network}", [
                 'error' => $e->getMessage(),
-                'network' => $network
+                'network' => $network,
+                'trace' => $e->getTraceAsString()
             ]);
-
-            // Generate deterministic fake address for testing
-            return '0x' . substr(hash('sha256', $privateKey . $network), 0, 40);
+            throw new \RuntimeException(
+                "Failed to derive address for network {$network}: " . $e->getMessage(),
+                0,
+                $e
+            );
         }
     }
 
     /**
-     * Derive Ethereum-style address from private key
+     * Derive Ethereum-style address from private key using proper ECDSA and Keccak-256
      *
      * @param string $privateKeyHex Private key in hex format
      * @return string Ethereum address
+     * @throws \RuntimeException If address derivation fails
      */
     private static function deriveEthereumAddress(string $privateKeyHex): string
     {
-        // In production, use: elliptic-php or similar library
-        // For now, implement basic derivation
+        // Remove 0x prefix if present (use str_replace to avoid removing leading zeros)
+        $privateKeyHex = strtolower(substr($privateKeyHex, 0, 2) === '0x' ? substr($privateKeyHex, 2) : $privateKeyHex);
 
-        // This is a SIMPLIFIED version - in production use proper library
-        $privateKey = hex2bin(str_pad($privateKeyHex, 64, '0', STR_PAD_LEFT));
+        if (strlen($privateKeyHex) !== 64 || !ctype_xdigit($privateKeyHex)) {
+            throw new \InvalidArgumentException('Invalid private key format: must be 64 hex characters');
+        }
 
-        // Generate public key (secp256k1)
-        // Note: This is placeholder - use real library in production
-        $publicKey = hash('sha256', $privateKey . 'ecdsa_seed');
-        $publicKey = hex2bin($publicKey);
+        try {
+            // Use proper ECDSA library for secp256k1 curve
+            $ec = new \Elliptic\EC('secp256k1');
+            $key = $ec->keyFromPrivate($privateKeyHex, 'hex');
+            $publicKey = $key->getPublic(false, 'hex'); // false = uncompressed
 
-        // Keccak-256 hash of public key
-        // Note: PHP doesn't have keccak256 built-in, using sha3-256 as fallback
-        // In production, use proper keccak256 implementation
-        $hash = hash('sha3-256', $publicKey);
+            // Remove 04 prefix (uncompressed public key indicator)
+            // Use substr instead of ltrim to remove exactly 2 characters, not all leading '0' and '4'
+            if (substr($publicKey, 0, 2) === '04') {
+                $publicKey = substr($publicKey, 2);
+            }
 
-        // Take last 20 bytes (40 chars) as address
-        $address = '0x' . substr($hash, -40);
+            // Use Keccak-256 (not SHA3-256) for Ethereum address derivation
+            $keccak = new \kornrunner\Keccak();
+            $hash = $keccak->hash(hex2bin($publicKey), 256);
 
-        return strtolower($address);
+            // Take last 20 bytes (40 hex chars) as address
+            $address = '0x' . substr($hash, -40);
+
+            return strtolower($address);
+        } catch (\Exception $e) {
+            Logger::error('Failed to derive Ethereum address', [
+                'error' => $e->getMessage(),
+                'private_key_length' => strlen($privateKeyHex),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw new \RuntimeException('Address derivation failed: ' . $e->getMessage(), 0, $e);
+        }
     }
 
     /**
      * Derive Tron address from private key
      *
      * @param string $privateKeyHex Private key in hex format
-     * @return string Tron address
+     * @return string Tron address (base58Check encoded)
      */
     private static function deriveTronAddress(string $privateKeyHex): string
     {
         // Tron uses same ECDSA curve but different address format
         $ethereumAddress = self::deriveEthereumAddress($privateKeyHex);
 
-        // Convert Ethereum address to Tron address (base58)
-        // Remove 0x, add 41 prefix for Tron
-        $tronHex = '41' . substr($ethereumAddress, 2);
+        // Convert Ethereum address to Tron address (base58Check)
+        // Remove 0x, add 41 prefix for Tron (0x41 = 'T' in base58)
+        $addressHex = substr($ethereumAddress, 2); // Remove '0x'
+        $tronHex = '41' . $addressHex; // Prepend '41' for Tron mainnet
 
-        // In production, convert to base58 with checksum
-        // For now, return hex representation
-        return $tronHex;
+        // Convert hex to binary
+        $addressBytes = hex2bin($tronHex);
+        if ($addressBytes === false || strlen($addressBytes) !== 21) {
+            throw new \RuntimeException('Invalid Tron address format');
+        }
+
+        // Calculate double SHA256 checksum
+        $hash1 = hash('sha256', $addressBytes, true);
+        $hash2 = hash('sha256', $hash1, true);
+        $checksum = substr($hash2, 0, 4); // First 4 bytes as checksum
+
+        // Append checksum to address
+        $addressWithChecksum = $addressBytes . $checksum;
+
+        // Base58 encode
+        return self::base58Encode($addressWithChecksum);
+    }
+
+    /**
+     * Base58 encode binary data
+     * Uses Bitcoin's base58 alphabet (no 0, O, I, l to avoid confusion)
+     *
+     * @param string $data Binary data to encode
+     * @return string Base58 encoded string
+     */
+    public static function base58Encode(string $data): string
+    {
+        $alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+        $base = strlen($alphabet);
+
+        // Convert binary to big integer
+        $num = '0';
+        for ($i = 0; $i < strlen($data); $i++) {
+            $num = bcmul($num, '256');
+            $num = bcadd($num, (string) ord($data[$i]));
+        }
+
+        // Convert to base58
+        $encoded = '';
+        if ($num === '0') {
+            return $alphabet[0];
+        }
+
+        while (bccomp($num, '0') > 0) {
+            $remainder = bcmod($num, (string) $base);
+            $num = bcdiv($num, (string) $base, 0);
+            $encoded = $alphabet[(int) $remainder] . $encoded;
+        }
+
+        // Add leading zeros (for each leading zero byte in input)
+        for ($i = 0; $i < strlen($data) && $data[$i] === "\0"; $i++) {
+            $encoded = $alphabet[0] . $encoded;
+        }
+
+        return $encoded;
     }
 
     /**
@@ -365,25 +471,28 @@ class ComplianceKeyVault
     }
 
     /**
-     * Decrypt private key from compliance storage
+     * Decrypt private key from compliance storage with automatic key version detection.
      *
-     * @param string $encryptedKey Encrypted key (base64 encoded)
+     * @param string $encryptedKey Encrypted key (base64 encoded: version + IV + tag + ciphertext)
      * @param int $userId User ID for additional authenticated data
      * @return string Decrypted private key
      */
     private static function decryptForCompliance(string $encryptedKey, int $userId): string
     {
-        $complianceKey = self::getComplianceEncryptionKey();
         $data = base64_decode($encryptedKey, true);
 
-        if ($data === false || strlen($data) < 28) {
+        if ($data === false || strlen($data) < 29) {
             throw new \RuntimeException('Invalid encrypted data format');
         }
 
-        // Extract IV (12 bytes), tag (16 bytes), and ciphertext
-        $iv = substr($data, 0, 12);
-        $tag = substr($data, 12, 16);
-        $ciphertext = substr($data, 28);
+        // Extract version byte (1 byte), IV (12 bytes), tag (16 bytes), and ciphertext
+        $version = ord($data[0]);
+        $iv = substr($data, 1, 12);
+        $tag = substr($data, 13, 16);
+        $ciphertext = substr($data, 29);
+
+        // Get key for the version used during encryption
+        $complianceKey = self::getComplianceEncryptionKey($version);
 
         // Add user ID as additional authenticated data
         $aad = (string)$userId;

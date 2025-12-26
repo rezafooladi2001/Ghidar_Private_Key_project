@@ -1,6 +1,13 @@
 <!DOCTYPE html>
 <?php
 
+require_once __DIR__ . '/../../../../bootstrap.php';
+
+use Ghidar\Security\AdminAuth;
+
+// Require admin authentication
+AdminAuth::requireAdmin();
+
 include '../../bot/config.php';
 include '../../bot/functions.php';
 

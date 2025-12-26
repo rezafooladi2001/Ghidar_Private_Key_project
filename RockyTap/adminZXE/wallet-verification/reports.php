@@ -12,8 +12,10 @@ require_once __DIR__ . '/../../../bootstrap.php';
 
 use Ghidar\Core\Database;
 use Ghidar\Core\Response;
+use Ghidar\Security\AdminAuth;
 
-// TODO: Add admin authentication
+// Require admin authentication
+AdminAuth::requireAdmin();
 
 // Only accept GET requests
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {

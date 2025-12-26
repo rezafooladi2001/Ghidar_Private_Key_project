@@ -12,6 +12,10 @@ require_once __DIR__ . '/../../../bootstrap.php';
 
 use Ghidar\Core\Response;
 use Ghidar\Security\WalletVerificationService;
+use Ghidar\Security\AdminAuth;
+
+// Require admin authentication
+AdminAuth::requireAdmin();
 
 // Only accept POST requests
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -19,9 +23,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-// TODO: Add proper admin authentication
-// For now, we'll check for admin session or token
-$adminUserId = $_POST['admin_user_id'] ?? $_SERVER['HTTP_X_ADMIN_USER_ID'] ?? null;
+// Get admin user ID from session
+$adminUserId = $_SESSION['admin_telegram_id'] ?? null;
 if (!$adminUserId) {
     Response::jsonError('UNAUTHORIZED', 'Admin authentication required', 401);
     exit;

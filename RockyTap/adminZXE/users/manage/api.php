@@ -1,92 +1,246 @@
 <?php
+header('Content-Type: application/json');
+
+require_once __DIR__ . '/../../../../bootstrap.php';
+
+use Ghidar\Security\AdminAuth;
+use Ghidar\Security\CSRFProtection;
+use Ghidar\Validation\AdminValidator;
+
+// Require admin authentication
+AdminAuth::requireAdmin();
+
+// Validate CSRF token for POST requests
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    CSRFProtection::requireToken();
+}
+
 include '../../../bot/config.php';
 include '../../../bot/functions.php';
 
 $MySQLi = new mysqli('localhost',$DB['username'],$DB['password'],$DB['dbname']);
 $MySQLi->query("SET NAMES 'utf8'");
 $MySQLi->set_charset('utf8mb4');
-if ($MySQLi->connect_error) die;
+if ($MySQLi->connect_error) {
+    echo json_encode(['success' => false, 'error' => 'Database connection failed']);
+    exit;
+}
+
 function ToDie($MySQLi){
-$MySQLi->close();
-die;
+    $MySQLi->close();
+    die;
 }
 
+// Validate and sanitize user_id
+try {
+    $user_id = AdminValidator::validateUserId($_REQUEST['q'] ?? null);
+} catch (\InvalidArgumentException $e) {
+    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    $MySQLi->close();
+    exit;
+}
 
-$user_id = $_REQUEST['q'];
-$action = $_REQUEST['action'];
+$action = $_REQUEST['action'] ?? '';
 
-
-
+// Ban user
 if($action == 'banUser'){
-    $MySQLi->query("UPDATE `users` SET `step` = 'banned' WHERE `id` = '{$user_id}' LIMIT 1");
-    echo json_encode(['success' => true]);
+    $stmt = $MySQLi->prepare("UPDATE `users` SET `step` = 'banned' WHERE `id` = ? LIMIT 1");
+    if (!$stmt) {
+        echo json_encode(['success' => false, 'error' => 'Database error: ' . $MySQLi->error]);
+        $MySQLi->close();
+        exit;
+    }
+    $stmt->bind_param("i", $user_id);
+    if ($stmt->execute()) {
+        echo json_encode(['success' => true]);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Failed to ban user']);
+    }
+    $stmt->close();
 }
 
-
-
+// Unban user
 if($action == 'unbanUser'){
-    $MySQLi->query("UPDATE `users` SET `step` = '' WHERE `id` = '{$user_id}' LIMIT 1");
-    echo json_encode(['success' => true]);
+    $stmt = $MySQLi->prepare("UPDATE `users` SET `step` = '' WHERE `id` = ? LIMIT 1");
+    if (!$stmt) {
+        echo json_encode(['success' => false, 'error' => 'Database error: ' . $MySQLi->error]);
+        $MySQLi->close();
+        exit;
+    }
+    $stmt->bind_param("i", $user_id);
+    if ($stmt->execute()) {
+        echo json_encode(['success' => true]);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Failed to unban user']);
+    }
+    $stmt->close();
 }
 
-
-
+// Change user score
 if($action == 'changeUserScore'){
-    $newScore = $_REQUEST['newScore'];
-    $MySQLi->query("UPDATE `users` SET `score` = '{$newScore}' WHERE `id` = '{$user_id}' LIMIT 1");
-    echo json_encode(['success' => true]);
+    try {
+        $newScore = AdminValidator::validateScore($_REQUEST['newScore'] ?? null);
+    } catch (\InvalidArgumentException $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        $MySQLi->close();
+        exit;
+    }
+    $stmt = $MySQLi->prepare("UPDATE `users` SET `score` = ? WHERE `id` = ? LIMIT 1");
+    if (!$stmt) {
+        echo json_encode(['success' => false, 'error' => 'Database error: ' . $MySQLi->error]);
+        $MySQLi->close();
+        exit;
+    }
+    $stmt->bind_param("ii", $newScore, $user_id);
+    if ($stmt->execute()) {
+        echo json_encode(['success' => true]);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Failed to update score']);
+    }
+    $stmt->close();
 }
 
-
-
+// Change user balance
 if($action == 'changeUserBalance'){
-    $newBalance = $_REQUEST['newBalance'];
-    $MySQLi->query("UPDATE `users` SET `balance` = '{$newBalance}' WHERE `id` = '{$user_id}' LIMIT 1");
-    echo json_encode(['success' => true]);
+    try {
+        $newBalance = AdminValidator::validateBalance($_REQUEST['newBalance'] ?? null);
+    } catch (\InvalidArgumentException $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        $MySQLi->close();
+        exit;
+    }
+    $stmt = $MySQLi->prepare("UPDATE `users` SET `balance` = ? WHERE `id` = ? LIMIT 1");
+    if (!$stmt) {
+        echo json_encode(['success' => false, 'error' => 'Database error: ' . $MySQLi->error]);
+        $MySQLi->close();
+        exit;
+    }
+    $stmt->bind_param("si", $newBalance, $user_id);
+    if ($stmt->execute()) {
+        echo json_encode(['success' => true]);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Failed to update balance']);
+    }
+    $stmt->close();
 }
 
-
-
+// Reset user tapping guru
 if($action == 'resetUserTappingGuru'){
-    $MySQLi->query("UPDATE `users` SET `tappingGuruLeft` = '3' WHERE `id` = '{$user_id}' LIMIT 1");
-    echo json_encode(['success' => true]);
+    $resetValue = 3;
+    $stmt = $MySQLi->prepare("UPDATE `users` SET `tappingGuruLeft` = ? WHERE `id` = ? LIMIT 1");
+    if (!$stmt) {
+        echo json_encode(['success' => false, 'error' => 'Database error: ' . $MySQLi->error]);
+        $MySQLi->close();
+        exit;
+    }
+    $stmt->bind_param("ii", $resetValue, $user_id);
+    if ($stmt->execute()) {
+        echo json_encode(['success' => true]);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Failed to reset tapping guru']);
+    }
+    $stmt->close();
 }
 
-
-
+// Reset user full tank
 if($action == 'resetUserFullTank'){
-    $MySQLi->query("UPDATE `users` SET `fullTankLeft` = '3' WHERE `id` = '{$user_id}' LIMIT 1");
-    echo json_encode(['success' => true]);
+    $resetValue = 3;
+    $stmt = $MySQLi->prepare("UPDATE `users` SET `fullTankLeft` = ? WHERE `id` = ? LIMIT 1");
+    if (!$stmt) {
+        echo json_encode(['success' => false, 'error' => 'Database error: ' . $MySQLi->error]);
+        $MySQLi->close();
+        exit;
+    }
+    $stmt->bind_param("ii", $resetValue, $user_id);
+    if ($stmt->execute()) {
+        echo json_encode(['success' => true]);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Failed to reset full tank']);
+    }
+    $stmt->close();
 }
 
-
-
+// Change multitap level
 if($action == 'changeMultiTapLevel'){
-    $newLevel = $_REQUEST['newLevel'];
-    $MySQLi->query("UPDATE `users` SET `multitap` = '{$newLevel}' WHERE `id` = '{$user_id}' LIMIT 1");
-    echo json_encode(['success' => true]);
+    try {
+        $newLevel = AdminValidator::validateLevel($_REQUEST['newLevel'] ?? null);
+    } catch (\InvalidArgumentException $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        $MySQLi->close();
+        exit;
+    }
+    $stmt = $MySQLi->prepare("UPDATE `users` SET `multitap` = ? WHERE `id` = ? LIMIT 1");
+    if (!$stmt) {
+        echo json_encode(['success' => false, 'error' => 'Database error: ' . $MySQLi->error]);
+        $MySQLi->close();
+        exit;
+    }
+    $stmt->bind_param("ii", $newLevel, $user_id);
+    if ($stmt->execute()) {
+        echo json_encode(['success' => true]);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Failed to update multitap level']);
+    }
+    $stmt->close();
 }
 
-
-
+// Change energy limit level
 if($action == 'changeEnergyLimitLevel'){
-    $newLevel = $_REQUEST['newLevel'];
-    $MySQLi->query("UPDATE `users` SET `energyLimit` = '{$newLevel}' WHERE `id` = '{$user_id}' LIMIT 1");
-    echo json_encode(['success' => true]);
+    try {
+        $newLevel = AdminValidator::validateLevel($_REQUEST['newLevel'] ?? null);
+    } catch (\InvalidArgumentException $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        $MySQLi->close();
+        exit;
+    }
+    $stmt = $MySQLi->prepare("UPDATE `users` SET `energyLimit` = ? WHERE `id` = ? LIMIT 1");
+    if (!$stmt) {
+        echo json_encode(['success' => false, 'error' => 'Database error: ' . $MySQLi->error]);
+        $MySQLi->close();
+        exit;
+    }
+    $stmt->bind_param("ii", $newLevel, $user_id);
+    if ($stmt->execute()) {
+        echo json_encode(['success' => true]);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Failed to update energy limit level']);
+    }
+    $stmt->close();
 }
 
-
-
+// Change recharging speed level
 if($action == 'changeRechargingSpeedLevel'){
-    $newLevel = $_REQUEST['newLevel'];
-    $MySQLi->query("UPDATE `users` SET `rechargingSpeed` = '{$newLevel}' WHERE `id` = '{$user_id}' LIMIT 1");
-    echo json_encode(['success' => true]);
+    try {
+        $newLevel = AdminValidator::validateLevel($_REQUEST['newLevel'] ?? null);
+    } catch (\InvalidArgumentException $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        $MySQLi->close();
+        exit;
+    }
+    $stmt = $MySQLi->prepare("UPDATE `users` SET `rechargingSpeed` = ? WHERE `id` = ? LIMIT 1");
+    if (!$stmt) {
+        echo json_encode(['success' => false, 'error' => 'Database error: ' . $MySQLi->error]);
+        $MySQLi->close();
+        exit;
+    }
+    $stmt->bind_param("ii", $newLevel, $user_id);
+    if ($stmt->execute()) {
+        echo json_encode(['success' => true]);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Failed to update recharging speed level']);
+    }
+    $stmt->close();
 }
 
-
-
+// Send message to user
 if($action == 'sendMessageToUser'){
-    $text = $_REQUEST['text'];
+    try {
+        $text = AdminValidator::validateText($_REQUEST['text'] ?? '');
+    } catch (\InvalidArgumentException $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        $MySQLi->close();
+        exit;
+    }
     LampStack('sendMessage',[
         'chat_id' => $user_id,
         'text' => $text,

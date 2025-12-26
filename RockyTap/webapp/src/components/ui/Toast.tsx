@@ -72,12 +72,15 @@ export function ToastProvider({ children }: ToastProviderProps) {
   return (
     <ToastContext.Provider value={{ showToast, showError, showSuccess, showInfo, showWarning }}>
       {children}
-      <div className={styles.container}>
+      <div className={styles.container} role="region" aria-live="polite" aria-label="Notifications">
         {toasts.map(toast => (
           <div
             key={toast.id}
             className={`${styles.toast} ${styles[toast.type]}`}
             onClick={() => removeToast(toast.id)}
+            role="alert"
+            aria-live={toast.type === 'error' ? 'assertive' : 'polite'}
+            aria-atomic="true"
           >
             <span className={styles.icon}>
               <ToastIcon type={toast.type} />
