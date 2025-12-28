@@ -21,6 +21,11 @@ RockyTap/assets/new/
 RockyTap/storage/logs/*.log
 !RockyTap/storage/logs/.gitkeep
 
+# Backups
+RockyTap/storage/backups/**/*
+!RockyTap/storage/backups/.gitkeep
+!RockyTap/storage/backups/**/.gitkeep
+
 # Backup and temporary files
 *.bak
 *.old
