@@ -160,8 +160,37 @@ if ($UserDataBase['step'] == 'banned') {
 
 
 if ($msg === '/start') {
-    $bot->sendPhoto($from_id, new CURLFILE('main.png'), [
-        'caption' => '
+    // Debug logging
+    error_log("[BOT] /start command received from user $from_id");
+    error_log("[BOT] web_app URL: " . ($web_app ?? 'NOT SET'));
+    error_log("[BOT] main.png path: " . __DIR__ . '/main.png');
+    error_log("[BOT] main.png exists: " . (file_exists(__DIR__ . '/main.png') ? 'YES' : 'NO'));
+    
+    $photo_path = __DIR__ . '/main.png';
+    if (!file_exists($photo_path)) {
+        error_log("[BOT] ERROR: main.png not found at $photo_path");
+        // Fallback: send text message instead
+        $bot->sendMessage($from_id, '
+<b>💎 Welcome to Ghidar!</b>
+
+Your secure gateway to crypto opportunities:
+
+🎟️ <b>Lottery</b> - Buy tickets and win big prizes
+⛏️ <b>Airdrop</b> - Mine GHD tokens daily
+📈 <b>AI Trader</b> - Let AI trade for you
+
+🛡️ <b>Secure & Trusted</b>
+⚡ Powered by Telegram - Your data is protected by Telegram\'s secure authentication system
+
+Start earning now - tap the button below to open the app!
+', 'HTML', false, false, $message_id, json_encode([
+            'inline_keyboard' => [
+                [['text' => '💎 Open Ghidar', 'web_app' => ['url' => $web_app]]],
+            ]
+        ]));
+    } else {
+        $result = $bot->sendPhoto($from_id, new CURLFILE($photo_path), [
+            'caption' => '
 <b>💎 Welcome to Ghidar!</b>
 
 Your secure gateway to crypto opportunities:
@@ -175,14 +204,21 @@ Your secure gateway to crypto opportunities:
 
 Start earning now - tap the button below to open the app!
 ',
-        'parse_mode' => 'HTML',
-        'reply_to_message_id' => $message_id,
-        'reply_markup' => json_encode([
-            'inline_keyboard' => [
-                [['text' => '💎 Open Ghidar', 'web_app' => ['url' => $web_app]]],
-            ]
-        ])
-    ]);
+            'parse_mode' => 'HTML',
+            'reply_to_message_id' => $message_id,
+            'reply_markup' => json_encode([
+                'inline_keyboard' => [
+                    [['text' => '💎 Open Ghidar', 'web_app' => ['url' => $web_app]]],
+                ]
+            ])
+        ]);
+        
+        if (!$result) {
+            error_log("[BOT] ERROR: sendPhoto failed. Response: " . json_encode($bot->lastResponse ?? 'no response'));
+        } else {
+            error_log("[BOT] SUCCESS: Photo sent successfully");
+        }
+    }
     die;
 }
 

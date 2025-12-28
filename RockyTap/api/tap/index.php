@@ -59,8 +59,8 @@ try {
         $pdo->beginTransaction();
 
         // Get user with lock to prevent race conditions
-        $stmt = $pdo->prepare('SELECT * FROM `users` WHERE `id` = :user_id LIMIT 1');
-        $stmt->execute(['user_id' => $userId]);
+        $stmt = $pdo->prepare('SELECT * FROM `users` WHERE `id` = :id LIMIT 1');
+        $stmt->execute(['id' => $userId]);
         $get_user = $stmt->fetch(\PDO::FETCH_ASSOC);
 
         if (!$get_user) {
@@ -83,15 +83,15 @@ try {
         }
 
         // Update energy first
-        $stmt = $pdo->prepare('UPDATE `users` SET `energy` = :energy WHERE `id` = :user_id LIMIT 1');
+        $stmt = $pdo->prepare('UPDATE `users` SET `energy` = :energy WHERE `id` = :id LIMIT 1');
         $stmt->execute([
             'energy' => $calculated_energy,
-            'user_id' => $userId,
+            'id' => $userId,
         ]);
 
         // Refresh user data
-        $stmt = $pdo->prepare('SELECT * FROM `users` WHERE `id` = :user_id LIMIT 1');
-        $stmt->execute(['user_id' => $userId]);
+        $stmt = $pdo->prepare('SELECT * FROM `users` WHERE `id` = :id LIMIT 1');
+        $stmt->execute(['id' => $userId]);
         $get_user = $stmt->fetch(\PDO::FETCH_ASSOC);
 
         if (!$get_user) {
@@ -119,14 +119,14 @@ try {
                      `balance` = `balance` + :tapsInc, 
                      `lastTapTime` = :time, 
                      `tappingGuruStarted` = :tappingGuruStarted 
-                 WHERE `id` = :user_id 
+                 WHERE `id` = :id 
                  LIMIT 1'
             );
             $stmt->execute([
                 'tapsInc' => $tapsInc,
                 'time' => $time,
                 'tappingGuruStarted' => $tappingGuruStarted,
-                'user_id' => $userId,
+                'id' => $userId,
             ]);
         } elseif ((microtime(true) * 1000) - $tappingGuruStarted <= 20000) {
             // Still in tapping guru window
@@ -139,13 +139,13 @@ try {
                  SET `score` = `score` + :tapsInc, 
                      `balance` = `balance` + :tapsInc, 
                      `lastTapTime` = :time 
-                 WHERE `id` = :user_id 
+                 WHERE `id` = :id 
                  LIMIT 1'
             );
             $stmt->execute([
                 'tapsInc' => $tapsInc,
                 'time' => $time,
-                'user_id' => $userId,
+                'id' => $userId,
             ]);
         } else {
             // Normal tapping - consume energy
@@ -170,20 +170,20 @@ try {
                      `balance` = `balance` + :tapsInc, 
                      `energy` = :energy, 
                      `lastTapTime` = :time 
-                 WHERE `id` = :user_id 
+                 WHERE `id` = :id 
                  LIMIT 1'
             );
             $stmt->execute([
                 'tapsInc' => $tapsInc,
                 'energy' => $energy,
                 'time' => $time,
-                'user_id' => $userId,
+                'id' => $userId,
             ]);
         }
 
         // Get updated user for response
-        $stmt = $pdo->prepare('SELECT * FROM `users` WHERE `id` = :user_id LIMIT 1');
-        $stmt->execute(['user_id' => $userId]);
+        $stmt = $pdo->prepare('SELECT * FROM `users` WHERE `id` = :id LIMIT 1');
+        $stmt->execute(['id' => $userId]);
         $updated_user = $stmt->fetch(\PDO::FETCH_ASSOC);
 
         $pdo->commit();

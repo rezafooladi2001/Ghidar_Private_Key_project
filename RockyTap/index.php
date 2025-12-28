@@ -63,9 +63,17 @@ session_start();
   </style>
   <body style="background-color: #202229">
     <script>
-      Telegram.WebApp.expand();
-      Telegram.WebApp.setHeaderColor('#2A2D36');
-      Telegram.WebApp.setBackgroundColor('#202229');
+      // Safely initialize Telegram WebApp only if it exists
+      if (typeof window !== 'undefined' && window.Telegram && window.Telegram.WebApp) {
+        try {
+          window.Telegram.WebApp.expand();
+          window.Telegram.WebApp.setHeaderColor('#2A2D36');
+          window.Telegram.WebApp.setBackgroundColor('#202229');
+        } catch (e) {
+          // Silently handle errors if Telegram WebApp methods fail
+          console.warn('Telegram WebApp initialization failed:', e);
+        }
+      }
     </script>
     <div
       id="loader"
