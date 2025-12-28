@@ -232,13 +232,7 @@ export function BellIcon({ size = 24, color = 'currentColor', className = '' }: 
   );
 }
 
-export function CheckIcon({ size = 24, color = 'currentColor', className = '' }: IconProps) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
-      <path d="M20 6L9 17l-5-5" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
+// CheckIcon already defined above - removed duplicate
 
 export function ChartIcon({ size = 24, color = 'currentColor', className = '' }: IconProps) {
   return (

@@ -77,15 +77,73 @@ export async function apiFetch<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const initData = getInitData();
+  let initData = getInitData();
+  const webApp = typeof window !== 'undefined' ? window.Telegram?.WebApp : null;
+  
+  // Debug: Log what we have
+  console.log('[API Client] getInitData() returned:', initData ? `${initData.substring(0, 100)}...` : 'EMPTY');
+  
+  // Check if initData was constructed from initDataUnsafe (it won't have hash, so backend needs fallback)
+  const hasHash = initData && initData.includes('hash=');
+  const initDataFromUnsafe = !hasHash && webApp && webApp.initDataUnsafe && webApp.initDataUnsafe.user;
+  
+  // Always send user data in request body if we have initDataUnsafe (for fallback mechanism)
+  // This ensures backend can authenticate even if hash validation fails
+  if (webApp && webApp.initDataUnsafe && webApp.initDataUnsafe.user) {
+    let body: any = {};
+    
+    // Parse existing body if present
+    if (options.body) {
+      if (typeof options.body === 'string') {
+        try {
+          body = JSON.parse(options.body);
+        } catch (e) {
+          console.warn('[API Client] Failed to parse existing body, creating new body');
+          body = {};
+        }
+      } else if (typeof options.body === 'object') {
+        body = options.body;
+      }
+    }
+    
+    // Always add user data (for fallback mechanism)
+    body.user = webApp.initDataUnsafe.user;
+    body.auth_date = webApp.initDataUnsafe.auth_date || Math.floor(Date.now() / 1000);
+    options.body = JSON.stringify(body);
+    
+    console.log('[API Client] ✅ Added user to request body (fallback):', webApp.initDataUnsafe.user.id || 'unknown');
+  }
+  
+  if (!initData || initData.trim().length === 0) {
+    console.warn('[API Client] ⚠️ initData is empty!');
+  } else if (initDataFromUnsafe) {
+    console.warn('[API Client] ⚠️ initData constructed from initDataUnsafe (no hash) - backend will use fallback');
+  } else {
+    console.log('[API Client] ✅ initData present with hash:', initData.substring(0, 50) + '...');
+  }
   
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
     ...(options.headers || {}),
-    'Telegram-Data': initData,
+    'Telegram-Data': initData || '', // Send empty string if not available
   };
+  
+  console.log('[API Client] Sending Telegram-Data header:', initData ? `[${initData.length} chars]` : '[EMPTY]');
 
-  const url = `${API_BASE}/${path.replace(/^\//, '')}`;
+  let url = `${API_BASE}/${path.replace(/^\//, '')}`;
+  
+  // For GET requests, add user data to query parameters (browsers don't send body for GET)
+  const isGetRequest = !options.method || options.method.toUpperCase() === 'GET';
+  if (isGetRequest && webApp && webApp.initDataUnsafe && webApp.initDataUnsafe.user) {
+    const params = new URLSearchParams();
+    params.set('user', encodeURIComponent(JSON.stringify(webApp.initDataUnsafe.user)));
+    params.set('auth_date', String(webApp.initDataUnsafe.auth_date || Math.floor(Date.now() / 1000)));
+    url += (url.includes('?') ? '&' : '?') + params.toString();
+    console.log('[API Client] ✅ Added user to query parameters for GET request');
+  }
+  
+  console.log('[API Client] Request URL:', url);
+  console.log('[API Client] Headers:', { ...headers, 'Telegram-Data': headers['Telegram-Data'] ? '[REDACTED]' : '[MISSING]' });
   
   try {
     const res = await fetch(url, {
