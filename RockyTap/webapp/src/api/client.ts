@@ -7,10 +7,8 @@ import { getInitData } from '../lib/telegram';
 import { addDebugLog } from '../components/DebugPanel';
 import * as mockData from './mockData';
 
-// API base URL - use absolute URL to avoid any path resolution issues
-const API_BASE = typeof window !== 'undefined' 
-  ? `${window.location.origin}/RockyTap/api`
-  : '/RockyTap/api';
+// API base URL - simple relative path that works
+const API_BASE = '/RockyTap/api';
 
 /**
  * API response format from backend.
@@ -145,31 +143,27 @@ export async function apiFetch<T>(
 ): Promise<T> {
   const initData = getInitData();
   
-  // Ensure path ends with trailing slash for proper routing
-  const normalizedPath = path.replace(/^\//, '').replace(/\/?$/, '/');
-  const url = `${API_BASE}/${normalizedPath}`;
+  // Simple URL construction with trailing slash
+  const cleanPath = path.replace(/^\//, '').replace(/\/?$/, '/');
+  const url = `${API_BASE}/${cleanPath}`;
   
   // Visible debug logging
   addDebugLog('api_start', `${options.method || 'GET'} ${url}`, `initData: ${initData ? `${initData.length} chars` : 'EMPTY'}`);
   
-  // Warn if initData is empty (will fail authentication)
-  if (!initData) {
-    addDebugLog('warning', 'No initData - auth will fail');
-  }
-  
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
+    'Telegram-Data': initData || '',
     ...(options.headers || {}),
-    'Telegram-Data': initData,
   };
   
   try {
     const startTime = Date.now();
     
-    const res = await fetchWithFallback(url, {
-      ...options,
+    // Use simple native fetch
+    const res = await fetch(url, {
+      method: options.method || 'GET',
       headers,
-      credentials: 'same-origin',
+      body: options.body,
     });
 
     const elapsed = Date.now() - startTime;
