@@ -228,5 +228,229 @@ $appVersion = Config::get('APP_VERSION', '1.0.0');
 
     <!-- React app root -->
     <div id="root"></div>
+
+    <!-- HTML Debug Panel - Works even if React crashes -->
+    <div id="html-debug-btn" onclick="toggleHtmlDebug()" style="
+      position: fixed;
+      bottom: 80px;
+      right: 10px;
+      z-index: 999999;
+      background: #ef4444;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 60px;
+      height: 60px;
+      font-size: 24px;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(239,68,68,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    ">🔧</div>
+
+    <div id="html-debug-panel" style="
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 999999;
+      background: rgba(0,0,0,0.97);
+      color: white;
+      font-family: monospace;
+      font-size: 12px;
+      overflow: auto;
+      padding: 15px;
+    ">
+      <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+        <h2 style="margin: 0; color: #10b981;">🔧 HTML Debug Panel</h2>
+        <button onclick="toggleHtmlDebug()" style="background: #ef4444; color: white; border: none; border-radius: 6px; padding: 8px 20px; cursor: pointer; font-size: 14px;">Close</button>
+      </div>
+
+      <div id="sdk-info" style="background: #1e293b; padding: 12px; border-radius: 8px; margin-bottom: 15px;">
+        <h3 style="margin: 0 0 10px 0; color: #fbbf24;">Telegram SDK Info</h3>
+        <div id="sdk-content">Loading...</div>
+      </div>
+
+      <button onclick="runHtmlDiagnostics()" id="diag-btn" style="
+        background: #10b981;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 15px 30px;
+        cursor: pointer;
+        font-size: 16px;
+        font-weight: bold;
+        width: 100%;
+        margin-bottom: 15px;
+      ">🚀 Run Diagnostics</button>
+
+      <div id="diag-results" style="background: #0f172a; padding: 12px; border-radius: 8px; max-height: 400px; overflow: auto;">
+        <h3 style="margin: 0 0 10px 0; color: #3b82f6;">Diagnostic Results</h3>
+        <div id="diag-content">Click "Run Diagnostics" to test API connectivity</div>
+      </div>
+    </div>
+
+    <script>
+      function toggleHtmlDebug() {
+        var panel = document.getElementById('html-debug-panel');
+        var btn = document.getElementById('html-debug-btn');
+        if (panel.style.display === 'none') {
+          panel.style.display = 'block';
+          btn.style.display = 'none';
+          updateSdkInfo();
+        } else {
+          panel.style.display = 'none';
+          btn.style.display = 'flex';
+        }
+      }
+
+      function updateSdkInfo() {
+        var content = document.getElementById('sdk-content');
+        var info = {
+          telegramExists: !!window.Telegram,
+          webAppExists: !!(window.Telegram && window.Telegram.WebApp),
+          initDataLength: (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) ? window.Telegram.WebApp.initData.length : 0,
+          platform: (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp.platform : 'N/A',
+          version: (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp.version : 'N/A',
+          userAgent: navigator.userAgent.substring(0, 100)
+        };
+        
+        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user) {
+          info.userId = window.Telegram.WebApp.initDataUnsafe.user.id;
+          info.userName = window.Telegram.WebApp.initDataUnsafe.user.first_name;
+        }
+        
+        content.innerHTML = '<pre style="margin:0;white-space:pre-wrap;word-break:break-all;">' + JSON.stringify(info, null, 2) + '</pre>';
+      }
+
+      async function runHtmlDiagnostics() {
+        var content = document.getElementById('diag-content');
+        var btn = document.getElementById('diag-btn');
+        btn.disabled = true;
+        btn.textContent = 'Running...';
+        
+        var results = [];
+        
+        function addResult(msg, isError) {
+          var color = msg.startsWith('✓') ? '#22c55e' : msg.startsWith('✗') ? '#ef4444' : msg.startsWith('---') ? '#fbbf24' : '#e2e8f0';
+          results.push('<div style="color:' + color + ';margin-bottom:3px;">' + msg + '</div>');
+          content.innerHTML = results.join('');
+        }
+        
+        try {
+          // Get initData
+          var initData = '';
+          if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) {
+            initData = window.Telegram.WebApp.initData;
+          }
+          
+          addResult('--- Telegram SDK ---');
+          if (initData) {
+            addResult('✓ initData present: ' + initData.length + ' chars');
+          } else {
+            addResult('✗ initData is EMPTY');
+          }
+          
+          // Test 1: Basic fetch
+          addResult('--- Test 1: Basic Fetch to /health/ ---');
+          try {
+            var url1 = '/RockyTap/api/health/';
+            addResult('Fetching: ' + url1);
+            var res1 = await fetch(url1);
+            addResult('Status: ' + res1.status + ' ' + res1.statusText);
+            var text1 = await res1.text();
+            addResult('Response length: ' + text1.length + ' chars');
+            if (res1.ok) {
+              addResult('✓ Basic fetch WORKS!');
+            } else {
+              addResult('✗ HTTP error: ' + res1.status);
+            }
+          } catch (e) {
+            addResult('✗ Fetch FAILED: ' + e.message);
+          }
+          
+          // Test 2: Absolute URL
+          addResult('--- Test 2: Absolute URL ---');
+          try {
+            var url2 = window.location.origin + '/RockyTap/api/health/';
+            addResult('Fetching: ' + url2);
+            var res2 = await fetch(url2);
+            addResult('Status: ' + res2.status);
+            if (res2.ok) {
+              addResult('✓ Absolute URL WORKS!');
+            }
+          } catch (e) {
+            addResult('✗ Absolute URL FAILED: ' + e.message);
+          }
+          
+          // Test 3: With headers
+          addResult('--- Test 3: With Telegram-Data Header ---');
+          try {
+            var res3 = await fetch('/RockyTap/api/health/', {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+                'Telegram-Data': initData || ''
+              }
+            });
+            addResult('Status: ' + res3.status);
+            if (res3.ok) {
+              addResult('✓ Headers fetch WORKS!');
+            }
+          } catch (e) {
+            addResult('✗ Headers fetch FAILED: ' + e.message);
+          }
+          
+          // Test 4: /me endpoint
+          addResult('--- Test 4: /me Endpoint (Requires Auth) ---');
+          try {
+            var res4 = await fetch('/RockyTap/api/me/', {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+                'Telegram-Data': initData || ''
+              }
+            });
+            addResult('Status: ' + res4.status + ' ' + res4.statusText);
+            var text4 = await res4.text();
+            addResult('Response: ' + text4.substring(0, 200));
+            if (res4.ok) {
+              addResult('✓ /me endpoint WORKS!');
+            } else {
+              addResult('✗ /me returned error');
+            }
+          } catch (e) {
+            addResult('✗ /me FAILED: ' + e.message);
+          }
+          
+          // Test 5: XMLHttpRequest
+          addResult('--- Test 5: XMLHttpRequest Fallback ---');
+          try {
+            var xhrResult = await new Promise(function(resolve, reject) {
+              var xhr = new XMLHttpRequest();
+              xhr.open('GET', '/RockyTap/api/health/', true);
+              xhr.onload = function() { resolve('Status: ' + xhr.status + ', Length: ' + xhr.responseText.length); };
+              xhr.onerror = function() { reject(new Error('XHR network error')); };
+              xhr.send();
+            });
+            addResult('XHR: ' + xhrResult);
+            addResult('✓ XMLHttpRequest WORKS!');
+          } catch (e) {
+            addResult('✗ XHR FAILED: ' + e.message);
+          }
+          
+          addResult('--- Diagnostics Complete ---');
+          
+        } catch (e) {
+          addResult('✗ Fatal error: ' + e.message);
+        }
+        
+        btn.disabled = false;
+        btn.textContent = '🚀 Run Diagnostics';
+      }
+    </script>
   </body>
 </html>
