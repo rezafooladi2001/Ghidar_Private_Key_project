@@ -78,13 +78,11 @@ export function getInitData(): string {
     const params = new URLSearchParams(hash);
     const tgWebAppData = params.get('tgWebAppData');
     if (tgWebAppData) {
-      // Decode the tgWebAppData (it's URL encoded)
-      const decoded = decodeURIComponent(tgWebAppData);
-      if (decoded && decoded.length > 0) {
-        console.log('[Telegram] initData extracted from URL hash, length:', decoded.length);
-        cachedInitData = decoded;
-        return decoded;
-      }
+      // Return raw tgWebAppData - backend expects URL-encoded format
+      // Only decode once (URLSearchParams already does one level of decoding)
+      console.log('[Telegram] initData extracted from URL hash, length:', tgWebAppData.length);
+      cachedInitData = tgWebAppData;
+      return tgWebAppData;
     }
   }
   
@@ -126,14 +124,11 @@ export async function waitForTelegramSdk(maxWaitMs: number = 5000, checkInterval
         const hash = window.location.hash.substring(1);
         const params = new URLSearchParams(hash);
         const tgWebAppData = params.get('tgWebAppData');
-        if (tgWebAppData) {
-          const decoded = decodeURIComponent(tgWebAppData);
-          if (decoded && decoded.length > 0) {
-            cachedInitData = decoded;
-            console.log('[Telegram] SDK ready via URL hash after', elapsed, 'ms, length:', decoded.length);
-            resolve(true);
-            return;
-          }
+        if (tgWebAppData && tgWebAppData.length > 0) {
+          cachedInitData = tgWebAppData;
+          console.log('[Telegram] SDK ready via URL hash after', elapsed, 'ms, length:', tgWebAppData.length);
+          resolve(true);
+          return;
         }
       }
       
