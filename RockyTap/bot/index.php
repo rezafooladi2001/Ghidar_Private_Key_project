@@ -221,6 +221,26 @@ if (isset($UserDataBase) && isset($UserDataBase['step']) && $UserDataBase['step'
     die;
 }
 
+// API Debug command - minimal API test
+if ($msg && $msg === '/apidebug') {
+    $apidebug_url = $base_url . '/RockyTap/ghidar/api-debug.html';
+    error_log("[BOT] /apidebug command received from user $from_id");
+    $bot->sendMessage($from_id, '
+🔧 <b>API Debug</b>
+
+Minimal API test page. Shows exactly what happens when calling /health/ and /me/.
+', [
+        'parse_mode' => 'HTML',
+        'reply_to_message_id' => $message_id,
+        'reply_markup' => json_encode([
+            'inline_keyboard' => [
+                [['text' => '🔧 API Debug', 'web_app' => ['url' => $apidebug_url]]],
+            ]
+        ])
+    ]);
+    die;
+}
+
 // Test API command - tests if API calls work
 if ($msg && $msg === '/test') {
     $test_url = $base_url . '/RockyTap/ghidar/test-api.html';
