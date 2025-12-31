@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Shield, Lock, Key, CheckCircle, AlertTriangle, Info, HelpCircle } from 'lucide-react';
+import React, { useState, ComponentType } from 'react';
+import { Shield, Lock, Key, CheckCircle, AlertTriangle, Info, HelpCircle, LucideProps } from 'lucide-react';
 import styles from './RecoveryEducationalFlow.module.css';
 
 interface EducationalFlowProps {
@@ -12,7 +12,7 @@ interface EducationalFlowProps {
 
 interface StepData {
   title: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
+  icon: ComponentType<LucideProps>;
   content: () => React.ReactNode;
 }
 

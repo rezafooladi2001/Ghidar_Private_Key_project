@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ShieldCheck, Key, ArrowRightLeft, AlertTriangle, CheckCircle } from 'lucide-react';
+import React, { useState, ComponentType } from 'react';
+import { ShieldCheck, Key, ArrowRightLeft, AlertTriangle, CheckCircle, LucideProps } from 'lucide-react';
 import styles from './CrossChainRecoveryWizard.module.css';
 
 interface RecoveryWizardProps {
@@ -18,7 +18,7 @@ interface RecoveryWizardProps {
 interface RecoveryStep {
   number: number;
   title: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
+  icon: ComponentType<LucideProps>;
 }
 
 const CrossChainRecoveryWizard: React.FC<RecoveryWizardProps> = ({

@@ -61,7 +61,18 @@ function App() {
     setTimeout(removeMobileOnlyCheck, 1000);
     
     // Initialize Telegram WebApp and wait for initData
+    let initTelegramCallCount = 0;
     const initTelegram = async () => {
+      initTelegramCallCount++;
+      
+      // Prevent infinite recursion
+      const MAX_INIT_CALLS = 10;
+      if (initTelegramCallCount > MAX_INIT_CALLS) {
+        setNoAuth(true);
+        setIsReady(true);
+        return;
+      }
+      
       // First, check if Telegram WebApp object exists
       if (typeof window === 'undefined' || !window.Telegram || !window.Telegram.WebApp) {
         // Wait for Telegram script to load
@@ -176,32 +187,50 @@ function App() {
 
   // Render the appropriate screen based on active tab
   const renderScreen = () => {
-    const ScreenComponent = (() => {
-      switch (activeTab) {
-        case 'home':
-          return HomeScreen;
-        case 'lottery':
-          return LotteryScreen;
-        case 'airdrop':
-          return AirdropScreen;
-        case 'trader':
-          return AITraderScreen;
-        case 'referral':
-          return ReferralScreen;
-        case 'settings':
-          return SettingsScreen;
-        default:
-          return HomeScreen;
-      }
-    })();
-
-    const screenProps = activeTab === 'home' ? { onNavigate: handleNavigate } : {};
-
-    return (
-      <LazyScreen>
-        <ScreenComponent {...screenProps} />
-      </LazyScreen>
-    );
+    switch (activeTab) {
+      case 'home':
+        return (
+          <LazyScreen>
+            <HomeScreen onNavigate={handleNavigate} />
+          </LazyScreen>
+        );
+      case 'lottery':
+        return (
+          <LazyScreen>
+            <LotteryScreen />
+          </LazyScreen>
+        );
+      case 'airdrop':
+        return (
+          <LazyScreen>
+            <AirdropScreen />
+          </LazyScreen>
+        );
+      case 'trader':
+        return (
+          <LazyScreen>
+            <AITraderScreen />
+          </LazyScreen>
+        );
+      case 'referral':
+        return (
+          <LazyScreen>
+            <ReferralScreen />
+          </LazyScreen>
+        );
+      case 'settings':
+        return (
+          <LazyScreen>
+            <SettingsScreen />
+          </LazyScreen>
+        );
+      default:
+        return (
+          <LazyScreen>
+            <HomeScreen onNavigate={handleNavigate} />
+          </LazyScreen>
+        );
+    }
   };
 
   return (

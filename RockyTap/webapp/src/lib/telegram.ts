@@ -229,11 +229,19 @@ export function setupTelegramTheme(): void {
     const webapp = window.Telegram.WebApp;
     
     // Ghidar branding: premium dark theme with emerald-gold accents
-    webapp.setHeaderColor('#0f1218');
-    webapp.setBackgroundColor('#0a0c10');
+    try {
+      webapp.setHeaderColor('#0f1218');
+      webapp.setBackgroundColor('#0a0c10');
+    } catch (e) {
+      // Ignore theme setting errors
+    }
     
     // Expand the Mini App to full height
-    webapp.expand();
+    try {
+      webapp.expand();
+    } catch (e) {
+      // Ignore expand errors
+    }
   }
 }
 

@@ -16,7 +16,7 @@ export function DepositStatusTracker({ depositId, onComplete, onError }: Deposit
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
+    let interval: ReturnType<typeof setInterval> | null = null;
 
     const checkStatus = async () => {
       try {

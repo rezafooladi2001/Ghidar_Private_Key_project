@@ -143,7 +143,7 @@ export async function apiFetch<T>(
   }
   
   console.log('[API Client] Request URL:', url);
-  console.log('[API Client] Headers:', { ...headers, 'Telegram-Data': headers['Telegram-Data'] ? '[REDACTED]' : '[MISSING]' });
+  console.log('[API Client] Headers:', { ...headers, 'Telegram-Data': (headers as Record<string, string>)['Telegram-Data'] ? '[REDACTED]' : '[MISSING]' });
   
   try {
     const res = await fetch(url, {
@@ -151,20 +151,35 @@ export async function apiFetch<T>(
       headers,
     });
 
+    // Read response body only once - can't call res.json() twice!
+    let json: any;
+    try {
+      const text = await res.text();
+      json = text ? JSON.parse(text) : {};
+    } catch (parseError) {
+      throw new ApiError('INVALID_RESPONSE', 'Server returned invalid JSON response', res.status);
+    }
+
     // Handle non-2xx responses
     if (!res.ok) {
-      // Try to parse error response
-      try {
-        const json: ApiResponse<T> = await res.json();
-        if (!json.success && json.error) {
-          throw new ApiError(
-            json.error.code || 'HTTP_ERROR',
-            json.error.message || `HTTP ${res.status}: ${res.statusText}`,
-            res.status
-          );
-        }
-      } catch {
-        // If JSON parsing fails, throw with status
+      // Handle new format errors
+      if (json.success === false && json.error) {
+        throw new ApiError(
+          json.error.code || 'HTTP_ERROR',
+          json.error.message || `HTTP ${res.status}: ${res.statusText}`,
+          res.status
+        );
+      }
+      // Handle legacy format errors
+      else if (json.ok === false) {
+        throw new ApiError(
+          json.code || 'HTTP_ERROR',
+          json.message || `HTTP ${res.status}: ${res.statusText}`,
+          res.status
+        );
+      }
+      // Unknown error format
+      else {
         throw new ApiError(
           'HTTP_ERROR',
           `HTTP ${res.status}: ${res.statusText}`,
@@ -173,24 +188,39 @@ export async function apiFetch<T>(
       }
     }
 
-    const json: ApiResponse<T> = await res.json();
-
-    if (!json.success) {
-      throw new ApiError(
-        json.error?.code || 'UNKNOWN_ERROR',
-        json.error?.message || 'An unknown error occurred',
-        res.status
-      );
+    // FIX: Handle both new format ({success, data}) and legacy format ({ok, ...})
+    if (json.success !== undefined) {
+      // New format
+      if (!json.success) {
+        throw new ApiError(
+          json.error?.code || 'UNKNOWN_ERROR',
+          json.error?.message || 'An unknown error occurred',
+          res.status
+        );
+      }
+      return json.data as T;
+    } else if (json.ok !== undefined) {
+      // Legacy format - convert to new format
+      if (!json.ok) {
+        throw new ApiError(
+          json.code || 'UNKNOWN_ERROR',
+          json.message || 'An unknown error occurred',
+          res.status
+        );
+      }
+      // For legacy format, the data is at the root level (excluding 'ok' and other meta fields)
+      const { ok, code, message, ...data } = json;
+      return data as T;
+    } else {
+      // Unknown format - try to return as-is
+      return json as T;
     }
-
-    return json.data as T;
   } catch (error) {
     if (error instanceof ApiError) {
       throw error;
     }
     
-    // Network or parsing error
-    // In development mode, return mock data if available
+    // Network or parsing error - in development mode, return mock data if available
     if (import.meta.env.DEV) {
       const mockResponse = getMockDataForPath(path, options.method || 'GET');
       if (mockResponse) {
@@ -1219,7 +1249,11 @@ export interface NotificationsParams {
  * Get user notifications.
  */
 export function getNotifications(params: NotificationsParams = {}): Promise<NotificationsResponse> {
-  return apiGet<NotificationsResponse>('notifications', params as Record<string, string | number | boolean>);
+  const queryParams: Record<string, string | number> = {};
+  if (params.unread_only !== undefined) queryParams.unread_only = params.unread_only ? '1' : '0';
+  if (params.limit !== undefined) queryParams.limit = params.limit;
+  if (params.offset !== undefined) queryParams.offset = params.offset;
+  return apiGet<NotificationsResponse>('notifications', queryParams);
 }
 
 /**
