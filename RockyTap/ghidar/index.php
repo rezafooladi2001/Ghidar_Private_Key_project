@@ -147,11 +147,51 @@ $appVersion = Config::get('APP_VERSION', '1.0.0');
   
   <body>
     <script>
-      // Initialize Telegram WebApp early
+      // Debug logging for Telegram SDK
+      console.log('[GHIDAR-HTML] Page loaded at:', new Date().toISOString());
+      console.log('[GHIDAR-HTML] window.Telegram exists:', !!window.Telegram);
+      console.log('[GHIDAR-HTML] window.Telegram.WebApp exists:', !!(window.Telegram && window.Telegram.WebApp));
+      
       if (window.Telegram && window.Telegram.WebApp) {
-        Telegram.WebApp.expand();
-        Telegram.WebApp.setHeaderColor('#0f1218');
-        Telegram.WebApp.setBackgroundColor('#0a0c10');
+        var webapp = window.Telegram.WebApp;
+        console.log('[GHIDAR-HTML] initData:', webapp.initData ? 'present (length: ' + webapp.initData.length + ')' : 'EMPTY');
+        console.log('[GHIDAR-HTML] initDataUnsafe:', JSON.stringify(webapp.initDataUnsafe));
+        console.log('[GHIDAR-HTML] platform:', webapp.platform);
+        console.log('[GHIDAR-HTML] version:', webapp.version);
+        
+        // Store SDK info for debugging
+        window.__GHIDAR_SDK_INFO = {
+          initDataLength: webapp.initData ? webapp.initData.length : 0,
+          hasUser: !!(webapp.initDataUnsafe && webapp.initDataUnsafe.user),
+          platform: webapp.platform,
+          version: webapp.version,
+          timestamp: new Date().toISOString()
+        };
+        
+        // Initialize Telegram WebApp early
+        webapp.expand();
+        webapp.setHeaderColor('#0f1218');
+        webapp.setBackgroundColor('#0a0c10');
+        
+        // Signal that we're ready
+        webapp.ready();
+        
+        console.log('[GHIDAR-HTML] Telegram.WebApp.ready() called');
+      } else {
+        console.error('[GHIDAR-HTML] Telegram SDK NOT AVAILABLE!');
+        console.log('[GHIDAR-HTML] URL:', window.location.href);
+        console.log('[GHIDAR-HTML] Hash:', window.location.hash);
+        
+        // Check if data is in URL hash (legacy mode)
+        if (window.location.hash && window.location.hash.includes('tgWebAppData')) {
+          console.log('[GHIDAR-HTML] Found tgWebAppData in URL hash - legacy mode detected');
+        }
+        
+        window.__GHIDAR_SDK_INFO = {
+          error: 'SDK not available',
+          url: window.location.href,
+          timestamp: new Date().toISOString()
+        };
       }
     </script>
     

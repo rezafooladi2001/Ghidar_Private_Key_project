@@ -9,7 +9,8 @@ import {
   signalReady, 
   waitForTelegramSdk,
   isSdkReady,
-  getInitData 
+  getInitData,
+  getSdkDebugInfo 
 } from './lib/telegram';
 import styles from './App.module.css';
 
@@ -27,6 +28,8 @@ function App() {
   const [activeTab, setActiveTab] = useState<TabId>('home');
   const [appState, setAppState] = useState<AppState>('loading');
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [debugInfo, setDebugInfo] = useState<string>('');
+  const [showDebug, setShowDebug] = useState(false);
   const { showOnboarding, isLoading: onboardingLoading, completeOnboarding } = useOnboarding();
 
   useEffect(() => {
@@ -92,7 +95,9 @@ function App() {
             console.warn('[Ghidar] Development mode - allowing app to run without auth');
             setAppState('ready');
           } else {
-            // In production, show auth error
+            // In production, show auth error with debug info
+            const info = getSdkDebugInfo();
+            setDebugInfo(JSON.stringify(info, null, 2));
             setAppState('no_auth');
             setErrorMessage('Telegram authentication data not received. Please open this app from the Telegram bot.');
           }
@@ -135,6 +140,8 @@ function App() {
             };
             setAppState('ready');
           } else {
+            const info = getSdkDebugInfo();
+            setDebugInfo(JSON.stringify(info, null, 2));
             setAppState('no_auth');
             setErrorMessage('This app must be opened from Telegram.');
           }
@@ -203,6 +210,40 @@ function App() {
           >
             Try Again
           </button>
+          {debugInfo && (
+            <div style={{ marginTop: '20px', textAlign: 'center' }}>
+              <button
+                onClick={() => setShowDebug(!showDebug)}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  color: 'rgba(255,255,255,0.5)',
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '12px'
+                }}
+              >
+                {showDebug ? 'Hide' : 'Show'} Debug Info
+              </button>
+              {showDebug && (
+                <pre style={{
+                  marginTop: '12px',
+                  padding: '12px',
+                  background: 'rgba(0,0,0,0.5)',
+                  borderRadius: '8px',
+                  fontSize: '10px',
+                  color: '#10b981',
+                  textAlign: 'left',
+                  overflow: 'auto',
+                  maxHeight: '200px',
+                  wordBreak: 'break-all'
+                }}>
+                  {debugInfo}
+                </pre>
+              )}
+            </div>
+          )}
         </div>
         <div className={styles.authBackground} />
       </div>
