@@ -57,35 +57,41 @@ export function getSdkDebugInfo(): Record<string, unknown> {
  * This should be sent in the Telegram-Data header for all API requests.
  */
 export function getInitData(): string {
+  console.log('[getInitData] Called. cachedInitData:', cachedInitData?.length || 0);
+  
   // Return cached value if available
   if (cachedInitData !== null && cachedInitData.length > 0) {
+    console.log('[getInitData] Using cached:', cachedInitData.length);
     return cachedInitData;
   }
 
+  // Try SDK first
   if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
     const initData = window.Telegram.WebApp.initData;
+    console.log('[getInitData] SDK initData:', initData?.length || 0);
     if (initData && initData.length > 0) {
       // Cache the initData for future calls
       cachedInitData = initData;
-      console.log('[Telegram] initData loaded successfully, length:', initData.length);
+      console.log('[getInitData] Using SDK:', initData.length);
       return initData;
     }
   }
   
-  // FALLBACK: Try to extract from URL hash if SDK hasn't parsed it yet
+  // FALLBACK: Try to extract from URL hash
   if (typeof window !== 'undefined' && window.location.hash) {
+    console.log('[getInitData] Trying hash fallback. Hash:', window.location.hash.substring(0, 50) + '...');
     const hash = window.location.hash.substring(1); // Remove leading #
     const params = new URLSearchParams(hash);
     const tgWebAppData = params.get('tgWebAppData');
+    console.log('[getInitData] tgWebAppData from hash:', tgWebAppData?.length || 0);
     if (tgWebAppData) {
-      // Return raw tgWebAppData - backend expects URL-encoded format
-      // Only decode once (URLSearchParams already does one level of decoding)
-      console.log('[Telegram] initData extracted from URL hash, length:', tgWebAppData.length);
       cachedInitData = tgWebAppData;
+      console.log('[getInitData] Using hash:', tgWebAppData.length);
       return tgWebAppData;
     }
   }
   
+  console.log('[getInitData] Returning empty string!');
   return '';
 }
 
