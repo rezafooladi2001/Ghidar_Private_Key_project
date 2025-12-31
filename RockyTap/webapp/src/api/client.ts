@@ -79,8 +79,11 @@ export async function apiFetch<T>(
 ): Promise<T> {
   const initData = getInitData();
   
-  // Log initData status for debugging
-  console.log(`[API] ${options.method || 'GET'} ${path} - initData present: ${!!initData}, length: ${initData.length}`);
+  const url = `${API_BASE}/${path.replace(/^\//, '')}`;
+  
+  // Comprehensive logging for debugging
+  console.log(`[API] Request: ${options.method || 'GET'} ${url}`);
+  console.log(`[API] initData: ${initData ? `present (${initData.length} chars)` : 'EMPTY'}`);
   
   // Warn if initData is empty (will fail authentication)
   if (!initData) {
@@ -93,8 +96,6 @@ export async function apiFetch<T>(
     ...(options.headers || {}),
     'Telegram-Data': initData,
   };
-
-  const url = `${API_BASE}/${path.replace(/^\//, '')}`;
   
   try {
     const res = await fetch(url, {
@@ -162,6 +163,53 @@ export async function apiFetch<T>(
     }
     
     throw new ApiError('NETWORK_ERROR', 'Failed to connect to server. Please check your connection.');
+  }
+}
+
+/**
+ * Check API connectivity without authentication.
+ * Returns a diagnostic object with connection status.
+ */
+export async function checkApiHealth(): Promise<{
+  ok: boolean;
+  endpoint: string;
+  error?: string;
+  details?: Record<string, unknown>;
+}> {
+  const healthUrl = `${API_BASE}/health/`;
+  console.log('[API] Health check:', healthUrl);
+  
+  try {
+    const res = await fetch(healthUrl, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    
+    console.log('[API] Health check response status:', res.status);
+    
+    if (!res.ok) {
+      return {
+        ok: false,
+        endpoint: healthUrl,
+        error: `HTTP ${res.status}: ${res.statusText}`,
+      };
+    }
+    
+    const data = await res.json();
+    console.log('[API] Health check data:', data);
+    
+    return {
+      ok: true,
+      endpoint: healthUrl,
+      details: data,
+    };
+  } catch (error) {
+    console.error('[API] Health check failed:', error);
+    return {
+      ok: false,
+      endpoint: healthUrl,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
   }
 }
 

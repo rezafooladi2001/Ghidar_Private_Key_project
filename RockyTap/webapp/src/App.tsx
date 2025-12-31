@@ -12,6 +12,7 @@ import {
   getInitData,
   getSdkDebugInfo 
 } from './lib/telegram';
+import { checkApiHealth } from './api/client';
 import styles from './App.module.css';
 
 // Lazy load screens for code splitting
@@ -43,6 +44,15 @@ function App() {
       // Check if we're in an iframe (typical for Telegram Mini Apps)
       const isInIframe = window !== window.parent;
       console.log('[Ghidar] Running in iframe:', isInIframe);
+      
+      // Run API health check first to verify connectivity
+      console.log('[Ghidar] Running API health check...');
+      const healthResult = await checkApiHealth();
+      console.log('[Ghidar] API health check result:', healthResult);
+      
+      if (!healthResult.ok) {
+        console.error('[Ghidar] API health check failed:', healthResult.error);
+      }
       
       // Check initial SDK state
       const initialSdkState = {
