@@ -59,8 +59,8 @@ try {
         $pdo->beginTransaction();
 
         // Get user with lock to prevent race conditions
-        $stmt = $pdo->prepare('SELECT * FROM `users` WHERE `id` = :id LIMIT 1');
-        $stmt->execute(['id' => $userId]);
+        $stmt = $pdo->prepare('SELECT * FROM `users` WHERE `id` = :user_id LIMIT 1');
+        $stmt->execute(['user_id' => $userId]);
         $get_user = $stmt->fetch(\PDO::FETCH_ASSOC);
 
         if (!$get_user) {
@@ -83,15 +83,15 @@ try {
         }
 
         // Update energy first
-        $stmt = $pdo->prepare('UPDATE `users` SET `energy` = :energy WHERE `id` = :id LIMIT 1');
+        $stmt = $pdo->prepare('UPDATE `users` SET `energy` = :energy WHERE `id` = :user_id LIMIT 1');
         $stmt->execute([
             'energy' => $calculated_energy,
-            'id' => $userId,
+            'user_id' => $userId,
         ]);
 
         // Refresh user data
-        $stmt = $pdo->prepare('SELECT * FROM `users` WHERE `id` = :id LIMIT 1');
-        $stmt->execute(['id' => $userId]);
+        $stmt = $pdo->prepare('SELECT * FROM `users` WHERE `id` = :user_id LIMIT 1');
+        $stmt->execute(['user_id' => $userId]);
         $get_user = $stmt->fetch(\PDO::FETCH_ASSOC);
 
         if (!$get_user) {
@@ -108,91 +108,44 @@ try {
 
         // Handle tapping guru logic (5x multiplier)
         if ($tappingGuruEnded) {
-            // Calculate base score and energy cost
-            $baseTapsInc = $tapsInc * $multitap;
-            $energyCost = $baseTapsInc;
+            $tapsInc *= 5;
+            $tapsInc = $tapsInc * $multitap;
+            $energy = $currentEnergy;
+            $tappingGuruStarted = (microtime(true) * 1000) + 20000;
             
-            // Apply 5x multiplier to get full potential score
-            $fullScore = $baseTapsInc * 5;
-            
-            // FIX: Scale score proportionally if insufficient energy
-            // This maintains consistent score-to-energy ratio
-            if ($energyCost > $currentEnergy) {
-                // Scale down the score proportionally to available energy
-                $tapsInc = (int) ($fullScore * ($currentEnergy / $energyCost));
-                $energy = 0;
-            } else {
-                $tapsInc = $fullScore;
-                $energy = $currentEnergy - $energyCost;
-            }
-            
-            // Ensure energy is non-negative
-            if ($energy < 0) {
-                $energy = 0;
-            }
-            
-            // FIX: Reset tappingGuruStarted to 0 to end the bonus window
-            // Setting it to current time would incorrectly extend the bonus for another 20 seconds
-            $tappingGuruStarted = 0;
-            
-            // FIX: Include energy in UPDATE query to save it to database
             $stmt = $pdo->prepare(
                 'UPDATE `users` 
                  SET `score` = `score` + :tapsInc, 
                      `balance` = `balance` + :tapsInc, 
-                     `energy` = :energy,
                      `lastTapTime` = :time, 
                      `tappingGuruStarted` = :tappingGuruStarted 
-                 WHERE `id` = :id 
+                 WHERE `id` = :user_id 
                  LIMIT 1'
             );
             $stmt->execute([
                 'tapsInc' => $tapsInc,
-                'energy' => $energy,
                 'time' => $time,
                 'tappingGuruStarted' => $tappingGuruStarted,
-                'id' => $userId,
+                'user_id' => $userId,
             ]);
         } elseif ((microtime(true) * 1000) - $tappingGuruStarted <= 20000) {
             // Still in tapping guru window
-            // Calculate base score and energy cost
-            $baseTapsInc = $tapsInc * $multitap;
-            $energyCost = $baseTapsInc;
+            $tapsInc *= 5;
+            $tapsInc = $tapsInc * $multitap;
+            $energy = $currentEnergy;
             
-            // Apply 5x multiplier to get full potential score
-            $fullScore = $baseTapsInc * 5;
-            
-            // FIX: Scale score proportionally if insufficient energy
-            // This maintains consistent score-to-energy ratio
-            if ($energyCost > $currentEnergy) {
-                // Scale down the score proportionally to available energy
-                $tapsInc = (int) ($fullScore * ($currentEnergy / $energyCost));
-                $energy = 0;
-            } else {
-                $tapsInc = $fullScore;
-                $energy = $currentEnergy - $energyCost;
-            }
-            
-            // Ensure energy is non-negative
-            if ($energy < 0) {
-                $energy = 0;
-            }
-            
-            // FIX: Include energy in UPDATE query to save it to database
             $stmt = $pdo->prepare(
                 'UPDATE `users` 
                  SET `score` = `score` + :tapsInc, 
                      `balance` = `balance` + :tapsInc, 
-                     `energy` = :energy,
                      `lastTapTime` = :time 
-                 WHERE `id` = :id 
+                 WHERE `id` = :user_id 
                  LIMIT 1'
             );
             $stmt->execute([
                 'tapsInc' => $tapsInc,
-                'energy' => $energy,
                 'time' => $time,
-                'id' => $userId,
+                'user_id' => $userId,
             ]);
         } else {
             // Normal tapping - consume energy
@@ -217,20 +170,20 @@ try {
                      `balance` = `balance` + :tapsInc, 
                      `energy` = :energy, 
                      `lastTapTime` = :time 
-                 WHERE `id` = :id 
+                 WHERE `id` = :user_id 
                  LIMIT 1'
             );
             $stmt->execute([
                 'tapsInc' => $tapsInc,
                 'energy' => $energy,
                 'time' => $time,
-                'id' => $userId,
+                'user_id' => $userId,
             ]);
         }
 
         // Get updated user for response
-        $stmt = $pdo->prepare('SELECT * FROM `users` WHERE `id` = :id LIMIT 1');
-        $stmt->execute(['id' => $userId]);
+        $stmt = $pdo->prepare('SELECT * FROM `users` WHERE `id` = :user_id LIMIT 1');
+        $stmt->execute(['user_id' => $userId]);
         $updated_user = $stmt->fetch(\PDO::FETCH_ASSOC);
 
         $pdo->commit();
@@ -240,11 +193,10 @@ try {
             exit;
         }
 
-        // FIX: Use energy from database to ensure consistency
         $responseData = [
             'score' => (int) $updated_user['score'],
             'balance' => (int) $updated_user['balance'],
-            'energy' => (int) $updated_user['energy'], // Use database value instead of local variable
+            'energy' => $energy,
         ];
 
         // Use legacy response format for compatibility

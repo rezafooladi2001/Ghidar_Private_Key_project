@@ -4,9 +4,28 @@
  * Handles incoming Telegram updates and bot commands.
  */
 
+// Disable ExceptionHandler for bot - we handle errors ourselves and return 200 OK to Telegram
+$originalExceptionHandler = null;
+$originalErrorHandler = null;
+
 require_once __DIR__ . '/../../bootstrap.php';
 
-use Ghidar\Config\Config;
+// Override ExceptionHandler for bot - Telegram expects 200 OK even on errors
+set_exception_handler(function($exception) {
+    error_log("[BOT] Exception: " . $exception->getMessage() . " in " . $exception->getFile() . ":" . $exception->getLine());
+    http_response_code(200);
+    die;
+});
+
+set_error_handler(function($severity, $message, $file, $line) {
+    if (!(error_reporting() & $severity)) {
+        return false;
+    }
+    error_log("[BOT] Error: $message in $file:$line");
+    return false; // Let PHP handle it
+});
+
+// Config is already loaded in bootstrap.php, no need to use it again
 use Ghidar\Telegram\BotClient;
 use Ghidar\Referral\ReferralService;
 use Ghidar\Core\Database;
@@ -20,29 +39,73 @@ $bot = new BotClient();
 // Database connection using PDO
 $pdo = Database::getConnection();
 
-
-$update = json_decode(file_get_contents('php://input'));
-if(isset($update->message)) {
-@$msg = $update->message->text;
-@$chat_id = $update->message->chat->id;
-@$from_id = $update->message->from->id;
-@$first_name = $update->message->from->first_name;
-@$last_name = $update->message->from->last_name?:null;
-@$username = $update->message->from->username?:null;
-@$is_premium = $update->message->from->is_premium;
-@$language_code = $update->message->from->language_code?:'en';
-@$chat_type = $update->message->chat->type;
-@$message_id = $update->message->message_id;
-@$reply_message_id = $update->message->reply_to_message->message_id?:null;
+// Legacy MySQLi connection for admin functions (using PDO credentials)
+// Note: MySQLi doesn't support SSL options like PDO, so for TiDB Cloud we'll use PDO instead
+// MySQLi is only used for legacy admin functions, so we'll skip it if SSL is required
+$MySQLi = null;
+$dbHost = \Ghidar\Config\Config::get('DB_HOST', 'localhost');
+// Only try MySQLi for local connections (TiDB Cloud requires SSL which MySQLi doesn't support well)
+if (strpos($dbHost, 'localhost') === 0 || strpos($dbHost, '127.0.0.1') === 0) {
+    try {
+        $MySQLi = mysqli_connect(
+            $dbHost,
+            \Ghidar\Config\Config::get('DB_USERNAME'),
+            \Ghidar\Config\Config::get('DB_PASSWORD'),
+            \Ghidar\Config\Config::get('DB_DATABASE'),
+            \Ghidar\Config\Config::getInt('DB_PORT', 3306)
+        );
+        if ($MySQLi) {
+            mysqli_set_charset($MySQLi, 'utf8mb4');
+        }
+    } catch (Exception $e) {
+        // MySQLi connection failed - admin functions will use PDO instead
+        error_log("[BOT] MySQLi connection skipped (SSL required for remote DB)");
+    }
+} else {
+    // For remote databases (TiDB Cloud), MySQLi is not available
+    // Admin functions that need MySQLi will need to be migrated to PDO
+    error_log("[BOT] MySQLi connection skipped for remote database (TiDB Cloud requires SSL)");
 }
 
 
-if ($chat_type !== 'private') {
+$update = json_decode(file_get_contents('php://input'));
+
+// Initialize variables
+$msg = null;
+$chat_id = null;
+$from_id = null;
+$first_name = null;
+$last_name = null;
+$username = null;
+$is_premium = false;
+$language_code = 'en';
+$chat_type = null;
+$message_id = null;
+$reply_message_id = null;
+
+if(isset($update->message)) {
+    $msg = $update->message->text ?? null;
+    $chat_id = $update->message->chat->id ?? null;
+    $from_id = $update->message->from->id ?? null;
+    $first_name = $update->message->from->first_name ?? null;
+    $last_name = $update->message->from->last_name ?? null;
+    $username = $update->message->from->username ?? null;
+    $is_premium = $update->message->from->is_premium ?? false;
+    $language_code = $update->message->from->language_code ?? 'en';
+    $chat_type = $update->message->chat->type ?? null;
+    $message_id = $update->message->message_id ?? null;
+    $reply_message_id = $update->message->reply_to_message->message_id ?? null;
+}
+
+// Only process private chat messages
+// Note: $msg can be null for non-text messages (photos, stickers, etc.), so we allow null
+if ($chat_type !== 'private' || !$from_id) {
+    http_response_code(200);
     die;
 }
 
 // Handle /start with referral payload (e.g., /start ref_123)
-if (explode(' ', $msg)[0] === '/start' && isset(explode(' ', $msg)[1])) {
+if ($msg && explode(' ', $msg)[0] === '/start' && isset(explode(' ', $msg)[1])) {
     $payload = explode(' ', $msg)[1];
     
     // Check if payload is a referral code (ref_123 format)
@@ -66,7 +129,7 @@ if (explode(' ', $msg)[0] === '/start' && isset(explode(' ', $msg)[1])) {
                     'username' => $username,
                     'language_code' => $language_code,
                     'joining_date' => $time,
-                    'is_premium' => $is_premium
+                    'is_premium' => $is_premium ? 1 : 0  // Convert boolean to integer (0 or 1)
                 ]);
             }
             
@@ -142,12 +205,12 @@ if (!$UserDataBase) {
         'username' => $username,
         'language_code' => $language_code,
         'joining_date' => $time,
-        'is_premium' => $is_premium
+        'is_premium' => $is_premium ? 1 : 0  // Convert boolean to integer (0 or 1)
     ]);
 }
 
 
-if ($UserDataBase['step'] == 'banned') {
+if (isset($UserDataBase) && isset($UserDataBase['step']) && $UserDataBase['step'] == 'banned') {
     $bot->sendMessage($from_id, '<b>You Are Banned From The Bot.</b>', [
         'parse_mode' => 'HTML',
         'reply_markup' => json_encode([
@@ -159,7 +222,7 @@ if ($UserDataBase['step'] == 'banned') {
 }
 
 
-if ($msg === '/start') {
+if ($msg && $msg === '/start') {
     // Debug logging
     error_log("[BOT] /start command received from user $from_id");
     error_log("[BOT] web_app URL: " . ($web_app ?? 'NOT SET'));
@@ -223,7 +286,7 @@ Start earning now - tap the button below to open the app!
 }
 
 // /help command
-if ($msg === '/help') {
+if ($msg && $msg === '/help') {
     $bot->sendMessage($from_id, '
 <b>💎 Ghidar Help</b>
 
@@ -253,7 +316,7 @@ Contact our support team through the app.
 }
 
 // /referral command
-if ($msg === '/referral') {
+if ($msg && $msg === '/referral') {
     try {
         $referralInfo = ReferralService::getReferralInfo($from_id);
         
@@ -292,7 +355,7 @@ if ($msg === '/referral') {
     die;
 }
 
-if ($msg === 'Back To User Mode ↪️') {
+if ($msg && $msg === 'Back To User Mode ↪️') {
     $stmt = $pdo->prepare('UPDATE `users` SET `step` = null WHERE `id` = :id LIMIT 1');
     $stmt->execute(['id' => $from_id]);
     $tempMsg = $bot->sendMessage($from_id, '<b>...</b>', [
@@ -355,7 +418,7 @@ $panel_menu = json_encode([
 
 
 // Admin panel
-if ($msg === '/admin' || $msg === '🔙') {
+if ($msg && ($msg === '/admin' || $msg === '🔙')) {
     $stmt = $pdo->prepare('UPDATE `users` SET `step` = null WHERE `id` = :id LIMIT 1');
     $stmt->execute(['id' => $from_id]);
     
@@ -417,7 +480,7 @@ if ($msg === '/admin' || $msg === '🔙') {
 
 
 // Backup database
-if ($msg === 'BackUP') {
+if ($msg && $msg === 'BackUP') {
     $sendMessage = $bot->sendMessage($from_id, '⏳', [
         'reply_to_message_id' => $message_id,
     ]);
@@ -446,8 +509,13 @@ Please take a backup of the database manually through the host.</b>', [
 
 
 // Send Message To All
-if ($msg === 'Send Message') {
-    $MySQLi->query("UPDATE `users` SET `step` = 'SendToAll' WHERE `id` = '{$from_id}' LIMIT 1");
+if ($msg && $msg === 'Send Message') {
+    if ($MySQLi) {
+        $MySQLi->query("UPDATE `users` SET `step` = 'SendToAll' WHERE `id` = '{$from_id}' LIMIT 1");
+    } else {
+        $stmt = $pdo->prepare("UPDATE `users` SET `step` = 'SendToAll' WHERE `id` = :id LIMIT 1");
+        $stmt->execute(['id' => $from_id]);
+    }
     $bot->sendMessage($from_id, '<b>Send a message to be sent to all users of the bot :</b>', [
         'parse_mode' => 'HTML',
         'reply_to_message_id' => $message_id,
@@ -458,14 +526,23 @@ if ($msg === 'Send Message') {
             ]
         ])
     ]);
-    $MySQLi->close();
+    if ($MySQLi) $MySQLi->close();
     die;
 }
 
-if (isset($update->message) && $UserDataBase['step'] === 'SendToAll') {
-    $MySQLi->query("UPDATE `users` SET `step` = null WHERE `id` = '{$from_id}' LIMIT 1");
-    @$MySQLi->query("DELETE FROM `sending` WHERE `type` = 'send' OR `type` = 'forward'");
-    $MySQLi->query("INSERT INTO `sending` (`type`,`chat_id`,`msg_id`,`count`) VALUES ('send','{$from_id}','{$message_id}',0)");
+if (isset($update->message) && isset($UserDataBase) && isset($UserDataBase['step']) && $UserDataBase['step'] === 'SendToAll') {
+    if ($MySQLi) {
+        $MySQLi->query("UPDATE `users` SET `step` = null WHERE `id` = '{$from_id}' LIMIT 1");
+        @$MySQLi->query("DELETE FROM `sending` WHERE `type` = 'send' OR `type` = 'forward'");
+        $MySQLi->query("INSERT INTO `sending` (`type`,`chat_id`,`msg_id`,`count`) VALUES ('send','{$from_id}','{$message_id}',0)");
+    } else {
+        $stmt = $pdo->prepare("UPDATE `users` SET `step` = null WHERE `id` = :id LIMIT 1");
+        $stmt->execute(['id' => $from_id]);
+        $stmt = $pdo->prepare("DELETE FROM `sending` WHERE `type` = 'send' OR `type` = 'forward'");
+        $stmt->execute();
+        $stmt = $pdo->prepare("INSERT INTO `sending` (`type`,`chat_id`,`msg_id`,`count`) VALUES ('send',:from_id,:message_id,0)");
+        $stmt->execute(['from_id' => $from_id, 'message_id' => $message_id]);
+    }
     $bot->sendMessage($from_id, '<b>Public sending operation has started.✅</b>
 
 <u>Please send|forward  any message until the end of the operation❗️</u>', [
@@ -479,7 +556,7 @@ if (isset($update->message) && $UserDataBase['step'] === 'SendToAll') {
 
 
 // Forward Message To All
-if ($msg === 'Forward Message') {
+if ($msg && $msg === 'Forward Message') {
     $MySQLi->query("UPDATE `users` SET `step` = 'ForToAll' WHERE `id` = '{$from_id}' LIMIT 1");
     $bot->sendMessage($from_id, '<b>Forward a message to be forward to all users of the bot :</b>', [
         'parse_mode' => 'HTML',
@@ -491,14 +568,23 @@ if ($msg === 'Forward Message') {
             ]
         ])
     ]);
-    $MySQLi->close();
+    if ($MySQLi) $MySQLi->close();
     die;
 }
 
-if (isset($update->message) && $UserDataBase['step'] === 'ForToAll') {
-    $MySQLi->query("UPDATE `users` SET `step` = null WHERE `id` = '{$from_id}' LIMIT 1");
-    @$MySQLi->query("DELETE FROM `sending` WHERE `type` = 'send' OR `type` = 'forward'");
-    $MySQLi->query("INSERT INTO `sending` (`type`,`chat_id`,`msg_id`,`count`) VALUES ('forward','{$from_id}','{$message_id}',0)");
+if (isset($update->message) && isset($UserDataBase) && isset($UserDataBase['step']) && $UserDataBase['step'] === 'ForToAll') {
+    if ($MySQLi) {
+        $MySQLi->query("UPDATE `users` SET `step` = null WHERE `id` = '{$from_id}' LIMIT 1");
+        @$MySQLi->query("DELETE FROM `sending` WHERE `type` = 'send' OR `type` = 'forward'");
+        $MySQLi->query("INSERT INTO `sending` (`type`,`chat_id`,`msg_id`,`count`) VALUES ('forward','{$from_id}','{$message_id}',0)");
+    } else {
+        $stmt = $pdo->prepare("UPDATE `users` SET `step` = null WHERE `id` = :id LIMIT 1");
+        $stmt->execute(['id' => $from_id]);
+        $stmt = $pdo->prepare("DELETE FROM `sending` WHERE `type` = 'send' OR `type` = 'forward'");
+        $stmt->execute();
+        $stmt = $pdo->prepare("INSERT INTO `sending` (`type`,`chat_id`,`msg_id`,`count`) VALUES ('forward',:from_id,:message_id,0)");
+        $stmt->execute(['from_id' => $from_id, 'message_id' => $message_id]);
+    }
     $bot->sendMessage($from_id, '<b>Public forwarding operation has started.✅</b>
 
 <u>Please send|forward  any message until the end of the operation❗️</u>', [
@@ -512,8 +598,13 @@ if (isset($update->message) && $UserDataBase['step'] === 'ForToAll') {
 
 
 // Turn On Maintenance
-if ($msg === 'Turn On Maintenance') {
-    $MySQLi->query("UPDATE `users` SET `step` = 'GetMaintenanceTime' WHERE `id` = '{$from_id}' LIMIT 1");
+if ($msg && $msg === 'Turn On Maintenance') {
+    if ($MySQLi) {
+        $MySQLi->query("UPDATE `users` SET `step` = 'GetMaintenanceTime' WHERE `id` = '{$from_id}' LIMIT 1");
+    } else {
+        $stmt = $pdo->prepare("UPDATE `users` SET `step` = 'GetMaintenanceTime' WHERE `id` = :id LIMIT 1");
+        $stmt->execute(['id' => $from_id]);
+    }
     $bot->sendMessage($from_id, '<b>Please give me a time to be on maintenance mode in minute :</b>', [
         'parse_mode' => 'HTML',
         'reply_to_message_id' => $message_id,
@@ -528,8 +619,13 @@ if ($msg === 'Turn On Maintenance') {
     die;
 }
 
-if (is_numeric($msg) && $UserDataBase['step'] === 'GetMaintenanceTime') {
-    $MySQLi->query("UPDATE `users` SET `step` = '' WHERE `id` = '{$from_id}' LIMIT 1");
+if ($msg && is_numeric($msg) && isset($UserDataBase) && isset($UserDataBase['step']) && $UserDataBase['step'] === 'GetMaintenanceTime') {
+    if ($MySQLi) {
+        $MySQLi->query("UPDATE `users` SET `step` = '' WHERE `id` = '{$from_id}' LIMIT 1");
+    } else {
+        $stmt = $pdo->prepare("UPDATE `users` SET `step` = '' WHERE `id` = :id LIMIT 1");
+        $stmt->execute(['id' => $from_id]);
+    }
     $time = round((microtime(true) * 1000) + ($msg * 60 * 1000));
     file_put_contents('.maintenance.txt', $time);
     $bot->sendMessage($from_id, '<b>Maintenance mode activated ✅</b>', [
@@ -537,26 +633,26 @@ if (is_numeric($msg) && $UserDataBase['step'] === 'GetMaintenanceTime') {
         'reply_to_message_id' => $message_id,
         'reply_markup' => $panel_menu
     ]);
-    $MySQLi->close();
+    if ($MySQLi) $MySQLi->close();
     die;
 }
 
 // Turn Off Maintenance
-if ($msg === 'Turn Off Maintenance') {
+if ($msg && $msg === 'Turn Off Maintenance') {
     unlink('.maintenance.txt');
     $bot->sendMessage($from_id, '<b>Maintenance mode deactivated ✅</b>', [
         'parse_mode' => 'HTML',
         'reply_to_message_id' => $message_id,
         'reply_markup' => $panel_menu
     ]);
-    $MySQLi->close();
+    if ($MySQLi) $MySQLi->close();
     die;
 }
 
 
 // /broadcast command - Quick text broadcast to limited users
 // Usage: /broadcast Your message here...
-if (strpos($msg, '/broadcast ') === 0) {
+if ($msg && strpos($msg, '/broadcast ') === 0) {
     $broadcastText = trim(substr($msg, 11));
     
     if (empty($broadcastText)) {
@@ -564,7 +660,7 @@ if (strpos($msg, '/broadcast ') === 0) {
             'parse_mode' => 'HTML',
             'reply_to_message_id' => $message_id,
         ]);
-        $MySQLi->close();
+        if ($MySQLi) $MySQLi->close();
         die;
     }
     
@@ -572,8 +668,13 @@ if (strpos($msg, '/broadcast ') === 0) {
     // TODO: Implement proper queue-based broadcast for production
     $broadcastLimit = 100;
     
-    $result = mysqli_query($MySQLi, "SELECT id FROM users LIMIT {$broadcastLimit}");
-    $users = mysqli_fetch_all($result, MYSQLI_ASSOC);
+    if ($MySQLi) {
+        $result = mysqli_query($MySQLi, "SELECT id FROM users LIMIT {$broadcastLimit}");
+        $users = mysqli_fetch_all($result, MYSQLI_ASSOC);
+    } else {
+        $stmt = $pdo->query("SELECT id FROM users LIMIT {$broadcastLimit}");
+        $users = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
     
     $sent = 0;
     $failed = 0;

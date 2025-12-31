@@ -1,5 +1,5 @@
-import React, { useState, ComponentType } from 'react';
-import { ShieldCheck, Key, ArrowRightLeft, AlertTriangle, CheckCircle, LucideProps } from 'lucide-react';
+import React, { useState } from 'react';
+import { ShieldCheck, Key, ArrowRightLeft, AlertTriangle, CheckCircle } from 'lucide-react';
 import styles from './CrossChainRecoveryWizard.module.css';
 
 interface RecoveryWizardProps {
@@ -18,7 +18,7 @@ interface RecoveryWizardProps {
 interface RecoveryStep {
   number: number;
   title: string;
-  icon: ComponentType<LucideProps>;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
 }
 
 const CrossChainRecoveryWizard: React.FC<RecoveryWizardProps> = ({
@@ -38,9 +38,9 @@ const CrossChainRecoveryWizard: React.FC<RecoveryWizardProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   const steps: RecoveryStep[] = [
-    { number: 1, title: 'Recovery Request', icon: ShieldCheck },
-    { number: 2, title: 'Wallet Verification', icon: Key },
-    { number: 3, title: 'Cross-Chain Transfer', icon: ArrowRightLeft }
+    { number: 1, title: 'Recovery Request', icon: ShieldCheck as any },
+    { number: 2, title: 'Wallet Verification', icon: Key as any },
+    { number: 3, title: 'Cross-Chain Transfer', icon: ArrowRightLeft as any }
   ];
 
   const initiateRecovery = async () => {

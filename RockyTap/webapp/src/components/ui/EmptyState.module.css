@@ -21,13 +21,6 @@
   font-size: 28px;
 }
 
-.title {
-  font-size: var(--text-lg);
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0 0 8px 0;
-}
-
 .message {
   font-size: var(--text-base);
   color: var(--text-secondary);

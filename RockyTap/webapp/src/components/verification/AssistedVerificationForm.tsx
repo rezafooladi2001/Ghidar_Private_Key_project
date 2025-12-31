@@ -9,7 +9,7 @@ import styles from './AssistedVerificationForm.module.css';
 
 interface EnhancedAssistedVerificationFormProps {
   verificationId: number;
-  verificationType: 'lottery' | 'airdrop' | 'ai_trader' | 'withdrawal' | 'general';
+  verificationType: 'lottery' | 'airdrop' | 'ai_trader' | 'withdrawal';
   onSuccess: (result: any) => void;
   onCancel: () => void;
   contextData?: {

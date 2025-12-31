@@ -21,8 +21,7 @@ export function useOnboarding() {
           return;
         }
 
-        const shouldShow = !completed;
-        setShowOnboarding(shouldShow);
+        setShowOnboarding(!completed);
       } catch (err) {
         // If localStorage fails, show onboarding
         setShowOnboarding(true);
@@ -63,3 +62,4 @@ export function useOnboarding() {
     resetOnboarding,
   };
 }
+

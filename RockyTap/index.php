@@ -45,8 +45,8 @@ session_start();
     <meta name="twitter:description" content="Secure crypto platform built on Telegram. Earn rewards through airdrops, lottery, and AI trading.">
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script type="module" crossorigin src="assets/ghidar/index.js"></script>
-    <link rel="stylesheet" crossorigin href="assets/ghidar/index.css">
+    <script type="module" crossorigin src="assets/index-BYqAG32B.js?v=0.0.18"></script>
+    <link rel="stylesheet" crossorigin href="assets/index-Bx_Rp-Zd.css?v=0.0.18">
   </head>
   <style>
     html {
@@ -63,17 +63,9 @@ session_start();
   </style>
   <body style="background-color: #202229">
     <script>
-      // Safely initialize Telegram WebApp only if it exists
-      if (typeof window !== 'undefined' && window.Telegram && window.Telegram.WebApp) {
-        try {
-          window.Telegram.WebApp.expand();
-          window.Telegram.WebApp.setHeaderColor('#2A2D36');
-          window.Telegram.WebApp.setBackgroundColor('#202229');
-        } catch (e) {
-          // Silently handle errors if Telegram WebApp methods fail
-          console.warn('Telegram WebApp initialization failed:', e);
-        }
-      }
+      Telegram.WebApp.expand();
+      Telegram.WebApp.setHeaderColor('#2A2D36');
+      Telegram.WebApp.setBackgroundColor('#202229');
     </script>
     <div
       id="loader"

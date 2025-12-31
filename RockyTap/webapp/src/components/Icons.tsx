@@ -232,8 +232,6 @@ export function BellIcon({ size = 24, color = 'currentColor', className = '' }: 
   );
 }
 
-// CheckIcon already defined above - removed duplicate
-
 export function ChartIcon({ size = 24, color = 'currentColor', className = '' }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>

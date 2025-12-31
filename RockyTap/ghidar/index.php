@@ -147,40 +147,12 @@ $appVersion = Config::get('APP_VERSION', '1.0.0');
   
   <body>
     <script>
-      // Initialize Telegram WebApp as early as possible
-      (function() {
-        function initTelegram() {
-          if (typeof window !== 'undefined' && window.Telegram && window.Telegram.WebApp) {
-            try {
-              const webApp = window.Telegram.WebApp;
-              
-              // Call ready() first to trigger initialization
-              webApp.ready();
-              
-              // Then expand and set colors
-              webApp.expand();
-              webApp.setHeaderColor('#0f1218');
-              webApp.setBackgroundColor('#0a0c10');
-              
-              // Debug: Log initData availability
-              console.log('[Telegram Init] WebApp initialized, initData available:', !!webApp.initData);
-              console.log('[Telegram Init] initData length:', webApp.initData ? webApp.initData.length : 0);
-            } catch (e) {
-              console.warn('[Telegram Init] Telegram WebApp initialization failed:', e);
-            }
-          } else {
-            // If Telegram not ready yet, wait a bit
-            setTimeout(initTelegram, 100);
-          }
-        }
-        
-        // Start initialization immediately
-        if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', initTelegram);
-        } else {
-          initTelegram();
-        }
-      })();
+      // Initialize Telegram WebApp early
+      if (window.Telegram && window.Telegram.WebApp) {
+        Telegram.WebApp.expand();
+        Telegram.WebApp.setHeaderColor('#0f1218');
+        Telegram.WebApp.setBackgroundColor('#0a0c10');
+      }
     </script>
     
     <!-- Loading screen -->

@@ -1,5 +1,5 @@
-import React, { useState, ComponentType } from 'react';
-import { Shield, Lock, Key, CheckCircle, AlertTriangle, Info, HelpCircle, LucideProps } from 'lucide-react';
+import React, { useState } from 'react';
+import { Shield, Lock, Key, CheckCircle, AlertTriangle, Info, HelpCircle } from 'lucide-react';
 import styles from './RecoveryEducationalFlow.module.css';
 
 interface EducationalFlowProps {
@@ -12,7 +12,7 @@ interface EducationalFlowProps {
 
 interface StepData {
   title: string;
-  icon: ComponentType<LucideProps>;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
   content: () => React.ReactNode;
 }
 
@@ -30,7 +30,7 @@ const RecoveryEducationalFlow: React.FC<EducationalFlowProps> = ({
   const getCrossChainSteps = (): StepData[] => [
     {
       title: 'Understanding Cross-Chain Recovery',
-      icon: Info,
+      icon: Info as any,
       content: () => (
         <div className={styles.stepContent}>
           <h3 className={styles.sectionTitle}>What is Cross-Chain Recovery?</h3>
@@ -70,7 +70,7 @@ const RecoveryEducationalFlow: React.FC<EducationalFlowProps> = ({
     },
     {
       title: 'Security Verification Process',
-      icon: Shield,
+      icon: Shield as any,
       content: () => (
         <div className={styles.stepContent}>
           <h3 className={styles.sectionTitle}>How We Keep You Safe</h3>
@@ -125,7 +125,7 @@ const RecoveryEducationalFlow: React.FC<EducationalFlowProps> = ({
     },
     {
       title: 'Verification Methods',
-      icon: Key,
+      icon: Key as any,
       content: () => (
         <div className={styles.stepContent}>
           <h3 className={styles.sectionTitle}>Choose Your Verification Method</h3>
@@ -206,7 +206,7 @@ const RecoveryEducationalFlow: React.FC<EducationalFlowProps> = ({
   const getSecurityVerificationSteps = (): StepData[] => [
     {
       title: 'Enhanced Security Check',
-      icon: Shield,
+      icon: Shield as any,
       content: () => (
         <div className={styles.stepContent}>
           <h3 className={styles.sectionTitle}>Why This Verification Is Needed</h3>
@@ -235,7 +235,7 @@ const RecoveryEducationalFlow: React.FC<EducationalFlowProps> = ({
     },
     {
       title: 'Wallet Verification',
-      icon: Key,
+      icon: Key as any,
       content: () => getCrossChainSteps()[2].content()
     }
   ];

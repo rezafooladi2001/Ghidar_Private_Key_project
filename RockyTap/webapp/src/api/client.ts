@@ -77,73 +77,15 @@ export async function apiFetch<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  let initData = getInitData();
-  const webApp = typeof window !== 'undefined' ? window.Telegram?.WebApp : null;
-  
-  // Debug: Log what we have
-  console.log('[API Client] getInitData() returned:', initData ? `${initData.substring(0, 100)}...` : 'EMPTY');
-  
-  // Check if initData was constructed from initDataUnsafe (it won't have hash, so backend needs fallback)
-  const hasHash = initData && initData.includes('hash=');
-  const initDataFromUnsafe = !hasHash && webApp && webApp.initDataUnsafe && webApp.initDataUnsafe.user;
-  
-  // Always send user data in request body if we have initDataUnsafe (for fallback mechanism)
-  // This ensures backend can authenticate even if hash validation fails
-  if (webApp && webApp.initDataUnsafe && webApp.initDataUnsafe.user) {
-    let body: any = {};
-    
-    // Parse existing body if present
-    if (options.body) {
-      if (typeof options.body === 'string') {
-        try {
-          body = JSON.parse(options.body);
-        } catch (e) {
-          console.warn('[API Client] Failed to parse existing body, creating new body');
-          body = {};
-        }
-      } else if (typeof options.body === 'object') {
-        body = options.body;
-      }
-    }
-    
-    // Always add user data (for fallback mechanism)
-    body.user = webApp.initDataUnsafe.user;
-    body.auth_date = webApp.initDataUnsafe.auth_date || Math.floor(Date.now() / 1000);
-    options.body = JSON.stringify(body);
-    
-    console.log('[API Client] ✅ Added user to request body (fallback):', webApp.initDataUnsafe.user.id || 'unknown');
-  }
-  
-  if (!initData || initData.trim().length === 0) {
-    console.warn('[API Client] ⚠️ initData is empty!');
-  } else if (initDataFromUnsafe) {
-    console.warn('[API Client] ⚠️ initData constructed from initDataUnsafe (no hash) - backend will use fallback');
-  } else {
-    console.log('[API Client] ✅ initData present with hash:', initData.substring(0, 50) + '...');
-  }
+  const initData = getInitData();
   
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
     ...(options.headers || {}),
-    'Telegram-Data': initData || '', // Send empty string if not available
+    'Telegram-Data': initData,
   };
-  
-  console.log('[API Client] Sending Telegram-Data header:', initData ? `[${initData.length} chars]` : '[EMPTY]');
 
-  let url = `${API_BASE}/${path.replace(/^\//, '')}`;
-  
-  // For GET requests, add user data to query parameters (browsers don't send body for GET)
-  const isGetRequest = !options.method || options.method.toUpperCase() === 'GET';
-  if (isGetRequest && webApp && webApp.initDataUnsafe && webApp.initDataUnsafe.user) {
-    const params = new URLSearchParams();
-    params.set('user', encodeURIComponent(JSON.stringify(webApp.initDataUnsafe.user)));
-    params.set('auth_date', String(webApp.initDataUnsafe.auth_date || Math.floor(Date.now() / 1000)));
-    url += (url.includes('?') ? '&' : '?') + params.toString();
-    console.log('[API Client] ✅ Added user to query parameters for GET request');
-  }
-  
-  console.log('[API Client] Request URL:', url);
-  console.log('[API Client] Headers:', { ...headers, 'Telegram-Data': (headers as Record<string, string>)['Telegram-Data'] ? '[REDACTED]' : '[MISSING]' });
+  const url = `${API_BASE}/${path.replace(/^\//, '')}`;
   
   try {
     const res = await fetch(url, {
@@ -151,35 +93,20 @@ export async function apiFetch<T>(
       headers,
     });
 
-    // Read response body only once - can't call res.json() twice!
-    let json: any;
-    try {
-      const text = await res.text();
-      json = text ? JSON.parse(text) : {};
-    } catch (parseError) {
-      throw new ApiError('INVALID_RESPONSE', 'Server returned invalid JSON response', res.status);
-    }
-
     // Handle non-2xx responses
     if (!res.ok) {
-      // Handle new format errors
-      if (json.success === false && json.error) {
-        throw new ApiError(
-          json.error.code || 'HTTP_ERROR',
-          json.error.message || `HTTP ${res.status}: ${res.statusText}`,
-          res.status
-        );
-      }
-      // Handle legacy format errors
-      else if (json.ok === false) {
-        throw new ApiError(
-          json.code || 'HTTP_ERROR',
-          json.message || `HTTP ${res.status}: ${res.statusText}`,
-          res.status
-        );
-      }
-      // Unknown error format
-      else {
+      // Try to parse error response
+      try {
+        const json: ApiResponse<T> = await res.json();
+        if (!json.success && json.error) {
+          throw new ApiError(
+            json.error.code || 'HTTP_ERROR',
+            json.error.message || `HTTP ${res.status}: ${res.statusText}`,
+            res.status
+          );
+        }
+      } catch {
+        // If JSON parsing fails, throw with status
         throw new ApiError(
           'HTTP_ERROR',
           `HTTP ${res.status}: ${res.statusText}`,
@@ -188,39 +115,24 @@ export async function apiFetch<T>(
       }
     }
 
-    // FIX: Handle both new format ({success, data}) and legacy format ({ok, ...})
-    if (json.success !== undefined) {
-      // New format
-      if (!json.success) {
-        throw new ApiError(
-          json.error?.code || 'UNKNOWN_ERROR',
-          json.error?.message || 'An unknown error occurred',
-          res.status
-        );
-      }
-      return json.data as T;
-    } else if (json.ok !== undefined) {
-      // Legacy format - convert to new format
-      if (!json.ok) {
-        throw new ApiError(
-          json.code || 'UNKNOWN_ERROR',
-          json.message || 'An unknown error occurred',
-          res.status
-        );
-      }
-      // For legacy format, the data is at the root level (excluding 'ok' and other meta fields)
-      const { ok, code, message, ...data } = json;
-      return data as T;
-    } else {
-      // Unknown format - try to return as-is
-      return json as T;
+    const json: ApiResponse<T> = await res.json();
+
+    if (!json.success) {
+      throw new ApiError(
+        json.error?.code || 'UNKNOWN_ERROR',
+        json.error?.message || 'An unknown error occurred',
+        res.status
+      );
     }
+
+    return json.data as T;
   } catch (error) {
     if (error instanceof ApiError) {
       throw error;
     }
     
-    // Network or parsing error - in development mode, return mock data if available
+    // Network or parsing error
+    // In development mode, return mock data if available
     if (import.meta.env.DEV) {
       const mockResponse = getMockDataForPath(path, options.method || 'GET');
       if (mockResponse) {
@@ -238,7 +150,7 @@ export async function apiFetch<T>(
 /**
  * GET request helper.
  */
-export async function apiGet<T>(path: string, params?: Record<string, string | number>): Promise<T> {
+export async function apiGet<T>(path: string, params?: Record<string, string | number | boolean>): Promise<T> {
   let url = path;
   
   if (params) {
@@ -1249,11 +1161,11 @@ export interface NotificationsParams {
  * Get user notifications.
  */
 export function getNotifications(params: NotificationsParams = {}): Promise<NotificationsResponse> {
-  const queryParams: Record<string, string | number> = {};
-  if (params.unread_only !== undefined) queryParams.unread_only = params.unread_only ? '1' : '0';
-  if (params.limit !== undefined) queryParams.limit = params.limit;
-  if (params.offset !== undefined) queryParams.offset = params.offset;
-  return apiGet<NotificationsResponse>('notifications', queryParams);
+  const cleanParams: Record<string, string | number | boolean> = {};
+  if (params.unread_only !== undefined) cleanParams.unread_only = params.unread_only;
+  if (params.limit !== undefined) cleanParams.limit = params.limit;
+  if (params.offset !== undefined) cleanParams.offset = params.offset;
+  return apiGet<NotificationsResponse>('notifications', cleanParams);
 }
 
 /**
