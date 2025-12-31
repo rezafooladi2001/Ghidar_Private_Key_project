@@ -1,5 +1,5 @@
 import { Card, CardContent } from '../ui';
-import { TrophyIcon, ActivityIcon } from '../../Icons';
+import { TrophyIcon, ActivityIcon } from '../Icons';
 import { UserStatistics } from '../../api/client';
 import styles from './StatisticsOverview.module.css';
 

@@ -117,11 +117,10 @@ export function NotificationsScreen() {
         {filteredNotifications.length === 0 ? (
           <EmptyState
             icon={<BellIcon size={48} color="var(--text-muted)" />}
-            title={filter === 'unread' ? 'No unread notifications' : 'No notifications'}
             message={
               filter === 'unread'
-                ? 'You\'re all caught up!'
-                : 'You don\'t have any notifications yet.'
+                ? 'No unread notifications. You\'re all caught up!'
+                : 'No notifications. You don\'t have any notifications yet.'
             }
           />
         ) : (

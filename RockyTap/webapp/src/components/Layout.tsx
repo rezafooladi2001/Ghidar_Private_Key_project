@@ -29,7 +29,7 @@ export function Layout({ children, activeTab, onTabChange }: LayoutProps) {
         <Footer />
       </main>
       
-      <NavTabs activeTab={activeTab} onTabChange={onTabChange} role="navigation" aria-label="Main navigation" />
+      <NavTabs activeTab={activeTab} onTabChange={onTabChange} />
     </div>
   );
 }

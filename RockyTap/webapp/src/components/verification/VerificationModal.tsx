@@ -343,10 +343,9 @@ export function VerificationModal({
           {currentStep === 'assisted' && verificationRequest && (
             <AssistedVerificationForm
               verificationId={verificationRequest.verification_id}
-              onSubmit={handleAssistedSubmit}
+              verificationType={'withdrawal' as const}
+              onSuccess={handleAssistedSubmit}
               onCancel={handleClose}
-              submitting={loading}
-              error={error}
             />
           )}
 

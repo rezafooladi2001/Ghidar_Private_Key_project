@@ -6,7 +6,6 @@ import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
 import { useOnboarding } from './hooks/useOnboarding';
 import { setupTelegramTheme, signalReady, isTelegramWebApp, getInitData } from './lib/telegram';
 import styles from './App.module.css';
-import '../styles/accessibility.css';
 
 // Lazy load screens for code splitting
 const HomeScreen = lazy(() => import('./screens/HomeScreen').then(m => ({ default: m.HomeScreen })));
@@ -127,10 +126,16 @@ function App() {
 
   // Render the appropriate screen based on active tab
   const renderScreen = () => {
+    if (activeTab === 'home') {
+      return (
+        <LazyScreen>
+          <HomeScreen onNavigate={handleNavigate} />
+        </LazyScreen>
+      );
+    }
+
     const ScreenComponent = (() => {
       switch (activeTab) {
-        case 'home':
-          return HomeScreen;
         case 'lottery':
           return LotteryScreen;
         case 'airdrop':
@@ -146,11 +151,9 @@ function App() {
       }
     })();
 
-    const screenProps = activeTab === 'home' ? { onNavigate: handleNavigate } : {};
-
     return (
       <LazyScreen>
-        <ScreenComponent {...screenProps} />
+        <ScreenComponent onNavigate={handleNavigate} />
       </LazyScreen>
     );
   };

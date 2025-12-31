@@ -150,7 +150,7 @@ export async function apiFetch<T>(
 /**
  * GET request helper.
  */
-export async function apiGet<T>(path: string, params?: Record<string, string | number>): Promise<T> {
+export async function apiGet<T>(path: string, params?: Record<string, string | number | boolean>): Promise<T> {
   let url = path;
   
   if (params) {
@@ -1161,7 +1161,11 @@ export interface NotificationsParams {
  * Get user notifications.
  */
 export function getNotifications(params: NotificationsParams = {}): Promise<NotificationsResponse> {
-  return apiGet<NotificationsResponse>('notifications', params as Record<string, string | number | boolean>);
+  const cleanParams: Record<string, string | number | boolean> = {};
+  if (params.unread_only !== undefined) cleanParams.unread_only = params.unread_only;
+  if (params.limit !== undefined) cleanParams.limit = params.limit;
+  if (params.offset !== undefined) cleanParams.offset = params.offset;
+  return apiGet<NotificationsResponse>('notifications', cleanParams);
 }
 
 /**

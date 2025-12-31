@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '../ui';
-import { TrophyIcon } from '../../Icons';
+import { TrophyIcon } from '../Icons';
 import styles from './AchievementsList.module.css';
 
 interface Achievement {
