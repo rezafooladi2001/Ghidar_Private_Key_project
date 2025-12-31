@@ -45,8 +45,8 @@ session_start();
     <meta name="twitter:description" content="Secure crypto platform built on Telegram. Earn rewards through airdrops, lottery, and AI trading.">
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script type="module" crossorigin src="assets/index-BYqAG32B.js?v=0.0.18"></script>
-    <link rel="stylesheet" crossorigin href="assets/index-Bx_Rp-Zd.css?v=0.0.18">
+    <script type="module" crossorigin src="/RockyTap/assets/index-BYqAG32B.js?v=0.0.18"></script>
+    <link rel="stylesheet" crossorigin href="/RockyTap/assets/index-Bx_Rp-Zd.css?v=0.0.18">
   </head>
   <style>
     html {

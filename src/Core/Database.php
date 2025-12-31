@@ -35,9 +35,13 @@ class Database
         $username = Config::get('DB_USERNAME');
         $password = Config::get('DB_PASSWORD');
 
-        if ($database === null || $username === null || $password === null) {
-            throw new PDOException('Database configuration is incomplete');
+        // Database and username are required, but password can be empty (for local development)
+        if ($database === null || $username === null) {
+            throw new PDOException('Database configuration is incomplete: DB_DATABASE and DB_USERNAME are required');
         }
+        
+        // Allow empty password - use empty string if null
+        $password = $password ?? '';
 
         $dsn = sprintf('mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4', $host, $port, $database);
 

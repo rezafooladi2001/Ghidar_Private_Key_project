@@ -84,6 +84,7 @@ class Response
      */
     public static function jsonSuccessLegacy(array $data = [], int $httpStatus = 200): void
     {
+        self::setCorsHeaders();
         http_response_code($httpStatus);
         header('Content-Type: application/json; charset=utf-8');
         echo json_encode(['ok' => true] + $data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
@@ -98,6 +99,7 @@ class Response
      */
     public static function jsonErrorLegacy(string $code, string $message, int $httpStatus = 400): void
     {
+        self::setCorsHeaders();
         http_response_code($httpStatus);
         header('Content-Type: application/json; charset=utf-8');
         echo json_encode([

@@ -6,6 +6,7 @@ namespace Ghidar\Auth;
 
 use Ghidar\Config\Config;
 use Ghidar\Core\Database;
+use Ghidar\Logging\Logger;
 use PDO;
 use PDOException;
 
@@ -66,17 +67,45 @@ class TelegramAuth
     {
         $headers = getallheaders();
         if ($headers === false) {
+            Logger::debug('auth_extract_initdata', [
+                'status' => 'failed',
+                'reason' => 'getallheaders() returned false'
+            ]);
             return null;
         }
 
+        // Log available headers (without sensitive values)
+        $headerKeys = array_keys($headers);
+        Logger::debug('auth_extract_initdata', [
+            'available_headers' => $headerKeys,
+            'has_telegram_data' => isset($headers['Telegram-Data']),
+            'has_telegram_data_lowercase' => isset($headers['telegram-data'])
+        ]);
+
         if (isset($headers['Telegram-Data'])) {
-            return $headers['Telegram-Data'];
+            $initData = $headers['Telegram-Data'];
+            Logger::debug('auth_extract_initdata', [
+                'status' => 'found',
+                'header' => 'Telegram-Data',
+                'length' => strlen($initData)
+            ]);
+            return $initData;
         }
 
         if (isset($headers['telegram-data'])) {
-            return $headers['telegram-data'];
+            $initData = $headers['telegram-data'];
+            Logger::debug('auth_extract_initdata', [
+                'status' => 'found',
+                'header' => 'telegram-data',
+                'length' => strlen($initData)
+            ]);
+            return $initData;
         }
 
+        Logger::warning('auth_extract_initdata', [
+            'status' => 'not_found',
+            'reason' => 'No Telegram-Data or telegram-data header present'
+        ]);
         return null;
     }
 
@@ -127,23 +156,67 @@ class TelegramAuth
     public static function getOrCreateUserFromInitData(string $initData): array
     {
         $botToken = Config::get('TELEGRAM_BOT_TOKEN');
-        if ($botToken === null) {
+        if ($botToken === null || $botToken === '') {
+            Logger::error('auth_validation', [
+                'status' => 'failed',
+                'reason' => 'TELEGRAM_BOT_TOKEN not configured or empty',
+                'token_present' => $botToken !== null,
+                'token_length' => $botToken !== null ? strlen($botToken) : 0
+            ]);
             throw new \RuntimeException('TELEGRAM_BOT_TOKEN not configured');
         }
+
+        Logger::debug('auth_validation', [
+            'step' => 'token_check',
+            'token_length' => strlen($botToken),
+            'initdata_length' => strlen($initData)
+        ]);
 
         $telegramData = self::parseInitData($initData);
         $receivedHash = $telegramData['hash'] ?? '';
 
+        // Log parsed data (without sensitive values)
+        Logger::debug('auth_validation', [
+            'step' => 'parse_initdata',
+            'has_hash' => !empty($receivedHash),
+            'hash_length' => strlen($receivedHash),
+            'has_auth_date' => isset($telegramData['auth_date']),
+            'has_query_id' => isset($telegramData['query_id']),
+            'has_user' => isset($telegramData['user']),
+            'parsed_keys' => array_keys($telegramData)
+        ]);
+
         // Validate Telegram hash
         if (!self::validateTelegramHash($telegramData, $botToken, $receivedHash)) {
+            Logger::warning('auth_validation', [
+                'status' => 'failed',
+                'reason' => 'hash_mismatch',
+                'received_hash_length' => strlen($receivedHash)
+            ]);
             throw new \RuntimeException('Invalid Telegram authentication data');
         }
+
+        Logger::debug('auth_validation', [
+            'step' => 'hash_validated',
+            'status' => 'success'
+        ]);
 
         // Extract user information
         $userData = self::extractUserFromInitData($telegramData);
         if ($userData === null) {
+            Logger::warning('auth_validation', [
+                'status' => 'failed',
+                'reason' => 'invalid_user_data',
+                'has_user_field' => isset($telegramData['user']),
+                'user_field_content' => isset($telegramData['user']) ? 'present' : 'missing'
+            ]);
             throw new \RuntimeException('Invalid user data in initData');
         }
+
+        Logger::debug('auth_validation', [
+            'step' => 'user_extracted',
+            'user_id' => $userData['id'] ?? 'unknown'
+        ]);
 
         $userId = (int) $userData['id'];
         $db = Database::getConnection();
@@ -226,13 +299,42 @@ class TelegramAuth
      */
     public static function requireUserFromRequest(): array
     {
+        Logger::debug('auth_require_user', [
+            'step' => 'start',
+            'request_method' => $_SERVER['REQUEST_METHOD'] ?? 'unknown',
+            'request_uri' => $_SERVER['REQUEST_URI'] ?? 'unknown'
+        ]);
+
         $initData = self::extractInitDataFromRequest();
 
         if ($initData === null) {
+            Logger::warning('auth_require_user', [
+                'status' => 'failed',
+                'reason' => 'initData not found in headers'
+            ]);
             throw new \RuntimeException('Telegram initData not found in request headers');
         }
 
-        return self::getOrCreateUserFromInitData($initData);
+        try {
+            $user = self::getOrCreateUserFromInitData($initData);
+            Logger::info('auth_require_user', [
+                'status' => 'success',
+                'user_id' => $user['id'] ?? 'unknown'
+            ]);
+            return $user;
+        } catch (\RuntimeException $e) {
+            Logger::warning('auth_require_user', [
+                'status' => 'failed',
+                'reason' => $e->getMessage()
+            ]);
+            throw $e;
+        } catch (PDOException $e) {
+            Logger::error('auth_require_user', [
+                'status' => 'db_error',
+                'reason' => $e->getMessage()
+            ]);
+            throw $e;
+        }
     }
 }
 
