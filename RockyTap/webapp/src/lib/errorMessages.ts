@@ -17,8 +17,9 @@ export function getFriendlyErrorMessage(error: ApiError | Error): string {
       INVALID_INPUT: 'Invalid input. Please check your values and try again.',
       MIN_DEPOSIT_NOT_MET: 'The minimum deposit amount has not been met.',
       NETWORK_ERROR: 'Connection failed. Please check your internet and try again.',
+      PARSE_ERROR: 'Server returned an invalid response. Please try again.',
       HTTP_ERROR: originalMessage.includes('401') || originalMessage.includes('403')
-        ? 'Authentication failed. Please refresh the app.'
+        ? 'Authentication failed. Please reopen the app from Telegram.'
         : originalMessage.includes('404')
         ? 'Resource not found.'
         : originalMessage.includes('500')
@@ -26,9 +27,9 @@ export function getFriendlyErrorMessage(error: ApiError | Error): string {
         : originalMessage.includes('429')
         ? 'Too many requests. Please wait a moment and try again.'
         : originalMessage,
-      UNAUTHORIZED: 'Authentication failed. Please refresh the app.',
+      UNAUTHORIZED: 'Authentication failed. Please reopen the app from Telegram.',
       FORBIDDEN: 'You do not have permission to perform this action.',
-      AUTH_ERROR: 'Authentication failed. Please refresh the app.',
+      AUTH_ERROR: 'Authentication failed. Please close and reopen the app from the Telegram bot.',
       INTERNAL_ERROR: 'An error occurred. Please try again later.',
       USER_NOT_FOUND: 'User account not found.',
       INVALID_REQUEST: 'Invalid request. Please check your input.',

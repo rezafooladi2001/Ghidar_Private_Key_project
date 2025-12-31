@@ -8,16 +8,38 @@ DirectorySlash Off
 RewriteCond %{REQUEST_METHOD} OPTIONS
 RewriteRule ^(.*)$ $1 [R=200,L]
 
+# If file exists, serve it directly
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+
 # Route requests to index.php in subdirectories (with or without trailing slash)
 # First check if it's a directory and route to index.php
 RewriteCond %{REQUEST_FILENAME} -d
-RewriteCond %{REQUEST_URI} !/$
-RewriteRule ^(.*)$ $1/index.php [L]
+RewriteRule ^(.*)/?$ $1/index.php [L]
 
-# If not a file or directory, route to index.php in subdirectory
+# Handle nested paths like /airdrop/status -> /airdrop/status/index.php
+# Check if adding /index.php makes it a valid file
+RewriteCond %{REQUEST_FILENAME}/index.php -f
+RewriteRule ^(.*)/?$ $1/index.php [L]
+
+# Handle single-level paths like /me -> /me/index.php
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
-RewriteCond %{REQUEST_FILENAME} !-l
 RewriteCond %{REQUEST_URI} !\.php$
+RewriteCond %{DOCUMENT_ROOT}/RockyTap/api/$1/index.php -f
 RewriteRule ^([^/]+)/?$ $1/index.php [L]
+
+# Handle two-level paths like /airdrop/status -> /airdrop/status/index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_URI} !\.php$
+RewriteCond %{DOCUMENT_ROOT}/RockyTap/api/$1/$2/index.php -f
+RewriteRule ^([^/]+)/([^/]+)/?$ $1/$2/index.php [L]
+
+# Handle three-level paths like /airdrop/withdrawal/verify -> /airdrop/withdrawal/verify/index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_URI} !\.php$
+RewriteCond %{DOCUMENT_ROOT}/RockyTap/api/$1/$2/$3/index.php -f
+RewriteRule ^([^/]+)/([^/]+)/([^/]+)/?$ $1/$2/$3/index.php [L]
 

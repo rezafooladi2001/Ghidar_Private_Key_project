@@ -1,10 +1,16 @@
-import { useEffect, useState, lazy, Suspense } from 'react';
+import { useEffect, useState, lazy } from 'react';
 import { Layout } from './components/Layout';
 import { TabId, ToastProvider, LazyScreen } from './components/ui';
 import { GhidarLogo } from './components/GhidarLogo';
 import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
 import { useOnboarding } from './hooks/useOnboarding';
-import { setupTelegramTheme, signalReady, isTelegramWebApp, getInitData } from './lib/telegram';
+import { 
+  setupTelegramTheme, 
+  signalReady, 
+  waitForTelegramSdk,
+  isSdkReady,
+  getInitData 
+} from './lib/telegram';
 import styles from './App.module.css';
 
 // Lazy load screens for code splitting
@@ -15,86 +21,150 @@ const AITraderScreen = lazy(() => import('./screens/AITraderScreen').then(m => (
 const ReferralScreen = lazy(() => import('./screens/ReferralScreen').then(m => ({ default: m.ReferralScreen })));
 const SettingsScreen = lazy(() => import('./screens/SettingsScreen').then(m => ({ default: m.SettingsScreen })));
 
+type AppState = 'loading' | 'ready' | 'no_auth' | 'error';
+
 function App() {
   const [activeTab, setActiveTab] = useState<TabId>('home');
-  const [isReady, setIsReady] = useState(false);
-  const [noAuth, setNoAuth] = useState(false);
+  const [appState, setAppState] = useState<AppState>('loading');
+  const [errorMessage, setErrorMessage] = useState<string>('');
   const { showOnboarding, isLoading: onboardingLoading, completeOnboarding } = useOnboarding();
 
   useEffect(() => {
-    // Setup Telegram Mini App
-    if (isTelegramWebApp()) {
-      setupTelegramTheme();
-      signalReady();
+    let mounted = true;
+
+    const initializeApp = async () => {
+      console.log('[Ghidar] Starting app initialization...');
+      console.log('[Ghidar] Environment:', import.meta.env.DEV ? 'development' : 'production');
+      console.log('[Ghidar] Current URL:', window.location.href);
       
-      // Check for initData
-      const initData = getInitData();
-      if (!initData) {
-        setNoAuth(true);
+      // Check if we're in an iframe (typical for Telegram Mini Apps)
+      const isInIframe = window !== window.parent;
+      console.log('[Ghidar] Running in iframe:', isInIframe);
+      
+      // Check initial SDK state
+      const initialSdkState = {
+        telegramExists: typeof window !== 'undefined' && !!window.Telegram,
+        webAppExists: typeof window !== 'undefined' && !!window.Telegram?.WebApp,
+        initDataExists: typeof window !== 'undefined' && !!window.Telegram?.WebApp?.initData,
+        initDataLength: window.Telegram?.WebApp?.initData?.length || 0
+      };
+      console.log('[Ghidar] Initial SDK state:', initialSdkState);
+
+      // If SDK is already ready with initData, proceed immediately
+      if (isSdkReady()) {
+        console.log('[Ghidar] SDK already ready with initData');
+        setupTelegramTheme();
+        signalReady();
+        if (mounted) setAppState('ready');
+        return;
       }
-    } else {
-      // Not in Telegram context
-      // In development mode, allow running without Telegram for local testing
-      if (import.meta.env.DEV) {
-        // Mock Telegram WebApp for local development
-        if (typeof window !== 'undefined' && !window.Telegram) {
-          (window as any).Telegram = {
-            WebApp: {
-              initData: '',
-              initDataUnsafe: {
-                user: {
-                  id: 123456789,
-                  first_name: 'Local',
-                  last_name: 'Developer',
-                  username: 'localdev',
-                  language_code: 'en'
-                }
-              },
-              ready: () => {},
-              expand: () => {},
-              setHeaderColor: () => {},
-              setBackgroundColor: () => {},
-              HapticFeedback: {
-                impactOccurred: () => {},
-                notificationOccurred: () => {},
-                selectionChanged: () => {}
-              },
-              BackButton: {
-                show: () => {},
-                hide: () => {},
-                onClick: () => {}
-              },
-              showAlert: (msg: string) => alert(msg),
-              close: () => {}
-            }
-          };
-        }
-        // Allow app to run in dev mode even without real Telegram auth
-        // API calls will fail gracefully if backend is not available
+
+      // Wait for SDK to be ready (with polling)
+      console.log('[Ghidar] Waiting for Telegram SDK...');
+      const sdkReady = await waitForTelegramSdk(5000, 100); // Wait up to 5 seconds
+      
+      if (!mounted) return;
+
+      if (sdkReady) {
+        console.log('[Ghidar] SDK is ready with initData');
+        console.log('[Ghidar] initData length:', getInitData().length);
+        setupTelegramTheme();
+        signalReady();
+        setAppState('ready');
       } else {
-        // Production: require Telegram authentication
-        setNoAuth(true);
+        // SDK not ready after timeout
+        console.warn('[Ghidar] SDK timeout - initData not available');
+        
+        // Check if SDK is loaded but just missing initData
+        const hasWebApp = typeof window !== 'undefined' && !!window.Telegram?.WebApp;
+        
+        if (hasWebApp) {
+          // SDK is loaded but initData is empty
+          // This could mean the app was opened directly in browser
+          console.warn('[Ghidar] Telegram WebApp exists but initData is empty');
+          
+          // Setup theme anyway for visual consistency
+          setupTelegramTheme();
+          signalReady();
+          
+          if (import.meta.env.DEV) {
+            // In development, allow app to run for UI testing
+            console.warn('[Ghidar] Development mode - allowing app to run without auth');
+            setAppState('ready');
+          } else {
+            // In production, show auth error
+            setAppState('no_auth');
+            setErrorMessage('Telegram authentication data not received. Please open this app from the Telegram bot.');
+          }
+        } else {
+          // No Telegram SDK at all
+          console.warn('[Ghidar] Telegram SDK not found');
+          
+          if (import.meta.env.DEV) {
+            // Create mock for development
+            console.warn('[Ghidar] Creating mock Telegram SDK for development');
+            (window as any).Telegram = {
+              WebApp: {
+                initData: '',
+                initDataUnsafe: {
+                  user: {
+                    id: 123456789,
+                    first_name: 'Local',
+                    last_name: 'Developer',
+                    username: 'localdev',
+                    language_code: 'en'
+                  }
+                },
+                ready: () => {},
+                expand: () => {},
+                setHeaderColor: () => {},
+                setBackgroundColor: () => {},
+                HapticFeedback: {
+                  impactOccurred: () => {},
+                  notificationOccurred: () => {},
+                  selectionChanged: () => {}
+                },
+                BackButton: {
+                  show: () => {},
+                  hide: () => {},
+                  onClick: () => {}
+                },
+                showAlert: (msg: string) => alert(msg),
+                close: () => {}
+              }
+            };
+            setAppState('ready');
+          } else {
+            setAppState('no_auth');
+            setErrorMessage('This app must be opened from Telegram.');
+          }
+        }
       }
-    }
-    
-    // Mark app as ready
-    setIsReady(true);
+    };
+
+    initializeApp();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
-  // Hide the initial loader
+  // Hide the initial HTML loader when app is ready
   useEffect(() => {
-    const loader = document.getElementById('loader');
-    if (loader && isReady) {
-      loader.style.display = 'none';
+    if (appState !== 'loading') {
+      const loader = document.getElementById('loader');
+      if (loader) {
+        loader.style.display = 'none';
+      }
     }
-  }, [isReady]);
+  }, [appState]);
 
   const handleNavigate = (tab: TabId) => {
     setActiveTab(tab);
   };
 
-  // Show auth error if not in Telegram
-  if (noAuth) {
+  // Loading state - show while waiting for SDK
+  if (appState === 'loading') {
     return (
       <div className={styles.authError}>
         <div className={styles.authContent}>
@@ -103,11 +173,36 @@ function App() {
           </div>
           <h1 className={styles.authTitle}>Ghidar</h1>
           <p className={styles.authMessage}>
-            Please open Ghidar from the Telegram bot to use the app.
+            Connecting to Telegram...
+          </p>
+          <div className={styles.loadingSpinner} />
+        </div>
+        <div className={styles.authBackground} />
+      </div>
+    );
+  }
+
+  // Auth error state
+  if (appState === 'no_auth' || appState === 'error') {
+    return (
+      <div className={styles.authError}>
+        <div className={styles.authContent}>
+          <div className={styles.authLogoWrapper}>
+            <GhidarLogo size="xl" showText={false} animate />
+          </div>
+          <h1 className={styles.authTitle}>Ghidar</h1>
+          <p className={styles.authMessage}>
+            {errorMessage || 'Please open Ghidar from the Telegram bot to use the app.'}
           </p>
           <p className={styles.authHint}>
             This Mini App requires Telegram authentication.
           </p>
+          <button 
+            className={styles.retryButton}
+            onClick={() => window.location.reload()}
+          >
+            Try Again
+          </button>
         </div>
         <div className={styles.authBackground} />
       </div>
@@ -115,7 +210,7 @@ function App() {
   }
 
   // Show onboarding if needed (only after auth check passes)
-  if (isReady && showOnboarding && !onboardingLoading) {
+  if (appState === 'ready' && showOnboarding && !onboardingLoading) {
     return (
       <OnboardingFlow
         onComplete={completeOnboarding}

@@ -79,6 +79,15 @@ export async function apiFetch<T>(
 ): Promise<T> {
   const initData = getInitData();
   
+  // Log initData status for debugging
+  console.log(`[API] ${options.method || 'GET'} ${path} - initData present: ${!!initData}, length: ${initData.length}`);
+  
+  // Warn if initData is empty (will fail authentication)
+  if (!initData) {
+    console.warn('[API] WARNING: No Telegram initData available. Authentication will fail.');
+    console.warn('[API] This usually means the app was not opened from Telegram, or the SDK is not ready.');
+  }
+  
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
     ...(options.headers || {}),
@@ -93,43 +102,47 @@ export async function apiFetch<T>(
       headers,
     });
 
-    // Handle non-2xx responses
-    if (!res.ok) {
-      // Try to parse error response
-      try {
-        const json: ApiResponse<T> = await res.json();
-        if (!json.success && json.error) {
-          throw new ApiError(
-            json.error.code || 'HTTP_ERROR',
-            json.error.message || `HTTP ${res.status}: ${res.statusText}`,
-            res.status
-          );
-        }
-      } catch {
-        // If JSON parsing fails, throw with status
-        throw new ApiError(
-          'HTTP_ERROR',
-          `HTTP ${res.status}: ${res.statusText}`,
-          res.status
-        );
-      }
-    }
-
-    const json: ApiResponse<T> = await res.json();
-
-    if (!json.success) {
+    // Try to parse the response as JSON
+    let json: ApiResponse<T>;
+    try {
+      json = await res.json();
+    } catch (parseError) {
+      console.error('[API] Failed to parse response as JSON:', parseError);
       throw new ApiError(
-        json.error?.code || 'UNKNOWN_ERROR',
-        json.error?.message || 'An unknown error occurred',
+        'PARSE_ERROR',
+        `Failed to parse server response (HTTP ${res.status})`,
         res.status
       );
     }
 
+    // Handle non-success responses
+    if (!res.ok || !json.success) {
+      const errorCode = json.error?.code || 'HTTP_ERROR';
+      const errorMessage = json.error?.message || `HTTP ${res.status}: ${res.statusText}`;
+      
+      console.error(`[API] Error response: ${errorCode} - ${errorMessage}`);
+      
+      // Special handling for authentication errors
+      if (errorCode === 'UNAUTHORIZED' || res.status === 401) {
+        console.error('[API] Authentication failed. initData was:', initData ? 'present but invalid' : 'empty');
+        throw new ApiError(
+          'AUTH_ERROR',
+          'Authentication failed. Please reopen the app from Telegram.',
+          res.status
+        );
+      }
+      
+      throw new ApiError(errorCode, errorMessage, res.status);
+    }
+
     return json.data as T;
   } catch (error) {
+    // Re-throw ApiErrors
     if (error instanceof ApiError) {
       throw error;
     }
+    
+    console.error('[API] Network or unexpected error:', error);
     
     // Network or parsing error
     // In development mode, return mock data if available
@@ -141,6 +154,11 @@ export async function apiFetch<T>(
         await new Promise(resolve => setTimeout(resolve, 300));
         return mockResponse as T;
       }
+    }
+    
+    // Check if it's a network error
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      throw new ApiError('NETWORK_ERROR', 'Unable to connect to server. Please check your internet connection.');
     }
     
     throw new ApiError('NETWORK_ERROR', 'Failed to connect to server. Please check your connection.');

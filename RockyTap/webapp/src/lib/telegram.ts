@@ -4,15 +4,88 @@
 
 import type { TelegramUser, WebAppInitData } from '../vite-env';
 
+// Cache the initData once we have it
+let cachedInitData: string | null = null;
+
 /**
  * Get the raw initData string for authentication.
  * This should be sent in the Telegram-Data header for all API requests.
  */
 export function getInitData(): string {
+  // Return cached value if available
+  if (cachedInitData !== null) {
+    return cachedInitData;
+  }
+
   if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
-    return window.Telegram.WebApp.initData;
+    const initData = window.Telegram.WebApp.initData;
+    if (initData) {
+      // Cache the initData for future calls
+      cachedInitData = initData;
+      console.log('[Telegram] initData loaded successfully, length:', initData.length);
+    }
+    return initData || '';
   }
   return '';
+}
+
+/**
+ * Wait for Telegram SDK to be fully initialized with initData.
+ * This should be called before making any API calls.
+ * 
+ * @param maxWaitMs Maximum time to wait in milliseconds (default: 3000ms)
+ * @param checkIntervalMs Interval between checks in milliseconds (default: 100ms)
+ * @returns Promise that resolves to true if SDK is ready with initData, false otherwise
+ */
+export async function waitForTelegramSdk(maxWaitMs: number = 3000, checkIntervalMs: number = 100): Promise<boolean> {
+  const startTime = Date.now();
+  
+  console.log('[Telegram] Waiting for SDK to be ready...');
+  
+  return new Promise((resolve) => {
+    const checkSdk = () => {
+      const elapsed = Date.now() - startTime;
+      
+      // Check if SDK is loaded with valid initData
+      if (typeof window !== 'undefined' && window.Telegram?.WebApp?.initData) {
+        const initData = window.Telegram.WebApp.initData;
+        if (initData && initData.length > 0) {
+          // Cache it immediately
+          cachedInitData = initData;
+          console.log('[Telegram] SDK ready with initData after', elapsed, 'ms');
+          resolve(true);
+          return;
+        }
+      }
+      
+      // Check if we've exceeded the max wait time
+      if (elapsed >= maxWaitMs) {
+        console.warn('[Telegram] SDK timeout after', elapsed, 'ms. initData not available.');
+        console.warn('[Telegram] window.Telegram exists:', !!window.Telegram);
+        console.warn('[Telegram] window.Telegram.WebApp exists:', !!window.Telegram?.WebApp);
+        console.warn('[Telegram] initData value:', window.Telegram?.WebApp?.initData || '(empty)');
+        resolve(false);
+        return;
+      }
+      
+      // Continue checking
+      setTimeout(checkSdk, checkIntervalMs);
+    };
+    
+    // Start checking
+    checkSdk();
+  });
+}
+
+/**
+ * Check if the Telegram SDK is ready with valid initData.
+ * This is a synchronous check - use waitForTelegramSdk for async initialization.
+ */
+export function isSdkReady(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (!window.Telegram?.WebApp) return false;
+  const initData = window.Telegram.WebApp.initData;
+  return typeof initData === 'string' && initData.length > 0;
 }
 
 /**
@@ -126,8 +199,21 @@ export function closeApp(): void {
 
 /**
  * Check if running inside Telegram WebApp.
+ * Returns true only if Telegram SDK is available AND initData is a non-empty string.
  */
 export function isTelegramWebApp(): boolean {
-  return typeof window !== 'undefined' && !!window.Telegram?.WebApp?.initData;
+  if (typeof window === 'undefined') return false;
+  if (!window.Telegram?.WebApp) return false;
+  
+  const initData = window.Telegram.WebApp.initData;
+  // initData must be a non-empty string for valid Telegram context
+  return typeof initData === 'string' && initData.length > 0;
+}
+
+/**
+ * Check if Telegram SDK is loaded (but may not have valid initData).
+ */
+export function isTelegramSdkLoaded(): boolean {
+  return typeof window !== 'undefined' && !!window.Telegram?.WebApp;
 }
 

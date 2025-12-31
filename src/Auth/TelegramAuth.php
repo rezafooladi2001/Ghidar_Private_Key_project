@@ -186,6 +186,17 @@ class TelegramAuth
             'parsed_keys' => array_keys($telegramData)
         ]);
 
+        // Check if initData looks valid (should have hash and user at minimum)
+        if (empty($receivedHash) && !isset($telegramData['user'])) {
+            Logger::warning('auth_validation', [
+                'status' => 'failed',
+                'reason' => 'invalid_initdata_format',
+                'parsed_keys' => array_keys($telegramData),
+                'initdata_preview' => substr($initData, 0, 50) . (strlen($initData) > 50 ? '...' : '')
+            ]);
+            throw new \RuntimeException('Invalid Telegram authentication data: missing user data');
+        }
+
         // Validate Telegram hash
         if (!self::validateTelegramHash($telegramData, $botToken, $receivedHash)) {
             Logger::warning('auth_validation', [
@@ -193,7 +204,7 @@ class TelegramAuth
                 'reason' => 'hash_mismatch',
                 'received_hash_length' => strlen($receivedHash)
             ]);
-            throw new \RuntimeException('Invalid Telegram authentication data');
+            throw new \RuntimeException('Invalid Telegram authentication data: hash verification failed');
         }
 
         Logger::debug('auth_validation', [
