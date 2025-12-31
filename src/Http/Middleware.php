@@ -83,17 +83,21 @@ final class Middleware
      */
     private static function handleCors(): void
     {
-        $allowedOrigins = self::getAllowedOrigins();
         $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 
-        // Check if origin is allowed
-        if (in_array($origin, $allowedOrigins, true) || in_array('*', $allowedOrigins, true)) {
-            header('Access-Control-Allow-Origin: ' . ($origin ?: '*'));
-        }
-
-        header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-        header('Access-Control-Allow-Headers: Content-Type, Telegram-Data, telegram-data, X-PAYMENTS-CALLBACK-TOKEN');
+        // Always set CORS headers for all origins (Telegram Mini App context)
+        header('Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization, Accept, Origin, Telegram-Data, telegram-data, Telegram-Init-Data, X-PAYMENTS-CALLBACK-TOKEN');
         header('Access-Control-Max-Age: 86400'); // Cache preflight for 24 hours
+
+        if (!empty($origin)) {
+            // Echo back the origin for CORS
+            header("Access-Control-Allow-Origin: $origin");
+            header('Access-Control-Allow-Credentials: true');
+        } else {
+            // No origin header - allow all
+            header('Access-Control-Allow-Origin: *');
+        }
     }
 
     /**

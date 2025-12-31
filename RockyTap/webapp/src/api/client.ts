@@ -79,7 +79,9 @@ export async function apiFetch<T>(
 ): Promise<T> {
   const initData = getInitData();
   
-  const url = `${API_BASE}/${path.replace(/^\//, '')}`;
+  // Ensure path ends with trailing slash for proper routing
+  const normalizedPath = path.replace(/^\//, '').replace(/\/?$/, '/');
+  const url = `${API_BASE}/${normalizedPath}`;
   
   // Comprehensive logging for debugging
   console.log(`[API] Request: ${options.method || 'GET'} ${url}`);
@@ -98,15 +100,35 @@ export async function apiFetch<T>(
   };
   
   try {
+    console.log(`[API] Fetching: ${url}`);
+    const startTime = Date.now();
+    
     const res = await fetch(url, {
       ...options,
       headers,
+      credentials: 'same-origin', // Include cookies for same-origin requests
     });
+
+    const elapsed = Date.now() - startTime;
+    console.log(`[API] Response received in ${elapsed}ms: status=${res.status}, ok=${res.ok}`);
 
     // Try to parse the response as JSON
     let json: ApiResponse<T>;
     try {
-      json = await res.json();
+      const responseText = await res.text();
+      console.log(`[API] Response body length: ${responseText.length} chars`);
+      
+      if (!responseText) {
+        console.error('[API] Empty response body');
+        throw new ApiError(
+          'EMPTY_RESPONSE',
+          'Server returned an empty response',
+          res.status
+        );
+      }
+      
+      json = JSON.parse(responseText);
+      console.log(`[API] Parsed JSON successfully. success=${json.success}`);
     } catch (parseError) {
       console.error('[API] Failed to parse response as JSON:', parseError);
       throw new ApiError(
@@ -143,7 +165,15 @@ export async function apiFetch<T>(
       throw error;
     }
     
-    console.error('[API] Network or unexpected error:', error);
+    // Log detailed error info
+    const errorInfo = {
+      name: error instanceof Error ? error.name : 'Unknown',
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      url: url,
+      path: path,
+    };
+    console.error('[API] Network or unexpected error:', errorInfo);
     
     // Network or parsing error
     // In development mode, return mock data if available
@@ -157,9 +187,11 @@ export async function apiFetch<T>(
       }
     }
     
-    // Check if it's a network error
-    if (error instanceof TypeError && error.message.includes('fetch')) {
-      throw new ApiError('NETWORK_ERROR', 'Unable to connect to server. Please check your internet connection.');
+    // Provide more specific error messages
+    if (error instanceof TypeError) {
+      // TypeError usually indicates network failure
+      console.error('[API] TypeError detected - likely network issue');
+      throw new ApiError('NETWORK_ERROR', `Network error: ${error.message}`);
     }
     
     throw new ApiError('NETWORK_ERROR', 'Failed to connect to server. Please check your connection.');

@@ -4,9 +4,15 @@ RewriteBase /RockyTap/api/
 # Disable directory slash redirect for API endpoints
 DirectorySlash Off
 
-# Allow OPTIONS for CORS preflight
+# Handle OPTIONS preflight - let PHP handle it by routing to any endpoint
+# The bootstrap.php will respond with proper CORS headers
 RewriteCond %{REQUEST_METHOD} OPTIONS
-RewriteRule ^(.*)$ $1 [R=200,L]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^([^/]+)/?$ $1/index.php [L]
+
+RewriteCond %{REQUEST_METHOD} OPTIONS
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^([^/]+)/([^/]+)/?$ $1/$2/index.php [L]
 
 # If file exists, serve it directly
 RewriteCond %{REQUEST_FILENAME} -f
