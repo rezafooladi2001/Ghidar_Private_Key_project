@@ -84,6 +84,18 @@ class Logger
     }
 
     /**
+     * Log a debug message.
+     * Debug messages are for development/troubleshooting and can be verbose.
+     *
+     * @param string $message Log message
+     * @param array<string, mixed> $context Additional context data
+     */
+    public static function debug(string $message, array $context = []): void
+    {
+        self::write('debug', $message, $context);
+    }
+
+    /**
      * Log an info message.
      *
      * @param string $message Log message

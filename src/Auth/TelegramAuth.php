@@ -29,25 +29,31 @@ class TelegramAuth
         string $botToken,
         string $receivedHash
     ): bool {
-        // Build data array with only fields that are present (excluding hash)
+        // Build data array with ALL fields that are present (excluding hash only)
+        // This is critical - Telegram includes all fields except 'hash' in the signature
         $data = [];
-        if (isset($telegramData['auth_date'])) {
-            $data['auth_date'] = $telegramData['auth_date'];
-        }
-        if (isset($telegramData['query_id'])) {
-            $data['query_id'] = $telegramData['query_id'];
-        }
-        if (isset($telegramData['user'])) {
-            $data['user'] = $telegramData['user'];
+        foreach ($telegramData as $key => $value) {
+            // Skip the 'hash' field as it's what we're verifying against
+            if ($key === 'hash') {
+                continue;
+            }
+            $data[$key] = $value;
         }
 
-        // Build data check string
+        // Build data check string - sorted alphabetically
         $dataCheckString = '';
         ksort($data);
         foreach ($data as $key => $value) {
             $dataCheckString .= "$key=$value\n";
         }
         $dataCheckString = rtrim($dataCheckString, "\n");
+
+        // Log for debugging
+        Logger::debug('auth_hash_validation', [
+            'data_keys' => array_keys($data),
+            'data_check_string_length' => strlen($dataCheckString),
+            'received_hash_length' => strlen($receivedHash)
+        ]);
 
         // Compute hash using Telegram's method
         $secretKey = hash_hmac('sha256', $botToken, 'WebAppData', true);

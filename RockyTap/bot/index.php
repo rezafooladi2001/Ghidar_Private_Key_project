@@ -221,6 +221,51 @@ if (isset($UserDataBase) && isset($UserDataBase['step']) && $UserDataBase['step'
     die;
 }
 
+// Test API command - tests if API calls work
+if ($msg && $msg === '/test') {
+    $test_url = $base_url . '/RockyTap/ghidar/test-api.html';
+    error_log("[BOT] /test command received from user $from_id");
+    $bot->sendMessage($from_id, '
+🧪 <b>API Test</b>
+
+Tap the button below to test if the API works correctly.
+This will verify that authentication is working.
+', [
+        'parse_mode' => 'HTML',
+        'reply_to_message_id' => $message_id,
+        'reply_markup' => json_encode([
+            'inline_keyboard' => [
+                [['text' => '🧪 Test API', 'web_app' => ['url' => $test_url]]],
+            ]
+        ])
+    ]);
+    die;
+}
+
+// Debug command - opens debug page to check SDK status
+if ($msg && $msg === '/debug') {
+    $debug_url = $base_url . '/RockyTap/ghidar/debug.html';
+    error_log("[BOT] /debug command received from user $from_id");
+    $bot->sendMessage($from_id, '
+🔍 <b>Debug Mode</b>
+
+Tap the button below to open the debug page.
+This will show you the Telegram SDK status and help diagnose any issues.
+
+<b>What to look for:</b>
+✅ initData PRESENT = Working correctly
+❌ initData EMPTY = BotFather not configured
+', [
+        'parse_mode' => 'HTML',
+        'reply_to_message_id' => $message_id,
+        'reply_markup' => json_encode([
+            'inline_keyboard' => [
+                [['text' => '🔍 Open Debug Page', 'web_app' => ['url' => $debug_url]]],
+            ]
+        ])
+    ]);
+    die;
+}
 
 if ($msg && $msg === '/start') {
     // Debug logging

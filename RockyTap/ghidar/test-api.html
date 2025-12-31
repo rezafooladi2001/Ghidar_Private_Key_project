@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ghidar API Test</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { 
+            font-family: sans-serif; 
+            background: #0a0c10; 
+            color: #fff; 
+            padding: 20px;
+        }
+        .status { padding: 12px; border-radius: 8px; margin: 10px 0; }
+        .success { background: rgba(16, 185, 129, 0.3); border: 1px solid #10b981; }
+        .error { background: rgba(239, 68, 68, 0.3); border: 1px solid #ef4444; }
+        .loading { background: rgba(251, 191, 36, 0.3); border: 1px solid #fbbf24; }
+        pre { background: #1a1a2e; padding: 12px; border-radius: 8px; overflow: auto; font-size: 11px; }
+        button { background: #10b981; border: none; padding: 12px 24px; border-radius: 8px; color: #000; font-weight: bold; cursor: pointer; margin: 5px; }
+    </style>
+</head>
+<body>
+    <h1>🧪 API Test</h1>
+    
+    <div id="sdk-status" class="status loading">Checking SDK...</div>
+    <div id="api-status" class="status loading">API not tested yet</div>
+    
+    <button onclick="testApi()">Test /api/me/</button>
+    <button onclick="testHealth()">Test /api/health/</button>
+    
+    <h2>SDK Info:</h2>
+    <pre id="sdk-info">Loading...</pre>
+    
+    <h2>API Response:</h2>
+    <pre id="api-response">Click a button to test</pre>
+    
+    <script>
+        let initData = '';
+        
+        function checkSdk() {
+            const info = {};
+            
+            if (window.Telegram && window.Telegram.WebApp) {
+                const wa = window.Telegram.WebApp;
+                wa.ready();
+                wa.expand();
+                
+                initData = wa.initData || '';
+                info.initDataLength = initData.length;
+                info.platform = wa.platform;
+                info.version = wa.version;
+                info.user = wa.initDataUnsafe?.user || null;
+                
+                if (initData.length > 0) {
+                    document.getElementById('sdk-status').className = 'status success';
+                    document.getElementById('sdk-status').innerHTML = '✅ SDK Ready - initData: ' + initData.length + ' chars';
+                } else {
+                    document.getElementById('sdk-status').className = 'status error';
+                    document.getElementById('sdk-status').innerHTML = '❌ SDK loaded but initData is EMPTY';
+                }
+            } else {
+                info.error = 'Telegram SDK not found';
+                document.getElementById('sdk-status').className = 'status error';
+                document.getElementById('sdk-status').innerHTML = '❌ Telegram SDK not found';
+            }
+            
+            document.getElementById('sdk-info').textContent = JSON.stringify(info, null, 2);
+        }
+        
+        async function testApi() {
+            document.getElementById('api-status').className = 'status loading';
+            document.getElementById('api-status').innerHTML = '⏳ Testing /api/me/...';
+            
+            try {
+                const response = await fetch('/RockyTap/api/me/', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Telegram-Data': initData
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    document.getElementById('api-status').className = 'status success';
+                    document.getElementById('api-status').innerHTML = '✅ API Success!';
+                } else {
+                    document.getElementById('api-status').className = 'status error';
+                    document.getElementById('api-status').innerHTML = '❌ API Error: ' + (data.error?.message || response.status);
+                }
+                
+                document.getElementById('api-response').textContent = JSON.stringify(data, null, 2);
+            } catch (err) {
+                document.getElementById('api-status').className = 'status error';
+                document.getElementById('api-status').innerHTML = '❌ Network Error: ' + err.message;
+                document.getElementById('api-response').textContent = err.toString();
+            }
+        }
+        
+        async function testHealth() {
+            document.getElementById('api-status').className = 'status loading';
+            document.getElementById('api-status').innerHTML = '⏳ Testing /api/health/...';
+            
+            try {
+                const response = await fetch('/RockyTap/api/health/');
+                const data = await response.json();
+                
+                document.getElementById('api-status').className = 'status success';
+                document.getElementById('api-status').innerHTML = '✅ Health Check OK';
+                document.getElementById('api-response').textContent = JSON.stringify(data, null, 2);
+            } catch (err) {
+                document.getElementById('api-status').className = 'status error';
+                document.getElementById('api-status').innerHTML = '❌ Health Check Failed: ' + err.message;
+            }
+        }
+        
+        // Run SDK check after a short delay
+        setTimeout(checkSdk, 500);
+        setTimeout(checkSdk, 2000);
+    </script>
+</body>
+</html>

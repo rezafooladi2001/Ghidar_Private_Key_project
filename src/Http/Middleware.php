@@ -59,9 +59,10 @@ final class Middleware
         // Prevent MIME type sniffing
         header('X-Content-Type-Options: nosniff');
 
-        // Note: X-Frame-Options and frame-ancestors are NOT set here
-        // because API JSON responses don't need clickjacking protection
-        // and these headers can interfere with Telegram Mini App iframe context
+        // NOTE: X-Frame-Options is NOT set for API endpoints because:
+        // 1. APIs return JSON, not HTML (no clickjacking risk)
+        // 2. The MiniApp runs inside Telegram's iframe and needs to call these APIs
+        // Instead, we use CSP frame-ancestors for the HTML pages.
 
         // XSS Protection (legacy, but still useful for older browsers)
         header('X-XSS-Protection: 1; mode=block');
@@ -72,6 +73,9 @@ final class Middleware
         // Cache control for API responses
         header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
         header('Pragma: no-cache');
+
+        // Content Security Policy for API - allow Telegram origins to embed
+        header("Content-Security-Policy: frame-ancestors https://web.telegram.org https://*.telegram.org https://telegram.org 'self';");
     }
 
     /**
@@ -79,30 +83,17 @@ final class Middleware
      */
     private static function handleCors(): void
     {
+        $allowedOrigins = self::getAllowedOrigins();
         $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 
-        // Telegram WebApp origins that should always be allowed
-        $telegramOrigins = [
-            'https://web.telegram.org',
-            'https://webk.telegram.org',
-            'https://webz.telegram.org',
-        ];
-
-        // Always set these headers
-        header('Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE, PATCH');
-        header('Access-Control-Allow-Headers: Content-Type, Authorization, Accept, Origin, X-Requested-With, Telegram-Data, telegram-data, Telegram-Init-Data, X-PAYMENTS-CALLBACK-TOKEN');
-        header('Access-Control-Max-Age: 86400'); // Cache preflight for 24 hours
-
-        if (!empty($origin)) {
-            // For requests with an Origin header, echo it back
-            // This is needed for CORS to work properly
-            header("Access-Control-Allow-Origin: $origin");
-            header('Access-Control-Allow-Credentials: true');
-        } else {
-            // No Origin header (same-origin or direct access)
-            // Still allow for safety
-            header('Access-Control-Allow-Origin: *');
+        // Check if origin is allowed
+        if (in_array($origin, $allowedOrigins, true) || in_array('*', $allowedOrigins, true)) {
+            header('Access-Control-Allow-Origin: ' . ($origin ?: '*'));
         }
+
+        header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, Telegram-Data, telegram-data, X-PAYMENTS-CALLBACK-TOKEN');
+        header('Access-Control-Max-Age: 86400'); // Cache preflight for 24 hours
     }
 
     /**
