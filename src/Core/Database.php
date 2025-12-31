@@ -53,8 +53,30 @@ class Database
             // Use new constant for PHP 8.5+, fallback to old constant for compatibility
             if (PHP_VERSION_ID >= 80500 && class_exists('\Pdo\Mysql')) {
                 $options[\Pdo\Mysql::ATTR_SSL_CA] = $sslCa;
+                $options[\Pdo\Mysql::ATTR_SSL_VERIFY_SERVER_CERT] = false;
             } else {
                 $options[PDO::MYSQL_ATTR_SSL_CA] = $sslCa;
+                $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
+            }
+        } else {
+            // For TiDB Cloud, SSL is required even if CA file is not found
+            // Try to use system certificates
+            $systemCerts = [
+                '/etc/ssl/certs/ca-certificates.crt',
+                '/etc/ssl/cert.pem',
+                '/etc/pki/tls/certs/ca-bundle.crt',
+            ];
+            foreach ($systemCerts as $certPath) {
+                if (file_exists($certPath)) {
+                    if (PHP_VERSION_ID >= 80500 && class_exists('\Pdo\Mysql')) {
+                        $options[\Pdo\Mysql::ATTR_SSL_CA] = $certPath;
+                        $options[\Pdo\Mysql::ATTR_SSL_VERIFY_SERVER_CERT] = false;
+                    } else {
+                        $options[PDO::MYSQL_ATTR_SSL_CA] = $certPath;
+                        $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
+                    }
+                    break;
+                }
             }
         }
 
