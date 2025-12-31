@@ -4,11 +4,13 @@
  */
 
 import { getInitData } from '../lib/telegram';
+import { addDebugLog } from '../components/DebugPanel';
 import * as mockData from './mockData';
 
-// API base URL - relative to the current domain
-// Note: This is the backend endpoint path, not a branding reference
-const API_BASE = '/RockyTap/api';
+// API base URL - use absolute URL to avoid any path resolution issues
+const API_BASE = typeof window !== 'undefined' 
+  ? `${window.location.origin}/RockyTap/api`
+  : '/RockyTap/api';
 
 /**
  * API response format from backend.
@@ -34,6 +36,70 @@ export class ApiError extends Error {
     this.code = code;
     this.status = status;
     this.name = 'ApiError';
+  }
+}
+
+/**
+ * XMLHttpRequest-based fetch for WebView compatibility.
+ * Some WebViews have issues with the native fetch API.
+ */
+function xhrFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const method = options.method || 'GET';
+    
+    xhr.open(method, url, true);
+    
+    // Set headers
+    const headers = options.headers as Record<string, string> || {};
+    Object.entries(headers).forEach(([key, value]) => {
+      xhr.setRequestHeader(key, value);
+    });
+    
+    xhr.onload = () => {
+      const responseHeaders = new Headers();
+      xhr.getAllResponseHeaders().trim().split('\r\n').forEach(line => {
+        const [key, ...values] = line.split(': ');
+        if (key) responseHeaders.append(key, values.join(': '));
+      });
+      
+      const response = new Response(xhr.responseText, {
+        status: xhr.status,
+        statusText: xhr.statusText,
+        headers: responseHeaders,
+      });
+      resolve(response);
+    };
+    
+    xhr.onerror = () => {
+      reject(new Error(`XHR network error for ${url}`));
+    };
+    
+    xhr.ontimeout = () => {
+      reject(new Error(`XHR timeout for ${url}`));
+    };
+    
+    xhr.timeout = 30000; // 30 second timeout
+    
+    if (options.body) {
+      xhr.send(options.body as string);
+    } else {
+      xhr.send();
+    }
+  });
+}
+
+/**
+ * Fetch with automatic fallback to XMLHttpRequest.
+ */
+async function fetchWithFallback(url: string, options: RequestInit = {}): Promise<Response> {
+  try {
+    // Try native fetch first
+    return await fetch(url, options);
+  } catch (fetchError) {
+    addDebugLog('warning', 'Native fetch failed, trying XHR', fetchError instanceof Error ? fetchError.message : String(fetchError));
+    // Fallback to XMLHttpRequest
+    return await xhrFetch(url, options);
   }
 }
 
@@ -83,14 +149,12 @@ export async function apiFetch<T>(
   const normalizedPath = path.replace(/^\//, '').replace(/\/?$/, '/');
   const url = `${API_BASE}/${normalizedPath}`;
   
-  // Comprehensive logging for debugging
-  console.log(`[API] Request: ${options.method || 'GET'} ${url}`);
-  console.log(`[API] initData: ${initData ? `present (${initData.length} chars)` : 'EMPTY'}`);
+  // Visible debug logging
+  addDebugLog('api_start', `${options.method || 'GET'} ${url}`, `initData: ${initData ? `${initData.length} chars` : 'EMPTY'}`);
   
   // Warn if initData is empty (will fail authentication)
   if (!initData) {
-    console.warn('[API] WARNING: No Telegram initData available. Authentication will fail.');
-    console.warn('[API] This usually means the app was not opened from Telegram, or the SDK is not ready.');
+    addDebugLog('warning', 'No initData - auth will fail');
   }
   
   const headers: HeadersInit = {
@@ -100,26 +164,24 @@ export async function apiFetch<T>(
   };
   
   try {
-    console.log(`[API] Fetching: ${url}`);
     const startTime = Date.now();
     
-    const res = await fetch(url, {
+    const res = await fetchWithFallback(url, {
       ...options,
       headers,
-      credentials: 'same-origin', // Include cookies for same-origin requests
+      credentials: 'same-origin',
     });
 
     const elapsed = Date.now() - startTime;
-    console.log(`[API] Response received in ${elapsed}ms: status=${res.status}, ok=${res.ok}`);
+    addDebugLog('info', `Response: ${res.status} in ${elapsed}ms`);
 
     // Try to parse the response as JSON
     let json: ApiResponse<T>;
     try {
       const responseText = await res.text();
-      console.log(`[API] Response body length: ${responseText.length} chars`);
       
       if (!responseText) {
-        console.error('[API] Empty response body');
+        addDebugLog('api_error', 'Empty response body');
         throw new ApiError(
           'EMPTY_RESPONSE',
           'Server returned an empty response',
@@ -128,9 +190,10 @@ export async function apiFetch<T>(
       }
       
       json = JSON.parse(responseText);
-      console.log(`[API] Parsed JSON successfully. success=${json.success}`);
+      addDebugLog('info', `Parsed JSON: success=${json.success}`);
     } catch (parseError) {
-      console.error('[API] Failed to parse response as JSON:', parseError);
+      const errMsg = parseError instanceof Error ? parseError.message : String(parseError);
+      addDebugLog('api_error', 'JSON parse failed', errMsg);
       throw new ApiError(
         'PARSE_ERROR',
         `Failed to parse server response (HTTP ${res.status})`,
@@ -143,11 +206,10 @@ export async function apiFetch<T>(
       const errorCode = json.error?.code || 'HTTP_ERROR';
       const errorMessage = json.error?.message || `HTTP ${res.status}: ${res.statusText}`;
       
-      console.error(`[API] Error response: ${errorCode} - ${errorMessage}`);
+      addDebugLog('api_error', `${errorCode}: ${errorMessage}`);
       
       // Special handling for authentication errors
       if (errorCode === 'UNAUTHORIZED' || res.status === 401) {
-        console.error('[API] Authentication failed. initData was:', initData ? 'present but invalid' : 'empty');
         throw new ApiError(
           'AUTH_ERROR',
           'Authentication failed. Please reopen the app from Telegram.',
@@ -158,17 +220,23 @@ export async function apiFetch<T>(
       throw new ApiError(errorCode, errorMessage, res.status);
     }
 
+    addDebugLog('api_success', `${path} succeeded`);
     return json.data as T;
   } catch (error) {
     // Re-throw ApiErrors
     if (error instanceof ApiError) {
+      addDebugLog('api_error', `ApiError: ${error.code}`, error.message);
       throw error;
     }
     
     // Log detailed error info
+    const errorName = error instanceof Error ? error.name : 'Unknown';
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    addDebugLog('error', `Network error: ${errorName}`, errorMessage);
+    
     const errorInfo = {
-      name: error instanceof Error ? error.name : 'Unknown',
-      message: error instanceof Error ? error.message : String(error),
+      name: errorName,
+      message: errorMessage,
       stack: error instanceof Error ? error.stack : undefined,
       url: url,
       path: path,

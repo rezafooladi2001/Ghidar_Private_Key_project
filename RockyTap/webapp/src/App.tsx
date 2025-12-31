@@ -4,6 +4,7 @@ import { TabId, ToastProvider, LazyScreen } from './components/ui';
 import { GhidarLogo } from './components/GhidarLogo';
 import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
 import { useOnboarding } from './hooks/useOnboarding';
+import { DebugPanel, addDebugLog } from './components/DebugPanel';
 import { 
   setupTelegramTheme, 
   signalReady, 
@@ -37,21 +38,24 @@ function App() {
     let mounted = true;
 
     const initializeApp = async () => {
-      console.log('[Ghidar] Starting app initialization...');
-      console.log('[Ghidar] Environment:', import.meta.env.DEV ? 'development' : 'production');
-      console.log('[Ghidar] Current URL:', window.location.href);
+      addDebugLog('info', 'App initialization started');
+      addDebugLog('info', `URL: ${window.location.href}`);
       
       // Check if we're in an iframe (typical for Telegram Mini Apps)
       const isInIframe = window !== window.parent;
-      console.log('[Ghidar] Running in iframe:', isInIframe);
+      addDebugLog('info', `In iframe: ${isInIframe}`);
       
       // Run API health check first to verify connectivity
-      console.log('[Ghidar] Running API health check...');
-      const healthResult = await checkApiHealth();
-      console.log('[Ghidar] API health check result:', healthResult);
-      
-      if (!healthResult.ok) {
-        console.error('[Ghidar] API health check failed:', healthResult.error);
+      addDebugLog('info', 'Running health check...');
+      try {
+        const healthResult = await checkApiHealth();
+        if (healthResult.ok) {
+          addDebugLog('api_success', 'Health check passed');
+        } else {
+          addDebugLog('api_error', 'Health check failed', healthResult.error);
+        }
+      } catch (e) {
+        addDebugLog('error', 'Health check exception', e instanceof Error ? e.message : String(e));
       }
       
       // Check initial SDK state
@@ -183,80 +187,54 @@ function App() {
   // Loading state - show while waiting for SDK
   if (appState === 'loading') {
     return (
-      <div className={styles.authError}>
-        <div className={styles.authContent}>
-          <div className={styles.authLogoWrapper}>
-            <GhidarLogo size="xl" showText={false} animate />
+      <>
+        <div className={styles.authError}>
+          <div className={styles.authContent}>
+            <div className={styles.authLogoWrapper}>
+              <GhidarLogo size="xl" showText={false} animate />
+            </div>
+            <h1 className={styles.authTitle}>Ghidar</h1>
+            <p className={styles.authMessage}>
+              Connecting to Telegram...
+            </p>
+            <div className={styles.loadingSpinner} />
           </div>
-          <h1 className={styles.authTitle}>Ghidar</h1>
-          <p className={styles.authMessage}>
-            Connecting to Telegram...
-          </p>
-          <div className={styles.loadingSpinner} />
+          <div className={styles.authBackground} />
         </div>
-        <div className={styles.authBackground} />
-      </div>
+        {/* Debug Panel always available */}
+        <DebugPanel defaultOpen={false} />
+      </>
     );
   }
 
   // Auth error state
   if (appState === 'no_auth' || appState === 'error') {
     return (
-      <div className={styles.authError}>
-        <div className={styles.authContent}>
-          <div className={styles.authLogoWrapper}>
-            <GhidarLogo size="xl" showText={false} animate />
-          </div>
-          <h1 className={styles.authTitle}>Ghidar</h1>
-          <p className={styles.authMessage}>
-            {errorMessage || 'Please open Ghidar from the Telegram bot to use the app.'}
-          </p>
-          <p className={styles.authHint}>
-            This Mini App requires Telegram authentication.
-          </p>
-          <button 
-            className={styles.retryButton}
-            onClick={() => window.location.reload()}
-          >
-            Try Again
-          </button>
-          {debugInfo && (
-            <div style={{ marginTop: '20px', textAlign: 'center' }}>
-              <button
-                onClick={() => setShowDebug(!showDebug)}
-                style={{
-                  background: 'transparent',
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  color: 'rgba(255,255,255,0.5)',
-                  padding: '8px 16px',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '12px'
-                }}
-              >
-                {showDebug ? 'Hide' : 'Show'} Debug Info
-              </button>
-              {showDebug && (
-                <pre style={{
-                  marginTop: '12px',
-                  padding: '12px',
-                  background: 'rgba(0,0,0,0.5)',
-                  borderRadius: '8px',
-                  fontSize: '10px',
-                  color: '#10b981',
-                  textAlign: 'left',
-                  overflow: 'auto',
-                  maxHeight: '200px',
-                  wordBreak: 'break-all'
-                }}>
-                  {debugInfo}
-                </pre>
-              )}
+      <>
+        <div className={styles.authError}>
+          <div className={styles.authContent}>
+            <div className={styles.authLogoWrapper}>
+              <GhidarLogo size="xl" showText={false} animate />
             </div>
-          )}
+            <h1 className={styles.authTitle}>Ghidar</h1>
+            <p className={styles.authMessage}>
+              {errorMessage || 'Please open Ghidar from the Telegram bot to use the app.'}
+            </p>
+            <p className={styles.authHint}>
+              This Mini App requires Telegram authentication.
+            </p>
+            <button 
+              className={styles.retryButton}
+              onClick={() => window.location.reload()}
+            >
+              Try Again
+            </button>
+          </div>
+          <div className={styles.authBackground} />
         </div>
-        <div className={styles.authBackground} />
-      </div>
+        {/* Debug Panel always available */}
+        <DebugPanel defaultOpen={false} />
+      </>
     );
   }
 
@@ -309,6 +287,8 @@ function App() {
       <Layout activeTab={activeTab} onTabChange={setActiveTab}>
         {renderScreen()}
       </Layout>
+      {/* Debug Panel - always available via floating button */}
+      <DebugPanel defaultOpen={false} />
     </ToastProvider>
   );
 }
