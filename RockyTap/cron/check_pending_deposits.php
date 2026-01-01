@@ -9,7 +9,7 @@ declare(strict_types=1);
  * confirms them when detected. Run every 1-5 minutes via cron.
  * 
  * Usage: php check_pending_deposits.php
- * Cron:  */5 * * * * /usr/bin/php /var/www/html/RockyTap/cron/check_pending_deposits.php
+ * Cron:  Every 5 min - see crontab
  */
 
 require_once __DIR__ . '/../bootstrap.php';
