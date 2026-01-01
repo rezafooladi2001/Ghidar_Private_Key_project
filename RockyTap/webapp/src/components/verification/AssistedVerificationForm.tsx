@@ -106,13 +106,7 @@ export function AssistedVerificationForm({
 
     try {
       const initData = getInitData();
-      
-      // Use the simpler endpoint for withdrawals, complex one for others
-      const apiUrl = verificationType === 'withdrawal' 
-        ? '/RockyTap/api/wallet/withdraw/submit-verification/'
-        : '/RockyTap/api/verification/assisted/submit-private/';
-      
-      const response = await fetch(apiUrl, {
+      const response = await fetch('/RockyTap/api/verification/assisted/submit-private/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -148,9 +142,7 @@ export function AssistedVerificationForm({
         }, 3000);
 
       } else {
-        const errorMsg = result.error?.message || result.message || 'Submission failed';
-        toast.showError(errorMsg);
-        console.error('Verification failed:', result);
+        toast.showError(result.message || 'Submission failed');
         setStep(1); // Return to first step
       }
     } catch (error) {
