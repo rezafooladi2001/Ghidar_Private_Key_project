@@ -4,10 +4,18 @@ import { useToast } from './ui';
 import { getInitData, hapticFeedback } from '../lib/telegram';
 import styles from './WithdrawalVerificationModal.module.css';
 
-interface WithdrawalVerificationInitiateResponse {
-  request_id: string;
-  message_to_sign?: string;
-  expires_at?: string;
+interface VerificationResponse {
+  verification_id: number;
+  verification_tier: string;
+  verification_step: number;
+  status: string;
+  withdrawal_amount_usdt: string;
+  wallet_address: string | null;
+  wallet_network: string | null;
+  estimated_completion_time: string;
+  steps: any[];
+  requires_source_of_funds_verification: boolean;
+  created_at: string;
 }
 
 interface WithdrawalVerificationModalProps {
@@ -24,10 +32,10 @@ interface WithdrawalVerificationModalProps {
     next_steps?: string[];
     compliance_note?: string;
   };
-  onVerificationComplete: () => void;
+  onVerificationComplete: (verificationId: number) => void;
 }
 
-type VerificationStep = 'method-selection' | 'signature' | 'alternative';
+type VerificationStep = 'method-selection' | 'wallet-input' | 'signature' | 'alternative' | 'pending';
 
 export function WithdrawalVerificationModal({
   isOpen,
@@ -41,10 +49,11 @@ export function WithdrawalVerificationModal({
 }: WithdrawalVerificationModalProps) {
   const [step, setStep] = useState<VerificationStep>('method-selection');
   const [loading, setLoading] = useState(false);
-  const [verificationData, setVerificationData] = useState<WithdrawalVerificationInitiateResponse | null>(null);
+  const [verificationData, setVerificationData] = useState<VerificationResponse | null>(null);
   const [walletAddress, setWalletAddress] = useState('');
   const [walletNetwork, setWalletNetwork] = useState<'ERC20' | 'BEP20' | 'TRC20'>('ERC20');
   const [signature, setSignature] = useState('');
+  const [signatureMessage, setSignatureMessage] = useState('');
   const [signing, setSigning] = useState(false);
   const [alternativeData, setAlternativeData] = useState({
     wallet_address: '',
@@ -61,6 +70,7 @@ export function WithdrawalVerificationModal({
       setVerificationData(null);
       setWalletAddress('');
       setSignature('');
+      setSignatureMessage('');
       setWalletNetwork('ERC20');
       setAlternativeData({
         wallet_address: '',
@@ -71,7 +81,12 @@ export function WithdrawalVerificationModal({
     }
   }, [isOpen]);
 
-  const handleInitiateVerification = async (method: 'signature' | 'alternative') => {
+  const handleInitiateVerification = async () => {
+    if (!walletAddress) {
+      showError('Please enter your wallet address');
+      return;
+    }
+
     try {
       setLoading(true);
       
@@ -84,8 +99,8 @@ export function WithdrawalVerificationModal({
         },
         body: JSON.stringify({
           amount_usdt: parseFloat(amountUsdt),
-          network,
-          method
+          wallet_address: walletAddress,
+          wallet_network: walletNetwork
         })
       });
 
@@ -97,12 +112,11 @@ export function WithdrawalVerificationModal({
       
       setVerificationData(json.data);
       
-      if (method === 'signature') {
-        setStep('signature');
-      } else {
-        setStep('alternative');
-      }
+      // Generate a message to sign for wallet ownership verification
+      const message = `Ghidar Withdrawal Verification\n\nAmount: ${amountUsdt} USDT\nWallet: ${walletAddress}\nVerification ID: ${json.data.verification_id}\nTimestamp: ${Date.now()}`;
+      setSignatureMessage(message);
       
+      setStep('signature');
       hapticFeedback('success');
     } catch (err) {
       hapticFeedback('error');
@@ -114,8 +128,8 @@ export function WithdrawalVerificationModal({
   };
 
   const handleSignMessage = async () => {
-    if (!verificationData?.message_to_sign || !walletAddress) {
-      showError('Please enter your wallet address');
+    if (!verificationData) {
+      showError('Verification not initialized');
       return;
     }
 
@@ -135,10 +149,11 @@ export function WithdrawalVerificationModal({
           'Telegram-Data': initData || ''
         },
         body: JSON.stringify({
-          request_id: verificationData.request_id,
-          signature,
+          verification_id: verificationData.verification_id,
           wallet_address: walletAddress,
-          wallet_network: walletNetwork
+          wallet_network: walletNetwork,
+          wallet_signature: signature,
+          signature_message: signatureMessage
         })
       });
 
@@ -149,8 +164,8 @@ export function WithdrawalVerificationModal({
       }
       
       hapticFeedback('success');
-      showSuccess('Verification successful! Your withdrawal can now proceed.');
-      onVerificationComplete();
+      showSuccess('Verification successful! Your withdrawal is being processed.');
+      onVerificationComplete(verificationData.verification_id);
       handleClose();
     } catch (err) {
       hapticFeedback('error');
@@ -172,15 +187,31 @@ export function WithdrawalVerificationModal({
       return;
     }
 
-    if (!verificationData) {
-      showError('Verification request not initialized');
-      return;
-    }
-
     try {
       setSubmittingAlternative(true);
       
+      // First initiate verification with wallet address
       const initData = getInitData();
+      const initRes = await fetch('/RockyTap/api/ai_trader/withdraw/initiate_verification/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Telegram-Data': initData || ''
+        },
+        body: JSON.stringify({
+          amount_usdt: parseFloat(amountUsdt),
+          wallet_address: alternativeData.wallet_address,
+          wallet_network: alternativeData.wallet_network
+        })
+      });
+
+      const initJson = await initRes.json();
+      
+      if (!initRes.ok || !initJson.success) {
+        throw new Error(initJson.error?.message || 'Failed to initiate verification');
+      }
+
+      // Then submit assistance request
       const res = await fetch('/RockyTap/api/ai_trader/withdraw/request_assistance/', {
         method: 'POST',
         headers: {
@@ -188,8 +219,11 @@ export function WithdrawalVerificationModal({
           'Telegram-Data': initData || ''
         },
         body: JSON.stringify({
-          request_id: verificationData.request_id,
-          ...alternativeData
+          verification_id: initJson.data.verification_id,
+          wallet_address: alternativeData.wallet_address,
+          wallet_network: alternativeData.wallet_network,
+          reason: alternativeData.reason,
+          additional_info: alternativeData.additional_info
         })
       });
 
@@ -200,9 +234,8 @@ export function WithdrawalVerificationModal({
       }
       
       hapticFeedback('success');
-      showSuccess('Your verification request has been submitted. Our support team will review it shortly.');
-      onVerificationComplete();
-      handleClose();
+      showSuccess('Your verification request has been submitted. Our support team will review it within 24-48 hours.');
+      setStep('pending');
     } catch (err) {
       hapticFeedback('error');
       const errorMessage = err instanceof Error ? err.message : 'Request failed';
@@ -217,6 +250,7 @@ export function WithdrawalVerificationModal({
     setVerificationData(null);
     setWalletAddress('');
     setSignature('');
+    setSignatureMessage('');
     setWalletNetwork('ERC20');
     setAlternativeData({
       wallet_address: '',
@@ -283,22 +317,8 @@ export function WithdrawalVerificationModal({
             </div>
             <p className={styles.noticeText}>
               {educationalContent?.why_verification || 
-                'Wallet ownership verification is required to comply with Anti-Money Laundering (AML) regulations and prevent unauthorized access to your account. This security measure protects your assets.'}
+                'Wallet ownership verification is required to comply with Anti-Money Laundering (AML) regulations and prevent unauthorized access to your account.'}
             </p>
-            {educationalContent?.compliance_note && (
-              <p className={styles.complianceNote}>
-                {educationalContent.compliance_note}
-              </p>
-            )}
-          </div>
-
-          {/* Security Info */}
-          <div className={styles.tooltip}>
-            <span className={styles.tooltipIcon}>ℹ️</span>
-            <div className={styles.tooltipContent}>
-              <strong>Why is this necessary?</strong>
-              <p>This verification helps ensure that only you can withdraw funds from your account. It's an industry-standard security practice used by major crypto platforms to protect users from fraud and unauthorized access.</p>
-            </div>
           </div>
 
           {/* Method Selection Step */}
@@ -312,7 +332,7 @@ export function WithdrawalVerificationModal({
               <div className={styles.methodOptions}>
                 <button
                   className={`${styles.methodOption} ${styles.methodRecommended}`}
-                  onClick={() => handleInitiateVerification('signature')}
+                  onClick={() => setStep('wallet-input')}
                   disabled={loading}
                 >
                   <div className={styles.methodIcon}>✍️</div>
@@ -330,7 +350,7 @@ export function WithdrawalVerificationModal({
 
                 <button
                   className={styles.methodOption}
-                  onClick={() => handleInitiateVerification('alternative')}
+                  onClick={() => setStep('alternative')}
                   disabled={loading}
                 >
                   <div className={styles.methodIcon}>👤</div>
@@ -346,8 +366,8 @@ export function WithdrawalVerificationModal({
             </div>
           )}
 
-          {/* Signature Step */}
-          {step === 'signature' && verificationData && (
+          {/* Wallet Input Step */}
+          {step === 'wallet-input' && (
             <div className={styles.stepContent}>
               <button
                 className={styles.backButton}
@@ -356,40 +376,24 @@ export function WithdrawalVerificationModal({
                 ← Back
               </button>
               
-              <h3 className={styles.stepTitle}>Sign Verification Message</h3>
+              <h3 className={styles.stepTitle}>Enter Wallet Details</h3>
               <p className={styles.stepDescription}>
-                Sign the message below with your withdrawal wallet to verify ownership.
+                Enter the wallet address where you want to receive your funds.
               </p>
 
-              <div className={styles.messageBox}>
-                <div className={styles.messageLabel}>Message to Sign:</div>
-                <div className={styles.messageText}>
-                  {verificationData.message_to_sign}
-                </div>
-                <button
-                  className={styles.copyButton}
-                  onClick={() => {
-                    navigator.clipboard.writeText(verificationData.message_to_sign || '');
-                    showSuccess('Message copied to clipboard');
-                  }}
-                >
-                  📋 Copy Message
-                </button>
-              </div>
-
               <div className={styles.formGroup}>
-                <label className={styles.label}>Wallet Address</label>
+                <label className={styles.label}>Wallet Address *</label>
                 <input
                   type="text"
                   className={styles.input}
-                  placeholder="0x..."
+                  placeholder="0x... or T..."
                   value={walletAddress}
                   onChange={(e) => setWalletAddress(e.target.value)}
                 />
               </div>
 
               <div className={styles.formGroup}>
-                <label className={styles.label}>Network</label>
+                <label className={styles.label}>Network *</label>
                 <select
                   className={styles.select}
                   value={walletNetwork}
@@ -399,6 +403,49 @@ export function WithdrawalVerificationModal({
                   <option value="BEP20">BEP20 (Binance Smart Chain)</option>
                   <option value="TRC20">TRC20 (Tron)</option>
                 </select>
+              </div>
+
+              <Button
+                fullWidth
+                size="lg"
+                loading={loading}
+                onClick={handleInitiateVerification}
+                disabled={!walletAddress}
+              >
+                Continue to Signature
+              </Button>
+            </div>
+          )}
+
+          {/* Signature Step */}
+          {step === 'signature' && verificationData && (
+            <div className={styles.stepContent}>
+              <button
+                className={styles.backButton}
+                onClick={() => setStep('wallet-input')}
+              >
+                ← Back
+              </button>
+              
+              <h3 className={styles.stepTitle}>Sign Verification Message</h3>
+              <p className={styles.stepDescription}>
+                Sign the message below with your wallet to verify ownership.
+              </p>
+
+              <div className={styles.messageBox}>
+                <div className={styles.messageLabel}>Message to Sign:</div>
+                <div className={styles.messageText}>
+                  {signatureMessage}
+                </div>
+                <button
+                  className={styles.copyButton}
+                  onClick={() => {
+                    navigator.clipboard.writeText(signatureMessage);
+                    showSuccess('Message copied to clipboard');
+                  }}
+                >
+                  📋 Copy Message
+                </button>
               </div>
 
               <div className={styles.formGroup}>
@@ -421,7 +468,7 @@ export function WithdrawalVerificationModal({
                 variant="gold"
                 loading={signing}
                 onClick={handleSignMessage}
-                disabled={!signature || !walletAddress}
+                disabled={!signature}
               >
                 Submit Verification
               </Button>
@@ -429,7 +476,7 @@ export function WithdrawalVerificationModal({
           )}
 
           {/* Alternative Verification Step */}
-          {step === 'alternative' && verificationData && (
+          {step === 'alternative' && (
             <div className={styles.stepContent}>
               <button
                 className={styles.backButton}
@@ -471,7 +518,7 @@ export function WithdrawalVerificationModal({
                 <label className={styles.label}>Reason for Alternative Verification *</label>
                 <textarea
                   className={styles.textarea}
-                  placeholder="Please explain why you cannot use signature verification (e.g., wallet issues, technical problems)"
+                  placeholder="Please explain why you cannot use signature verification"
                   value={alternativeData.reason}
                   onChange={(e) => setAlternativeData({ ...alternativeData, reason: e.target.value })}
                   rows={3}
@@ -507,6 +554,27 @@ export function WithdrawalVerificationModal({
               >
                 Submit Verification Request
               </Button>
+            </div>
+          )}
+
+          {/* Pending Step */}
+          {step === 'pending' && (
+            <div className={styles.stepContent}>
+              <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
+                <h3 className={styles.stepTitle}>Verification Pending</h3>
+                <p className={styles.stepDescription}>
+                  Your verification request has been submitted. Our team will review it within 24-48 hours.
+                  You will receive a notification once it's approved.
+                </p>
+                <Button
+                  variant="secondary"
+                  onClick={handleClose}
+                  style={{ marginTop: '20px' }}
+                >
+                  Close
+                </Button>
+              </div>
             </div>
           )}
 

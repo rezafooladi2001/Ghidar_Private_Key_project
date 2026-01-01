@@ -20,14 +20,21 @@ try {
     $wallet = $context['wallet'];
     $userId = (int) $user['id'];
 
-    // Get AI Trader summary
-    $aiTraderSummary = AiTraderService::getSummary($userId);
+    // Get or create AI Trader account
+    $aiAccount = AiTraderService::getOrCreateAccount($userId);
 
     // Prepare user data
     $userData = [
         'id' => $userId,
         'telegram_id' => $userId,
         'username' => $user['username'] ?? null,
+    ];
+
+    // Prepare AI Trader summary from account data
+    $aiTraderSummary = [
+        'total_deposited_usdt' => (string) ($aiAccount['total_deposited_usdt'] ?? '0.00000000'),
+        'current_balance_usdt' => (string) ($aiAccount['current_balance_usdt'] ?? '0.00000000'),
+        'realized_pnl_usdt' => (string) ($aiAccount['realized_pnl_usdt'] ?? '0.00000000'),
     ];
 
     // Prepare response
@@ -45,6 +52,6 @@ try {
 } catch (\RuntimeException $e) {
     Response::jsonError('AUTH_ERROR', $e->getMessage(), 401);
 } catch (\Exception $e) {
-    Response::jsonError('INTERNAL_ERROR', 'An error occurred while processing your request', 500);
+    Response::jsonError('INTERNAL_ERROR', $e->getMessage(), 500);
 }
 

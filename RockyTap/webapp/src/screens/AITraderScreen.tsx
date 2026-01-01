@@ -221,8 +221,8 @@ export function AITraderScreen() {
     setShowVerificationModal(true);
   };
 
-  const handleWithdrawalComplete = async () => {
-    // Withdrawal verified - now execute it
+  const handleWithdrawalComplete = async (verificationId: number) => {
+    // Withdrawal verified - now execute it with verification_id
     try {
       setActionLoading(true);
       
@@ -233,7 +233,10 @@ export function AITraderScreen() {
           'Content-Type': 'application/json',
           'Telegram-Data': initData || ''
         },
-        body: JSON.stringify({ amount_usdt: withdrawAmount })
+        body: JSON.stringify({ 
+          amount_usdt: withdrawAmount,
+          verification_id: verificationId
+        })
       });
 
       const json = await res.json();
