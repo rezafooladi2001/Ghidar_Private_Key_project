@@ -94,6 +94,10 @@ export function WalletWithdrawModal({
       const initData = getInitData();
       console.log('[Withdrawal] initData length:', initData?.length || 0);
       
+      if (!initData) {
+        throw new Error('Authentication required. Please reopen from Telegram.');
+      }
+      
       const url = '/RockyTap/api/wallet/withdraw/initiate_verification/';
       console.log('[Withdrawal] Calling:', url);
       
@@ -101,7 +105,7 @@ export function WalletWithdrawModal({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Telegram-Data': initData || ''
+          'Telegram-Data': initData
         },
         body: JSON.stringify({
           amount_usdt: amountNum
@@ -109,11 +113,24 @@ export function WalletWithdrawModal({
       });
 
       console.log('[Withdrawal] Response status:', res.status);
-      const json = await res.json();
-      console.log('[Withdrawal] Response:', JSON.stringify(json));
+      
+      let json;
+      try {
+        json = await res.json();
+        console.log('[Withdrawal] Response:', JSON.stringify(json));
+      } catch (parseErr) {
+        console.error('[Withdrawal] JSON parse error:', parseErr);
+        throw new Error('Server returned invalid response. Please try again.');
+      }
       
       if (!res.ok || !json.success) {
-        throw new Error(json.error?.message || json.message || 'Failed to initiate verification');
+        const errorMsg = json.error?.message || json.message || 'Failed to initiate verification';
+        console.error('[Withdrawal] API error:', errorMsg);
+        throw new Error(errorMsg);
+      }
+      
+      if (!json.data?.verification_id) {
+        throw new Error('Invalid response from server. Please try again.');
       }
       
       setVerificationId(json.data.verification_id);

