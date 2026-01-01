@@ -1,385 +1,298 @@
-import React, { useEffect, useState, lazy, Suspense } from 'react';
-import { Layout } from './components/Layout';
-import { TabId, ToastProvider } from './components/ui';
-import { GhidarLogo } from './components/GhidarLogo';
-import { 
-  setupTelegramTheme, 
-  signalReady, 
-  getInitData,
-} from './lib/telegram';
-import styles from './App.module.css';
+import { useEffect, useState } from 'react';
 
-// Screen component type
-type ScreenProps = { onNavigate: (tab: TabId) => void };
-
-// Lazy load screens with proper typing
-const HomeScreen = lazy<React.ComponentType<ScreenProps>>(() => 
-  import('./screens/HomeScreen').then(m => ({ default: m.HomeScreen }))
-);
-const LotteryScreen = lazy<React.ComponentType<ScreenProps>>(() => 
-  import('./screens/LotteryScreen').then(m => ({ default: m.LotteryScreen }))
-);
-const AirdropScreen = lazy<React.ComponentType<ScreenProps>>(() => 
-  import('./screens/AirdropScreen').then(m => ({ default: m.AirdropScreen }))
-);
-const AITraderScreen = lazy<React.ComponentType<ScreenProps>>(() => 
-  import('./screens/AITraderScreen').then(m => ({ default: m.AITraderScreen }))
-);
-const ReferralScreen = lazy<React.ComponentType<ScreenProps>>(() => 
-  import('./screens/ReferralScreen').then(m => ({ default: m.ReferralScreen }))
-);
-const SettingsScreen = lazy<React.ComponentType<ScreenProps>>(() => 
-  import('./screens/SettingsScreen').then(m => ({ default: m.SettingsScreen }))
-);
-
-// Simple loading fallback
-function LoadingFallback() {
-  return (
-    <div style={{ 
-      display: 'flex', 
-      flexDirection: 'column',
-      alignItems: 'center', 
-      justifyContent: 'center', 
-      height: '100vh',
-      background: '#0a0c10',
-      color: 'white'
-    }}>
-      <div style={{ marginBottom: '20px' }}>
-        <GhidarLogo size="xl" showText={false} animate />
-      </div>
-      <p style={{ color: '#94a3b8' }}>Loading...</p>
-    </div>
-  );
-}
-
-type AppState = 'loading' | 'ready' | 'no_auth';
+/**
+ * MINIMAL DIAGNOSTIC APP
+ * This version shows every step on screen to identify where the issue is.
+ * Once we find the problem, we'll restore the full UI.
+ */
 
 function App() {
-  const [activeTab, setActiveTab] = useState<TabId>('home');
-  const [appState, setAppState] = useState<AppState>('loading');
-  const [initDataStatus, setInitDataStatus] = useState<string>('checking...');
-  const [debugLogs, setDebugLogs] = useState<string[]>([]);
-  const [showDebugPanel, setShowDebugPanel] = useState(false);
+  const [status, setStatus] = useState<string[]>(['App starting...']);
+  const [userData, setUserData] = useState<any>(null);
+  const [error, setError] = useState<string>('');
+  const [phase, setPhase] = useState<'init' | 'loading' | 'success' | 'error'>('init');
 
-  const addLog = (msg: string) => {
+  const log = (msg: string) => {
     const time = new Date().toLocaleTimeString();
-    setDebugLogs(prev => [...prev, `[${time}] ${msg}`]);
     console.log(`[Ghidar] ${msg}`);
+    setStatus(prev => [...prev, `[${time}] ${msg}`]);
   };
 
   useEffect(() => {
-    const init = async () => {
-      addLog('Starting initialization...');
-      
-      // Check for Telegram SDK
-      const hasTelegram = typeof window !== 'undefined' && !!window.Telegram?.WebApp;
-      addLog(`Telegram SDK present: ${hasTelegram}`);
-      
-      if (hasTelegram) {
-        setupTelegramTheme();
-        signalReady();
-        addLog('Telegram theme setup complete');
-      }
-      
-      // Wait a bit for initData to be populated
-      let attempts = 0;
-      const maxAttempts = 50; // 5 seconds max
-      
-      while (attempts < maxAttempts) {
-        const initData = getInitData();
-        
-        if (initData && initData.length > 0) {
-          addLog(`initData found! Length: ${initData.length}`);
-          setInitDataStatus(`✓ ${initData.length} chars`);
-          setAppState('ready');
-          
-          // Mark onboarding as complete for new users (skip onboarding)
+    console.log('[Ghidar] React app mounted');
+
+    const run = async () => {
+      try {
+        // Step 1: Check if Telegram SDK exists
+        log('Step 1: Checking Telegram SDK...');
+        const hasTelegram = typeof window !== 'undefined' && !!window.Telegram;
+        const hasWebApp = hasTelegram && !!window.Telegram?.WebApp;
+        log(`  - window.Telegram exists: ${hasTelegram}`);
+        log(`  - window.Telegram.WebApp exists: ${hasWebApp}`);
+
+        if (hasWebApp) {
+          // Signal ready and expand
           try {
-            localStorage.setItem('ghidar_onboarding_complete', 'true');
-            localStorage.setItem('ghidar_onboarding_complete_version', '1.0');
+            window.Telegram!.WebApp!.ready();
+            window.Telegram!.WebApp!.expand();
+            window.Telegram!.WebApp!.setHeaderColor('#0f1218');
+            window.Telegram!.WebApp!.setBackgroundColor('#0a0c10');
+            log('  - Telegram SDK initialized');
           } catch (e) {
-            // Ignore localStorage errors
+            log(`  - SDK init error: ${e}`);
           }
-          
+        }
+
+        // Step 2: Get initData from SDK
+        log('Step 2: Getting initData from SDK...');
+        let initData = '';
+        
+        if (hasWebApp) {
+          initData = window.Telegram!.WebApp!.initData || '';
+          log(`  - SDK initData length: ${initData.length}`);
+        }
+
+        // Step 3: Try URL hash fallback
+        if (!initData || initData.length === 0) {
+          log('Step 3: SDK initData empty, trying URL hash...');
+          if (window.location.hash) {
+            log(`  - Hash present: ${window.location.hash.substring(0, 50)}...`);
+            const hashContent = window.location.hash.substring(1);
+            const params = new URLSearchParams(hashContent);
+            const tgWebAppData = params.get('tgWebAppData');
+            if (tgWebAppData) {
+              initData = tgWebAppData;
+              log(`  - Found in hash: ${initData.length} chars`);
+            } else {
+              log('  - tgWebAppData not in hash');
+            }
+          } else {
+            log('  - No hash in URL');
+          }
+        }
+
+        // Step 4: Check if we have initData
+        log('Step 4: Checking initData result...');
+        if (!initData || initData.length === 0) {
+          log('  - ERROR: No initData available!');
+          setError('No Telegram authentication data. Please open from Telegram bot.');
+          setPhase('error');
           return;
         }
+        log(`  - SUCCESS: initData is ${initData.length} characters`);
+
+        // Step 5: Call the API
+        log('Step 5: Calling /RockyTap/api/me/...');
+        setPhase('loading');
         
-        attempts++;
-        await new Promise(r => setTimeout(r, 100));
-      }
-      
-      // Timeout - no initData
-      addLog('initData timeout - not available');
-      setInitDataStatus('✗ Empty');
-      
-      // In development, allow app to run
-      if (import.meta.env.DEV) {
-        addLog('DEV mode - proceeding without auth');
-        setAppState('ready');
-      } else {
-        setAppState('no_auth');
+        const apiUrl = '/RockyTap/api/me/';
+        log(`  - URL: ${apiUrl}`);
+        log(`  - Sending Telegram-Data header`);
+
+        const response = await fetch(apiUrl, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Telegram-Data': initData
+          }
+        });
+
+        log(`  - Response status: ${response.status} ${response.statusText}`);
+
+        const responseText = await response.text();
+        log(`  - Response length: ${responseText.length} chars`);
+
+        let data;
+        try {
+          data = JSON.parse(responseText);
+          log(`  - JSON parsed successfully`);
+        } catch (e) {
+          log(`  - JSON parse error: ${e}`);
+          setError(`Invalid JSON response: ${responseText.substring(0, 100)}`);
+          setPhase('error');
+          return;
+        }
+
+        // Step 6: Check API response
+        log('Step 6: Checking API response...');
+        if (data.success && data.data) {
+          log(`  - SUCCESS! User: ${data.data.user?.first_name}`);
+          log(`  - USDT Balance: ${data.data.wallet?.usdt_balance}`);
+          setUserData(data.data);
+          setPhase('success');
+        } else {
+          log(`  - API Error: ${data.error?.code} - ${data.error?.message}`);
+          setError(data.error?.message || 'Unknown API error');
+          setPhase('error');
+        }
+
+      } catch (e) {
+        const errorMsg = e instanceof Error ? e.message : String(e);
+        log(`FATAL ERROR: ${errorMsg}`);
+        setError(errorMsg);
+        setPhase('error');
       }
     };
-    
-    init();
+
+    // Run immediately
+    run();
   }, []);
 
-  // Hide initial HTML loader
-  useEffect(() => {
-    if (appState !== 'loading') {
-      const loader = document.getElementById('loader');
-      if (loader) loader.style.display = 'none';
-    }
-  }, [appState]);
+  // Styles
+  const containerStyle: React.CSSProperties = {
+    padding: '20px',
+    background: '#0a0c10',
+    color: '#f8fafc',
+    minHeight: '100vh',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+  };
 
-  // Loading state
-  if (appState === 'loading') {
-    return (
-      <>
-        <div className={styles.authError}>
-          <div className={styles.authContent}>
-            <div className={styles.authLogoWrapper}>
-              <GhidarLogo size="xl" showText={false} animate />
-            </div>
-            <h1 className={styles.authTitle}>Ghidar</h1>
-            <p className={styles.authMessage}>Connecting to Telegram...</p>
-            <p style={{ fontSize: '12px', color: '#64748b', marginTop: '10px' }}>
-              initData: {initDataStatus}
-            </p>
-          </div>
-          <div className={styles.authBackground} />
-        </div>
-        <DebugButton logs={debugLogs} show={showDebugPanel} onToggle={() => setShowDebugPanel(!showDebugPanel)} />
-      </>
-    );
-  }
+  const headerStyle: React.CSSProperties = {
+    fontSize: '24px',
+    fontWeight: 'bold',
+    marginBottom: '10px',
+    color: '#10b981',
+  };
 
-  // No auth state
-  if (appState === 'no_auth') {
-    return (
-      <>
-        <div className={styles.authError}>
-          <div className={styles.authContent}>
-            <div className={styles.authLogoWrapper}>
-              <GhidarLogo size="xl" showText={false} animate />
-            </div>
-            <h1 className={styles.authTitle}>Ghidar</h1>
-            <p className={styles.authMessage}>
-              Please open this app from the Telegram bot.
-            </p>
-            <p style={{ fontSize: '12px', color: '#64748b', marginTop: '10px' }}>
-              initData: {initDataStatus}
-            </p>
-            <button 
-              className={styles.retryButton}
-              onClick={() => window.location.reload()}
-              style={{ marginTop: '20px' }}
-            >
-              Try Again
-            </button>
-          </div>
-          <div className={styles.authBackground} />
-        </div>
-        <DebugButton logs={debugLogs} show={showDebugPanel} onToggle={() => setShowDebugPanel(!showDebugPanel)} />
-      </>
-    );
-  }
+  const statusStyle: React.CSSProperties = {
+    background: '#1e293b',
+    padding: '15px',
+    borderRadius: '12px',
+    marginBottom: '20px',
+    fontSize: '13px',
+    fontFamily: 'monospace',
+    maxHeight: '300px',
+    overflow: 'auto',
+  };
 
-  // Main app render
-  const renderScreen = () => {
-    switch (activeTab) {
-      case 'home':
-        return <HomeScreen onNavigate={setActiveTab} />;
-      case 'lottery':
-        return <LotteryScreen onNavigate={setActiveTab} />;
-      case 'airdrop':
-        return <AirdropScreen onNavigate={setActiveTab} />;
-      case 'trader':
-        return <AITraderScreen onNavigate={setActiveTab} />;
-      case 'referral':
-        return <ReferralScreen onNavigate={setActiveTab} />;
-      case 'settings':
-        return <SettingsScreen onNavigate={setActiveTab} />;
-      default:
-        return <HomeScreen onNavigate={setActiveTab} />;
-    }
+  const logLineStyle: React.CSSProperties = {
+    marginBottom: '4px',
+    lineHeight: '1.4',
+  };
+
+  const errorStyle: React.CSSProperties = {
+    background: 'rgba(239, 68, 68, 0.1)',
+    border: '1px solid #ef4444',
+    color: '#ef4444',
+    padding: '15px',
+    borderRadius: '12px',
+    marginBottom: '20px',
+  };
+
+  const successStyle: React.CSSProperties = {
+    background: 'rgba(16, 185, 129, 0.1)',
+    border: '1px solid #10b981',
+    padding: '20px',
+    borderRadius: '12px',
+  };
+
+  const userCardStyle: React.CSSProperties = {
+    background: '#1e293b',
+    padding: '20px',
+    borderRadius: '12px',
+    marginTop: '15px',
+  };
+
+  const balanceStyle: React.CSSProperties = {
+    fontSize: '28px',
+    fontWeight: 'bold',
+    color: '#10b981',
   };
 
   return (
-    <ToastProvider>
-      <Layout activeTab={activeTab} onTabChange={setActiveTab}>
-        <Suspense fallback={<LoadingFallback />}>
-          {renderScreen()}
-        </Suspense>
-      </Layout>
-      <DebugButton logs={debugLogs} show={showDebugPanel} onToggle={() => setShowDebugPanel(!showDebugPanel)} />
-    </ToastProvider>
-  );
-}
+    <div style={containerStyle}>
+      <h1 style={headerStyle}>🔍 Ghidar Debug Mode</h1>
+      <p style={{ color: '#94a3b8', marginBottom: '20px' }}>
+        Phase: <strong style={{ color: phase === 'success' ? '#10b981' : phase === 'error' ? '#ef4444' : '#fbbf24' }}>
+          {phase.toUpperCase()}
+        </strong>
+      </p>
 
-// Simple debug button component
-function DebugButton({ 
-  logs, 
-  show, 
-  onToggle 
-}: { 
-  logs: string[]; 
-  show: boolean; 
-  onToggle: () => void;
-}) {
-  const [testResults, setTestResults] = useState<string[]>([]);
-  const [testing, setTesting] = useState(false);
-
-  const runTests = async () => {
-    setTesting(true);
-    setTestResults([]);
-    const results: string[] = [];
-    
-    const add = (msg: string) => {
-      results.push(msg);
-      setTestResults([...results]);
-    };
-
-    const initData = getInitData();
-    add(`initData: ${initData ? `${initData.length} chars` : 'EMPTY'}`);
-    
-    // Test health
-    add('--- Testing /health/ ---');
-    try {
-      const r1 = await fetch('/RockyTap/api/health/');
-      add(`Status: ${r1.status}`);
-      const d1 = await r1.json();
-      add(`Response: ${JSON.stringify(d1).substring(0, 100)}...`);
-      add('✓ Health OK');
-    } catch (e) {
-      add(`✗ Health failed: ${e}`);
-    }
-
-    // Test /me
-    add('--- Testing /me/ ---');
-    try {
-      const r2 = await fetch('/RockyTap/api/me/', {
-        headers: {
-          'Content-Type': 'application/json',
-          'Telegram-Data': initData || ''
-        }
-      });
-      add(`Status: ${r2.status}`);
-      const d2 = await r2.json();
-      add(`Response: ${JSON.stringify(d2).substring(0, 150)}...`);
-      if (r2.ok && d2.success) {
-        add('✓ /me/ OK');
-      } else {
-        add(`✗ /me/ error: ${d2.error?.message || 'Unknown'}`);
-      }
-    } catch (e) {
-      add(`✗ /me/ failed: ${e}`);
-    }
-
-    add('--- Done ---');
-    setTesting(false);
-  };
-
-  if (!show) {
-    return (
-      <button
-        onClick={onToggle}
-        style={{
-          position: 'fixed',
-          bottom: '80px',
-          right: '10px',
-          zIndex: 99999,
-          background: '#ef4444',
-          color: 'white',
-          border: 'none',
-          borderRadius: '50%',
-          width: '50px',
-          height: '50px',
-          fontSize: '20px',
-          cursor: 'pointer',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-        }}
-      >
-        🔧
-      </button>
-    );
-  }
-
-  return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      zIndex: 99999,
-      background: 'rgba(0,0,0,0.95)',
-      color: 'white',
-      fontFamily: 'monospace',
-      fontSize: '12px',
-      overflow: 'auto',
-      padding: '15px',
-    }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
-        <h2 style={{ margin: 0, fontSize: '18px' }}>🔧 Debug Panel</h2>
-        <button
-          onClick={onToggle}
-          style={{
-            background: '#ef4444',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            padding: '8px 16px',
-            cursor: 'pointer',
-          }}
-        >
-          Close
-        </button>
+      {/* Status Log */}
+      <div style={statusStyle}>
+        <div style={{ color: '#fbbf24', marginBottom: '10px', fontWeight: 'bold' }}>
+          Initialization Log:
+        </div>
+        {status.map((s, i) => (
+          <div 
+            key={i} 
+            style={{
+              ...logLineStyle,
+              color: s.includes('ERROR') ? '#ef4444' : s.includes('SUCCESS') ? '#10b981' : '#e2e8f0'
+            }}
+          >
+            {s}
+          </div>
+        ))}
       </div>
 
-      <button
-        onClick={runTests}
-        disabled={testing}
-        style={{
-          background: testing ? '#6b7280' : '#10b981',
-          color: 'white',
-          border: 'none',
-          borderRadius: '6px',
-          padding: '12px 20px',
-          cursor: testing ? 'not-allowed' : 'pointer',
-          width: '100%',
-          marginBottom: '15px',
-          fontSize: '14px',
-          fontWeight: 'bold',
-        }}
-      >
-        {testing ? 'Testing...' : '🚀 Run API Tests'}
-      </button>
-
-      {testResults.length > 0 && (
-        <div style={{ background: '#0f172a', padding: '12px', borderRadius: '8px', marginBottom: '15px' }}>
-          <h3 style={{ margin: '0 0 10px 0', color: '#fbbf24' }}>Test Results</h3>
-          {testResults.map((r, i) => (
-            <div key={i} style={{ 
-              color: r.startsWith('✓') ? '#22c55e' : r.startsWith('✗') ? '#ef4444' : r.startsWith('---') ? '#fbbf24' : '#e2e8f0',
-              marginBottom: '4px' 
-            }}>
-              {r}
-            </div>
-          ))}
+      {/* Error Display */}
+      {error && (
+        <div style={errorStyle}>
+          <strong>❌ Error:</strong>
+          <div style={{ marginTop: '8px' }}>{error}</div>
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              marginTop: '15px',
+              padding: '10px 20px',
+              background: '#ef4444',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+            }}
+          >
+            Reload
+          </button>
         </div>
       )}
 
-      <div style={{ background: '#1e293b', padding: '12px', borderRadius: '8px' }}>
-        <h3 style={{ margin: '0 0 10px 0', color: '#10b981' }}>App Logs</h3>
-        {logs.length === 0 ? (
-          <div style={{ color: '#64748b' }}>No logs yet</div>
-        ) : (
-          logs.map((log, i) => (
-            <div key={i} style={{ marginBottom: '4px', color: '#e2e8f0' }}>{log}</div>
-          ))
-        )}
-      </div>
+      {/* Success Display */}
+      {phase === 'success' && userData && (
+        <div style={successStyle}>
+          <div style={{ color: '#10b981', fontWeight: 'bold', fontSize: '18px', marginBottom: '10px' }}>
+            ✅ Everything Works!
+          </div>
+          <p style={{ color: '#94a3b8' }}>
+            The API returned successfully. The problem is in the UI layer, not the API.
+          </p>
+          
+          <div style={userCardStyle}>
+            <div style={{ color: '#94a3b8', fontSize: '14px' }}>Welcome,</div>
+            <div style={{ color: '#f8fafc', fontSize: '22px', fontWeight: 'bold' }}>
+              {userData.user?.first_name} {userData.user?.last_name || ''}
+            </div>
+            <div style={{ color: '#64748b', fontSize: '13px', marginTop: '4px' }}>
+              @{userData.user?.username || 'No username'}
+            </div>
+            
+            <div style={{ marginTop: '20px', display: 'flex', gap: '20px' }}>
+              <div>
+                <div style={{ color: '#94a3b8', fontSize: '12px' }}>USDT Balance</div>
+                <div style={balanceStyle}>${userData.wallet?.usdt_balance || '0.00'}</div>
+              </div>
+              <div>
+                <div style={{ color: '#94a3b8', fontSize: '12px' }}>GHD Balance</div>
+                <div style={{ ...balanceStyle, color: '#fbbf24' }}>{userData.wallet?.ghd_balance || '0'}</div>
+              </div>
+            </div>
+          </div>
+          
+          <p style={{ color: '#64748b', fontSize: '13px', marginTop: '20px' }}>
+            Since this works, we can now restore the full UI.
+          </p>
+        </div>
+      )}
+
+      {/* Loading indicator */}
+      {phase === 'loading' && (
+        <div style={{ textAlign: 'center', padding: '40px' }}>
+          <div style={{ fontSize: '40px', marginBottom: '10px' }}>⏳</div>
+          <div style={{ color: '#94a3b8' }}>Calling API...</div>
+        </div>
+      )}
     </div>
   );
 }

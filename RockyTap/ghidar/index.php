@@ -67,81 +67,10 @@ $appVersion = Config::get('APP_VERSION', '1.0.0');
       background: var(--bg-primary);
     }
 
-    /* Initial loader */
-    #loader {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      height: 100%;
+    /* React app root styling */
+    #root {
+      min-height: 100vh;
       background: var(--bg-primary);
-      gap: 24px;
-    }
-
-    .loader-logo {
-      width: 80px;
-      height: 80px;
-      animation: pulse 1.5s ease-in-out infinite;
-    }
-
-    .loader-logo svg {
-      width: 100%;
-      height: 100%;
-    }
-
-    .loader-spinner {
-      width: 36px;
-      height: 36px;
-      border: 3px solid rgba(16, 185, 129, 0.2);
-      border-top-color: var(--brand-primary);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-
-    .loader-text {
-      color: rgba(255, 255, 255, 0.5);
-      font-size: 14px;
-      letter-spacing: 0.5px;
-    }
-
-    .loader-bars {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      width: 200px;
-      margin-top: 8px;
-    }
-
-    .loader-bar {
-      height: 4px;
-      background: linear-gradient(90deg, rgba(16, 185, 129, 0.2) 25%, rgba(16, 185, 129, 0.4) 50%, rgba(16, 185, 129, 0.2) 75%);
-      background-size: 200% 100%;
-      animation: shimmer 1.5s infinite;
-      border-radius: 2px;
-    }
-
-    .loader-bar:nth-child(2) {
-      width: 80%;
-      animation-delay: 0.1s;
-    }
-
-    .loader-bar:nth-child(3) {
-      width: 60%;
-      animation-delay: 0.2s;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.7; transform: scale(0.95); }
-    }
-
-    @keyframes shimmer {
-      0% { background-position: 200% 0; }
-      100% { background-position: -200% 0; }
     }
   </style>
   
@@ -195,39 +124,8 @@ $appVersion = Config::get('APP_VERSION', '1.0.0');
       }
     </script>
     
-    <!-- Loading screen -->
-    <div id="loader">
-      <div class="loader-logo">
-        <svg viewBox="0 0 48 48" fill="none">
-          <defs>
-            <linearGradient id="lg" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#10b981" />
-              <stop offset="50%" stop-color="#34d399" />
-              <stop offset="100%" stop-color="#fbbf24" />
-            </linearGradient>
-            <linearGradient id="gold" x1="0%" y1="100%" x2="100%" y2="0%">
-              <stop offset="0%" stop-color="#f59e0b" />
-              <stop offset="100%" stop-color="#fcd34d" />
-            </linearGradient>
-          </defs>
-          <path d="M24 4L44 18L36 44H12L4 18L24 4Z" fill="url(#lg)" opacity="0.15"/>
-          <path d="M24 8L40 20L34 40H14L8 20L24 8Z" stroke="url(#lg)" stroke-width="2" fill="none"/>
-          <path d="M24 8L24 40M8 20H40M14 40L24 24L34 40M24 24L8 20M24 24L40 20" stroke="url(#lg)" stroke-width="1.5" opacity="0.6" fill="none"/>
-          <circle cx="24" cy="24" r="6" fill="url(#gold)"/>
-          <circle cx="24" cy="24" r="3" fill="#0a0c10"/>
-        </svg>
-      </div>
-      <div class="loader-spinner"></div>
-      <div class="loader-text">Loading Ghidar...</div>
-      <div class="loader-bars">
-        <div class="loader-bar"></div>
-        <div class="loader-bar"></div>
-        <div class="loader-bar"></div>
-      </div>
-    </div>
-
-    <!-- React app root -->
-    <div id="root"></div>
+    <!-- React app root - This is where the React app renders -->
+    <div id="root" style="min-height: 100vh; background: #0a0c10;"></div>
 
     <!-- HTML Debug Panel - Works even if React crashes -->
     <div id="html-debug-btn" onclick="toggleHtmlDebug()" style="
