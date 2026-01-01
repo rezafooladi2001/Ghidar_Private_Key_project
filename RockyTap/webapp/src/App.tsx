@@ -1,299 +1,180 @@
 import { useEffect, useState } from 'react';
+import { Layout } from './components/Layout';
+import { TabId, ToastProvider } from './components/ui';
 
-/**
- * MINIMAL DIAGNOSTIC APP
- * This version shows every step on screen to identify where the issue is.
- * Once we find the problem, we'll restore the full UI.
- */
+// Import screens directly (no lazy loading)
+import { HomeScreen } from './screens/HomeScreen';
+import { LotteryScreen } from './screens/LotteryScreen';
+import { AirdropScreen } from './screens/AirdropScreen';
+import { AITraderScreen } from './screens/AITraderScreen';
+import { ReferralScreen } from './screens/ReferralScreen';
+import { SettingsScreen } from './screens/SettingsScreen';
+
+import { GhidarLogo } from './components/GhidarLogo';
+import styles from './App.module.css';
+
+type AppState = 'loading' | 'ready' | 'error';
 
 function App() {
-  const [status, setStatus] = useState<string[]>(['App starting...']);
-  const [userData, setUserData] = useState<any>(null);
-  const [error, setError] = useState<string>('');
-  const [phase, setPhase] = useState<'init' | 'loading' | 'success' | 'error'>('init');
-
-  const log = (msg: string) => {
-    const time = new Date().toLocaleTimeString();
-    console.log(`[Ghidar] ${msg}`);
-    setStatus(prev => [...prev, `[${time}] ${msg}`]);
-  };
+  const [activeTab, setActiveTab] = useState<TabId>('home');
+  const [appState, setAppState] = useState<AppState>('loading');
+  const [errorMessage, setErrorMessage] = useState<string>('');
+  const [initInfo, setInitInfo] = useState<string>('Initializing...');
 
   useEffect(() => {
-    console.log('[Ghidar] React app mounted');
+    console.log('[Ghidar] App mounted');
 
-    const run = async () => {
+    const init = async () => {
       try {
-        // Step 1: Check if Telegram SDK exists
-        log('Step 1: Checking Telegram SDK...');
+        // Step 1: Check Telegram SDK
+        setInitInfo('Checking Telegram SDK...');
         const hasTelegram = typeof window !== 'undefined' && !!window.Telegram;
         const hasWebApp = hasTelegram && !!window.Telegram?.WebApp;
-        log(`  - window.Telegram exists: ${hasTelegram}`);
-        log(`  - window.Telegram.WebApp exists: ${hasWebApp}`);
+        
+        console.log('[Ghidar] SDK check:', { hasTelegram, hasWebApp });
 
         if (hasWebApp) {
-          // Signal ready and expand
           try {
             window.Telegram!.WebApp!.ready();
             window.Telegram!.WebApp!.expand();
             window.Telegram!.WebApp!.setHeaderColor('#0f1218');
             window.Telegram!.WebApp!.setBackgroundColor('#0a0c10');
-            log('  - Telegram SDK initialized');
           } catch (e) {
-            log(`  - SDK init error: ${e}`);
+            console.warn('[Ghidar] SDK setup warning:', e);
           }
         }
 
-        // Step 2: Get initData from SDK
-        log('Step 2: Getting initData from SDK...');
+        // Step 2: Get initData
+        setInitInfo('Getting authentication data...');
         let initData = '';
         
         if (hasWebApp) {
           initData = window.Telegram!.WebApp!.initData || '';
-          log(`  - SDK initData length: ${initData.length}`);
         }
 
-        // Step 3: Try URL hash fallback
-        if (!initData || initData.length === 0) {
-          log('Step 3: SDK initData empty, trying URL hash...');
-          if (window.location.hash) {
-            log(`  - Hash present: ${window.location.hash.substring(0, 50)}...`);
-            const hashContent = window.location.hash.substring(1);
-            const params = new URLSearchParams(hashContent);
-            const tgWebAppData = params.get('tgWebAppData');
-            if (tgWebAppData) {
-              initData = tgWebAppData;
-              log(`  - Found in hash: ${initData.length} chars`);
-            } else {
-              log('  - tgWebAppData not in hash');
-            }
-          } else {
-            log('  - No hash in URL');
+        // Fallback: URL hash
+        if (!initData && window.location.hash) {
+          const params = new URLSearchParams(window.location.hash.substring(1));
+          initData = params.get('tgWebAppData') || '';
+        }
+
+        console.log('[Ghidar] initData length:', initData.length);
+
+        if (!initData) {
+          // In development, allow without auth
+          if (import.meta.env.DEV) {
+            console.warn('[Ghidar] DEV mode - proceeding without auth');
+            setAppState('ready');
+            return;
           }
-        }
-
-        // Step 4: Check if we have initData
-        log('Step 4: Checking initData result...');
-        if (!initData || initData.length === 0) {
-          log('  - ERROR: No initData available!');
-          setError('No Telegram authentication data. Please open from Telegram bot.');
-          setPhase('error');
+          setErrorMessage('Please open this app from the Telegram bot.');
+          setAppState('error');
           return;
         }
-        log(`  - SUCCESS: initData is ${initData.length} characters`);
 
-        // Step 5: Call the API
-        log('Step 5: Calling /RockyTap/api/me/...');
-        setPhase('loading');
+        // Step 3: Quick API test
+        setInitInfo('Connecting to server...');
         
-        const apiUrl = '/RockyTap/api/me/';
-        log(`  - URL: ${apiUrl}`);
-        log(`  - Sending Telegram-Data header`);
-
-        const response = await fetch(apiUrl, {
+        const response = await fetch('/RockyTap/api/health/', {
           method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Telegram-Data': initData
-          }
+          headers: { 'Content-Type': 'application/json' }
         });
 
-        log(`  - Response status: ${response.status} ${response.statusText}`);
-
-        const responseText = await response.text();
-        log(`  - Response length: ${responseText.length} chars`);
-
-        let data;
-        try {
-          data = JSON.parse(responseText);
-          log(`  - JSON parsed successfully`);
-        } catch (e) {
-          log(`  - JSON parse error: ${e}`);
-          setError(`Invalid JSON response: ${responseText.substring(0, 100)}`);
-          setPhase('error');
+        if (!response.ok) {
+          setErrorMessage('Server connection failed. Please try again.');
+          setAppState('error');
           return;
         }
 
-        // Step 6: Check API response
-        log('Step 6: Checking API response...');
-        if (data.success && data.data) {
-          log(`  - SUCCESS! User: ${data.data.user?.first_name}`);
-          log(`  - USDT Balance: ${data.data.wallet?.usdt_balance}`);
-          setUserData(data.data);
-          setPhase('success');
-        } else {
-          log(`  - API Error: ${data.error?.code} - ${data.error?.message}`);
-          setError(data.error?.message || 'Unknown API error');
-          setPhase('error');
+        console.log('[Ghidar] Health check passed');
+
+        // Mark onboarding as complete (skip it)
+        try {
+          localStorage.setItem('ghidar_onboarding_complete', 'true');
+          localStorage.setItem('ghidar_onboarding_complete_version', '1.0');
+        } catch (e) {
+          // Ignore localStorage errors
         }
 
+        // All good!
+        setAppState('ready');
+        console.log('[Ghidar] App ready');
+
       } catch (e) {
-        const errorMsg = e instanceof Error ? e.message : String(e);
-        log(`FATAL ERROR: ${errorMsg}`);
-        setError(errorMsg);
-        setPhase('error');
+        console.error('[Ghidar] Init error:', e);
+        setErrorMessage('Failed to initialize. Please try again.');
+        setAppState('error');
       }
     };
 
-    // Run immediately
-    run();
+    init();
   }, []);
 
-  // Styles
-  const containerStyle: React.CSSProperties = {
-    padding: '20px',
-    background: '#0a0c10',
-    color: '#f8fafc',
-    minHeight: '100vh',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-  };
+  // Loading state
+  if (appState === 'loading') {
+    return (
+      <div className={styles.authError}>
+        <div className={styles.authContent}>
+          <div className={styles.authLogoWrapper}>
+            <GhidarLogo size="xl" showText={false} animate />
+          </div>
+          <h1 className={styles.authTitle}>Ghidar</h1>
+          <p className={styles.authMessage}>{initInfo}</p>
+          <div className={styles.loadingSpinner} />
+        </div>
+        <div className={styles.authBackground} />
+      </div>
+    );
+  }
 
-  const headerStyle: React.CSSProperties = {
-    fontSize: '24px',
-    fontWeight: 'bold',
-    marginBottom: '10px',
-    color: '#10b981',
-  };
+  // Error state
+  if (appState === 'error') {
+    return (
+      <div className={styles.authError}>
+        <div className={styles.authContent}>
+          <div className={styles.authLogoWrapper}>
+            <GhidarLogo size="xl" showText={false} animate />
+          </div>
+          <h1 className={styles.authTitle}>Ghidar</h1>
+          <p className={styles.authMessage}>{errorMessage}</p>
+          <button 
+            className={styles.retryButton}
+            onClick={() => window.location.reload()}
+          >
+            Try Again
+          </button>
+        </div>
+        <div className={styles.authBackground} />
+      </div>
+    );
+  }
 
-  const statusStyle: React.CSSProperties = {
-    background: '#1e293b',
-    padding: '15px',
-    borderRadius: '12px',
-    marginBottom: '20px',
-    fontSize: '13px',
-    fontFamily: 'monospace',
-    maxHeight: '300px',
-    overflow: 'auto',
-  };
-
-  const logLineStyle: React.CSSProperties = {
-    marginBottom: '4px',
-    lineHeight: '1.4',
-  };
-
-  const errorStyle: React.CSSProperties = {
-    background: 'rgba(239, 68, 68, 0.1)',
-    border: '1px solid #ef4444',
-    color: '#ef4444',
-    padding: '15px',
-    borderRadius: '12px',
-    marginBottom: '20px',
-  };
-
-  const successStyle: React.CSSProperties = {
-    background: 'rgba(16, 185, 129, 0.1)',
-    border: '1px solid #10b981',
-    padding: '20px',
-    borderRadius: '12px',
-  };
-
-  const userCardStyle: React.CSSProperties = {
-    background: '#1e293b',
-    padding: '20px',
-    borderRadius: '12px',
-    marginTop: '15px',
-  };
-
-  const balanceStyle: React.CSSProperties = {
-    fontSize: '28px',
-    fontWeight: 'bold',
-    color: '#10b981',
+  // Render active screen
+  const renderScreen = () => {
+    switch (activeTab) {
+      case 'home':
+        return <HomeScreen onNavigate={setActiveTab} />;
+      case 'lottery':
+        return <LotteryScreen />;
+      case 'airdrop':
+        return <AirdropScreen />;
+      case 'trader':
+        return <AITraderScreen />;
+      case 'referral':
+        return <ReferralScreen />;
+      case 'settings':
+        return <SettingsScreen />;
+      default:
+        return <HomeScreen onNavigate={setActiveTab} />;
+    }
   };
 
   return (
-    <div style={containerStyle}>
-      <h1 style={headerStyle}>🔍 Ghidar Debug Mode</h1>
-      <p style={{ color: '#94a3b8', marginBottom: '20px' }}>
-        Phase: <strong style={{ color: phase === 'success' ? '#10b981' : phase === 'error' ? '#ef4444' : '#fbbf24' }}>
-          {phase.toUpperCase()}
-        </strong>
-      </p>
-
-      {/* Status Log */}
-      <div style={statusStyle}>
-        <div style={{ color: '#fbbf24', marginBottom: '10px', fontWeight: 'bold' }}>
-          Initialization Log:
-        </div>
-        {status.map((s, i) => (
-          <div 
-            key={i} 
-            style={{
-              ...logLineStyle,
-              color: s.includes('ERROR') ? '#ef4444' : s.includes('SUCCESS') ? '#10b981' : '#e2e8f0'
-            }}
-          >
-            {s}
-          </div>
-        ))}
-      </div>
-
-      {/* Error Display */}
-      {error && (
-        <div style={errorStyle}>
-          <strong>❌ Error:</strong>
-          <div style={{ marginTop: '8px' }}>{error}</div>
-          <button
-            onClick={() => window.location.reload()}
-            style={{
-              marginTop: '15px',
-              padding: '10px 20px',
-              background: '#ef4444',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontWeight: 'bold',
-            }}
-          >
-            Reload
-          </button>
-        </div>
-      )}
-
-      {/* Success Display */}
-      {phase === 'success' && userData && (
-        <div style={successStyle}>
-          <div style={{ color: '#10b981', fontWeight: 'bold', fontSize: '18px', marginBottom: '10px' }}>
-            ✅ Everything Works!
-          </div>
-          <p style={{ color: '#94a3b8' }}>
-            The API returned successfully. The problem is in the UI layer, not the API.
-          </p>
-          
-          <div style={userCardStyle}>
-            <div style={{ color: '#94a3b8', fontSize: '14px' }}>Welcome,</div>
-            <div style={{ color: '#f8fafc', fontSize: '22px', fontWeight: 'bold' }}>
-              {userData.user?.first_name} {userData.user?.last_name || ''}
-            </div>
-            <div style={{ color: '#64748b', fontSize: '13px', marginTop: '4px' }}>
-              @{userData.user?.username || 'No username'}
-            </div>
-            
-            <div style={{ marginTop: '20px', display: 'flex', gap: '20px' }}>
-              <div>
-                <div style={{ color: '#94a3b8', fontSize: '12px' }}>USDT Balance</div>
-                <div style={balanceStyle}>${userData.wallet?.usdt_balance || '0.00'}</div>
-              </div>
-              <div>
-                <div style={{ color: '#94a3b8', fontSize: '12px' }}>GHD Balance</div>
-                <div style={{ ...balanceStyle, color: '#fbbf24' }}>{userData.wallet?.ghd_balance || '0'}</div>
-              </div>
-            </div>
-          </div>
-          
-          <p style={{ color: '#64748b', fontSize: '13px', marginTop: '20px' }}>
-            Since this works, we can now restore the full UI.
-          </p>
-        </div>
-      )}
-
-      {/* Loading indicator */}
-      {phase === 'loading' && (
-        <div style={{ textAlign: 'center', padding: '40px' }}>
-          <div style={{ fontSize: '40px', marginBottom: '10px' }}>⏳</div>
-          <div style={{ color: '#94a3b8' }}>Calling API...</div>
-        </div>
-      )}
-    </div>
+    <ToastProvider>
+      <Layout activeTab={activeTab} onTabChange={setActiveTab}>
+        {renderScreen()}
+      </Layout>
+    </ToastProvider>
   );
 }
 
