@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, Button, NumberInput, LoadingScreen, ErrorState, useToast, PullToRefresh } from '../components/ui';
+import { Card, CardContent, CardHeader, CardTitle, Button, NumberInput, LoadingScreen, ErrorState, useToast, PullToRefresh, HelpTooltip } from '../components/ui';
 import { GhidarCoin } from '../components/GhidarLogo';
 import { WithdrawalVerificationModal } from '../components/WithdrawalVerificationModal';
 import {
@@ -283,12 +283,18 @@ export function AirdropScreen() {
       {/* Convert Section */}
       <Card variant="elevated">
         <CardHeader>
-          <CardTitle>Convert to USDT</CardTitle>
+          <CardTitle>
+            Convert to USDT
+            <HelpTooltip content="Convert your mined GHD tokens to USDT at the current exchange rate. USDT can be withdrawn to your external wallet." />
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className={styles.convertInfo}>
             <div className={styles.convertRate}>
-              <span className={styles.rateLabel}>Exchange Rate</span>
+              <span className={styles.rateLabel}>
+                Exchange Rate
+                <HelpTooltip content="This rate determines how many GHD tokens equal 1 USDT. The rate may change based on market conditions." />
+              </span>
               <span className={styles.rateValue}>
                 {status?.airdrop.ghd_per_usdt.toLocaleString()} GHD = 1 USDT
               </span>

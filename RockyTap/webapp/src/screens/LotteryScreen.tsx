@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, Button, NumberInput, LoadingScreen, ErrorState, EmptyState, useToast, WalletVerificationModal, PullToRefresh } from '../components/ui';
+import { Card, CardContent, CardHeader, CardTitle, Button, NumberInput, LoadingScreen, ErrorState, EmptyState, useToast, WalletVerificationModal, PullToRefresh, HelpTooltip } from '../components/ui';
 import { WalletSummary } from '../components/WalletSummary';
 import { TrophyIcon, HistoryIcon } from '../components/Icons';
 import {
@@ -255,7 +255,10 @@ export function LotteryScreen() {
               <CardContent>
                 <div className={styles.lotteryInfo}>
                   <div className={styles.prizePool}>
-                    <span className={styles.prizeLabel}>Prize Pool</span>
+                    <span className={styles.prizeLabel}>
+                      Prize Pool
+                      <HelpTooltip content="The total prize amount that will be distributed among winners. Buy more tickets to increase your chances of winning!" />
+                    </span>
                     <span className={styles.prizeValue}>${formatPrice(status.lottery.prize_pool_usdt)}</span>
                   </div>
                   
@@ -265,7 +268,10 @@ export function LotteryScreen() {
                       <span className={styles.infoValue}>${formatPrice(status.lottery.ticket_price_usdt)}</span>
                     </div>
                     <div className={styles.infoItem}>
-                      <span className={styles.infoLabel}>Your Tickets</span>
+                      <span className={styles.infoLabel}>
+                        Your Tickets
+                        <HelpTooltip content="The number of tickets you own for this lottery draw. Each ticket gives you a chance to win." />
+                      </span>
                       <span className={styles.infoValue}>{status.user_tickets_count || 0}</span>
                     </div>
                   </div>

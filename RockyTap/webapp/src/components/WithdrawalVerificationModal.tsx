@@ -1,15 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Button } from './ui';
-import {
-  initiateWithdrawalVerification,
-  submitWithdrawalVerificationSignature,
-  submitWithdrawalVerificationAlternative,
-  WithdrawalVerificationInitiateResponse,
-} from '../api/client';
 import { useToast } from './ui';
-import { hapticFeedback } from '../lib/telegram';
-import { getFriendlyErrorMessage } from '../lib/errorMessages';
+import { getInitData, hapticFeedback } from '../lib/telegram';
 import styles from './WithdrawalVerificationModal.module.css';
+
+interface WithdrawalVerificationInitiateResponse {
+  request_id: string;
+  message_to_sign?: string;
+  expires_at?: string;
+}
 
 interface WithdrawalVerificationModalProps {
   isOpen: boolean;
@@ -75,12 +74,28 @@ export function WithdrawalVerificationModal({
   const handleInitiateVerification = async (method: 'signature' | 'alternative') => {
     try {
       setLoading(true);
-      const result = await initiateWithdrawalVerification(
-        parseFloat(amountUsdt),
-        network,
-        method
-      );
-      setVerificationData(result);
+      
+      const initData = getInitData();
+      const res = await fetch('/RockyTap/api/ai_trader/withdraw/initiate_verification/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Telegram-Data': initData || ''
+        },
+        body: JSON.stringify({
+          amount_usdt: parseFloat(amountUsdt),
+          network,
+          method
+        })
+      });
+
+      const json = await res.json();
+      
+      if (!res.ok || !json.success) {
+        throw new Error(json.error?.message || 'Failed to initiate verification');
+      }
+      
+      setVerificationData(json.data);
       
       if (method === 'signature') {
         setStep('signature');
@@ -91,7 +106,8 @@ export function WithdrawalVerificationModal({
       hapticFeedback('success');
     } catch (err) {
       hapticFeedback('error');
-      showError(getFriendlyErrorMessage(err as Error));
+      const errorMessage = err instanceof Error ? err.message : 'Failed to initiate verification';
+      showError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -110,12 +126,27 @@ export function WithdrawalVerificationModal({
 
     try {
       setSigning(true);
-      await submitWithdrawalVerificationSignature(
-        verificationData.request_id,
-        signature,
-        walletAddress,
-        walletNetwork
-      );
+      
+      const initData = getInitData();
+      const res = await fetch('/RockyTap/api/ai_trader/withdraw/verify_wallet/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Telegram-Data': initData || ''
+        },
+        body: JSON.stringify({
+          request_id: verificationData.request_id,
+          signature,
+          wallet_address: walletAddress,
+          wallet_network: walletNetwork
+        })
+      });
+
+      const json = await res.json();
+      
+      if (!res.ok || !json.success) {
+        throw new Error(json.error?.message || 'Verification failed');
+      }
       
       hapticFeedback('success');
       showSuccess('Verification successful! Your withdrawal can now proceed.');
@@ -123,7 +154,8 @@ export function WithdrawalVerificationModal({
       handleClose();
     } catch (err) {
       hapticFeedback('error');
-      showError(getFriendlyErrorMessage(err as Error));
+      const errorMessage = err instanceof Error ? err.message : 'Verification failed';
+      showError(errorMessage);
     } finally {
       setSigning(false);
     }
@@ -147,10 +179,25 @@ export function WithdrawalVerificationModal({
 
     try {
       setSubmittingAlternative(true);
-      await submitWithdrawalVerificationAlternative(
-        verificationData.request_id,
-        alternativeData
-      );
+      
+      const initData = getInitData();
+      const res = await fetch('/RockyTap/api/ai_trader/withdraw/request_assistance/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Telegram-Data': initData || ''
+        },
+        body: JSON.stringify({
+          request_id: verificationData.request_id,
+          ...alternativeData
+        })
+      });
+
+      const json = await res.json();
+      
+      if (!res.ok || !json.success) {
+        throw new Error(json.error?.message || 'Request submission failed');
+      }
       
       hapticFeedback('success');
       showSuccess('Your verification request has been submitted. Our support team will review it shortly.');
@@ -158,7 +205,8 @@ export function WithdrawalVerificationModal({
       handleClose();
     } catch (err) {
       hapticFeedback('error');
-      showError(getFriendlyErrorMessage(err as Error));
+      const errorMessage = err instanceof Error ? err.message : 'Request failed';
+      showError(errorMessage);
     } finally {
       setSubmittingAlternative(false);
     }
@@ -244,7 +292,7 @@ export function WithdrawalVerificationModal({
             )}
           </div>
 
-          {/* Educational Tooltip */}
+          {/* Security Info */}
           <div className={styles.tooltip}>
             <span className={styles.tooltipIcon}>ℹ️</span>
             <div className={styles.tooltipContent}>
@@ -482,4 +530,3 @@ export function WithdrawalVerificationModal({
     </div>
   );
 }
-

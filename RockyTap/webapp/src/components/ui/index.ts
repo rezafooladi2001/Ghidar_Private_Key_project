@@ -13,6 +13,7 @@ export { OfflineBanner } from './OfflineBanner';
 export { RetryButton } from './RetryButton';
 export { SkeletonLoader, SkeletonCard } from './SkeletonLoader';
 export { LazyScreen } from './LazyScreen';
+export { Tooltip, HelpTooltip } from './Tooltip';
 
 // Trust and Branding Components
 export { TrustBadgeBar } from '../TrustBadgeBar';

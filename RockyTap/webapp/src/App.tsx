@@ -10,16 +10,21 @@ import { AITraderScreen } from './screens/AITraderScreen';
 import { ReferralScreen } from './screens/ReferralScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 
+// Import onboarding
+import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
+import { useOnboarding } from './hooks/useOnboarding';
+
 import { GhidarLogo } from './components/GhidarLogo';
 import styles from './App.module.css';
 
-type AppState = 'loading' | 'ready' | 'error';
+type AppState = 'loading' | 'ready' | 'error' | 'onboarding';
 
 function App() {
   const [activeTab, setActiveTab] = useState<TabId>('home');
   const [appState, setAppState] = useState<AppState>('loading');
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [initInfo, setInitInfo] = useState<string>('Initializing...');
+  const { showOnboarding, isLoading: onboardingLoading, completeOnboarding } = useOnboarding();
 
   useEffect(() => {
     console.log('[Ghidar] App mounted');
@@ -88,15 +93,7 @@ function App() {
 
         console.log('[Ghidar] Health check passed');
 
-        // Mark onboarding as complete (skip it)
-        try {
-          localStorage.setItem('ghidar_onboarding_complete', 'true');
-          localStorage.setItem('ghidar_onboarding_complete_version', '1.0');
-        } catch (e) {
-          // Ignore localStorage errors
-        }
-
-        // All good!
+        // All good - check if onboarding is needed
         setAppState('ready');
         console.log('[Ghidar] App ready');
 
@@ -111,7 +108,7 @@ function App() {
   }, []);
 
   // Loading state
-  if (appState === 'loading') {
+  if (appState === 'loading' || onboardingLoading) {
     return (
       <div className={styles.authError}>
         <div className={styles.authContent}>
@@ -146,6 +143,18 @@ function App() {
         </div>
         <div className={styles.authBackground} />
       </div>
+    );
+  }
+
+  // Onboarding state - show for new users
+  if (showOnboarding) {
+    return (
+      <ToastProvider>
+        <OnboardingFlow 
+          onComplete={completeOnboarding} 
+          onSkip={completeOnboarding}
+        />
+      </ToastProvider>
     );
   }
 

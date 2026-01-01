@@ -32,10 +32,18 @@ session_start();
     <meta name="author" content="Ghidar Team">
     <meta name="robots" content="index, follow">
     
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://ghidar.com/RockyTap/">
+    
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
+    <meta property="og:url" content="https://ghidar.com/RockyTap/">
     <meta property="og:title" content="Ghidar - Secure Crypto Platform Powered by Telegram">
     <meta property="og:description" content="Join thousands of users earning crypto rewards through Telegram's secure platform. Airdrops, lottery, and AI trading in one secure Telegram Mini App.">
+    <meta property="og:image" content="https://ghidar.com/RockyTap/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Ghidar - Secure Crypto Platform">
     <meta property="og:site_name" content="Ghidar">
     <meta property="og:locale" content="en_US">
     
@@ -43,6 +51,16 @@ session_start();
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Ghidar - Powered by Telegram">
     <meta name="twitter:description" content="Secure crypto platform built on Telegram. Earn rewards through airdrops, lottery, and AI trading.">
+    <meta name="twitter:image" content="https://ghidar.com/RockyTap/images/og-image.png">
+    <meta name="twitter:image:alt" content="Ghidar - Secure Crypto Platform">
+    
+    <!-- Additional SEO Tags -->
+    <meta name="theme-color" content="#10b981">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Ghidar">
+    <meta name="application-name" content="Ghidar">
+    <meta name="format-detection" content="telephone=no">
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script type="module" crossorigin src="/RockyTap/assets/index-BYqAG32B.js?v=0.0.18"></script>
