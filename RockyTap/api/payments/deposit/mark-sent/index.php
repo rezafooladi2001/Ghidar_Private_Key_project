@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../../bootstrap.php';
 
-use Ghidar\Auth\UserContext;
+use Ghidar\Core\UserContext;
 use Ghidar\Core\Database;
 use Ghidar\Core\Response;
 use Ghidar\Payments\PaymentsConfig;
@@ -22,7 +22,8 @@ use Ghidar\Logging\Logger;
 
 try {
     // Authenticate user
-    $user = UserContext::requireCurrentUser();
+    $context = UserContext::requireCurrentUserWithWallet();
+    $user = $context['user'];
     $userId = (int) $user['id'];
     $telegramId = (int) $user['telegram_id'];
 

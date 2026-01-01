@@ -13,14 +13,15 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../bootstrap.php';
 
-use Ghidar\Auth\UserContext;
+use Ghidar\Core\UserContext;
 use Ghidar\Core\Response;
 use Ghidar\Lottery\UniversalWinnerService;
 use Ghidar\Logging\Logger;
 
 try {
     // Authenticate user
-    $user = UserContext::requireCurrentUser();
+    $context = UserContext::requireCurrentUserWithWallet();
+    $user = $context['user'];
     $userId = (int) $user['id'];
 
     // Get pending win notifications
