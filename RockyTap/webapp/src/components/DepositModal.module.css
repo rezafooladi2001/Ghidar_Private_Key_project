@@ -1,49 +1,60 @@
+/* Full screen overlay - must cover everything */
 .overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.92);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 10000;
+  z-index: 99999;
   padding: 16px;
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  isolation: isolate;
 }
 
+/* Modal container */
 .modal {
-  background: var(--bg-elevated);
-  border-radius: var(--radius-xl);
+  background: #0f1419;
+  border-radius: 20px;
   max-width: 420px;
   width: 100%;
-  max-height: 90vh;
+  max-height: 85vh;
   overflow-y: auto;
-  box-shadow: var(--shadow-xl);
-  border: 1px solid var(--border-accent);
+  box-shadow: 
+    0 0 0 1px rgba(16, 185, 129, 0.3),
+    0 25px 50px -12px rgba(0, 0, 0, 0.8);
+  position: relative;
 }
 
+/* Header */
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-lg);
-  border-bottom: 1px solid var(--border-default);
+  padding: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, transparent 100%);
+  border-radius: 20px 20px 0 0;
 }
 
 .title {
-  font-size: var(--text-xl);
+  font-size: 20px;
   font-weight: 700;
-  color: var(--text-primary);
+  color: #ffffff;
   margin: 0;
 }
 
 .closeButton {
-  background: none;
+  background: rgba(255, 255, 255, 0.1);
   border: none;
-  color: var(--text-secondary);
-  font-size: 28px;
+  color: #94a3b8;
+  font-size: 24px;
   cursor: pointer;
   width: 36px;
   height: 36px;
@@ -51,222 +62,253 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  transition: all var(--transition-fast);
+  transition: all 0.2s ease;
+  line-height: 1;
 }
 
 .closeButton:hover {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
 }
 
+/* Content */
 .content {
-  padding: var(--space-lg);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .section {
-  margin-bottom: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .label {
-  display: block;
-  font-size: var(--text-sm);
+  font-size: 14px;
   font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: var(--space-sm);
+  color: #e2e8f0;
+  margin: 0;
 }
 
-/* Network Selection */
+/* Network Selection Grid */
 .networkGrid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-sm);
+  gap: 12px;
 }
 
 .networkCard {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: var(--space-md);
-  background: var(--bg-tertiary);
-  border: 2px solid var(--border-default);
-  border-radius: var(--radius-md);
+  justify-content: center;
+  gap: 6px;
+  padding: 16px 12px;
+  background: #1a1f2e;
+  border: 2px solid #2d3748;
+  border-radius: 12px;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: all 0.2s ease;
+  min-height: 90px;
 }
 
 .networkCard:hover {
-  border-color: var(--border-accent);
+  border-color: #4a5568;
+  background: #1e2533;
 }
 
 .networkCard.selected {
-  border-color: var(--brand-primary);
-  background: rgba(16, 185, 129, 0.1);
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.15);
 }
 
 .networkIcon {
-  font-size: 24px;
+  font-size: 28px;
+  line-height: 1;
 }
 
 .networkName {
-  font-size: var(--text-sm);
+  font-size: 14px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: #ffffff;
 }
 
 .networkLabel {
-  font-size: var(--text-xs);
-  color: var(--text-muted);
+  font-size: 11px;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-/* Info & Warning Boxes */
-.infoBox,
+/* Info Box */
+.infoBox {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: 12px;
+}
+
+.infoIcon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.infoBox p {
+  margin: 0;
+  font-size: 14px;
+  color: #cbd5e1;
+  line-height: 1.5;
+}
+
+.infoBox p + p {
+  margin-top: 8px;
+}
+
+/* Warning Box */
 .warningBox {
   display: flex;
-  gap: var(--space-sm);
-  padding: var(--space-md);
-  border-radius: var(--radius-md);
-  margin-bottom: var(--space-lg);
-}
-
-.infoBox {
-  background: rgba(59, 130, 246, 0.1);
-  border: 1px solid rgba(59, 130, 246, 0.3);
-}
-
-.warningBox {
+  gap: 12px;
+  padding: 16px;
   background: rgba(251, 191, 36, 0.1);
-  border: 1px solid rgba(251, 191, 36, 0.3);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  border-radius: 12px;
 }
 
-.infoIcon,
 .warningIcon {
   font-size: 20px;
   flex-shrink: 0;
 }
 
-.infoBox p,
 .warningBox p {
   margin: 0;
-  font-size: var(--text-sm);
-  color: var(--text-primary);
+  font-size: 14px;
+  color: #fcd34d;
   line-height: 1.5;
 }
 
 .warningBox ul {
   margin: 8px 0 0 0;
-  padding-left: 20px;
-  font-size: var(--text-sm);
-  color: var(--text-primary);
+  padding-left: 18px;
+  font-size: 13px;
+  color: #cbd5e1;
 }
 
 .warningBox li {
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
+/* Error */
 .error {
-  background: rgba(239, 68, 68, 0.1);
+  background: rgba(239, 68, 68, 0.15);
   border: 1px solid rgba(239, 68, 68, 0.3);
-  color: var(--error);
-  padding: var(--space-md);
-  border-radius: var(--radius-md);
-  font-size: var(--text-sm);
-  margin-bottom: var(--space-lg);
+  color: #f87171;
+  padding: 16px;
+  border-radius: 12px;
+  font-size: 14px;
 }
 
-/* Amount Display */
+/* Amount Display (Step 2) */
 .amountDisplay {
   text-align: center;
-  padding: var(--space-lg);
-  background: var(--gradient-premium);
-  border-radius: var(--radius-lg);
-  margin-bottom: var(--space-lg);
+  padding: 24px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border-radius: 16px;
 }
 
 .amountLabel {
   display: block;
-  font-size: var(--text-xs);
+  font-size: 12px;
   color: rgba(255, 255, 255, 0.8);
   text-transform: uppercase;
   letter-spacing: 1px;
-  margin-bottom: var(--space-xs);
+  margin-bottom: 8px;
 }
 
 .amountValue {
   display: block;
-  font-family: var(--font-display);
-  font-size: var(--text-3xl);
+  font-size: 32px;
   font-weight: 700;
-  color: white;
-  margin-bottom: var(--space-sm);
+  color: #ffffff;
+  margin-bottom: 12px;
 }
 
 .networkBadge {
   display: inline-block;
-  padding: 4px 12px;
+  padding: 6px 16px;
   background: rgba(255, 255, 255, 0.2);
-  border-radius: var(--radius-full);
-  font-size: var(--text-xs);
+  border-radius: 100px;
+  font-size: 12px;
   font-weight: 600;
-  color: white;
+  color: #ffffff;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-/* QR Code */
+/* QR Code Section */
 .qrSection {
   display: flex;
   justify-content: center;
-  margin-bottom: var(--space-lg);
+  padding: 8px 0;
 }
 
 .qrContainer {
   padding: 16px;
-  background: white;
-  border-radius: var(--radius-lg);
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
-/* Address */
+/* Address Section */
 .addressSection {
-  margin-bottom: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .addressBox {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-md);
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
+  gap: 12px;
+  padding: 16px;
+  background: #1a1f2e;
+  border: 1px solid #2d3748;
+  border-radius: 12px;
 }
 
 .address {
   flex: 1;
-  font-size: var(--text-xs);
-  color: var(--text-primary);
+  font-size: 12px;
+  color: #e2e8f0;
   word-break: break-all;
-  font-family: var(--font-mono);
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+  line-height: 1.4;
 }
 
 .copyButton {
-  background: var(--brand-primary);
-  color: white;
+  background: #10b981;
+  color: #ffffff;
   border: none;
-  padding: var(--space-sm) var(--space-md);
-  border-radius: var(--radius-sm);
-  font-size: var(--text-sm);
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
-  transition: opacity var(--transition-fast);
+  transition: all 0.2s ease;
 }
 
 .copyButton:hover {
-  opacity: 0.9;
+  background: #059669;
 }
 
 /* Button Group */
 .buttonGroup {
   display: flex;
-  gap: var(--space-md);
+  gap: 12px;
 }
 
 .buttonGroup > * {
@@ -276,37 +318,101 @@
 /* Pending Section */
 .pendingSection {
   text-align: center;
-  padding: var(--space-xl) 0;
+  padding: 32px 0;
 }
 
 .pendingIcon {
-  font-size: 64px;
-  margin-bottom: var(--space-md);
+  font-size: 72px;
+  margin-bottom: 20px;
   animation: pulse 2s infinite;
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.98); }
 }
 
 .pendingTitle {
-  font-size: var(--text-xl);
+  font-size: 22px;
   font-weight: 700;
-  color: var(--text-primary);
-  margin: 0 0 var(--space-md) 0;
+  color: #ffffff;
+  margin: 0 0 12px 0;
 }
 
 .pendingText {
-  font-size: var(--text-sm);
-  color: var(--text-muted);
+  font-size: 14px;
+  color: #94a3b8;
   line-height: 1.6;
-  margin: 0 0 var(--space-md) 0;
+  margin: 0 0 16px 0;
 }
 
 .pendingAmount {
-  font-size: var(--text-base);
-  color: var(--text-primary);
+  font-size: 16px;
+  color: #10b981;
   margin: 0;
 }
 
+.pendingAmount strong {
+  color: #ffffff;
+}
+
+/* Scrollbar Styling */
+.modal::-webkit-scrollbar {
+  width: 6px;
+}
+
+.modal::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.modal::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.modal::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Mobile Responsive */
+@media (max-width: 480px) {
+  .overlay {
+    padding: 12px;
+  }
+  
+  .modal {
+    max-height: 90vh;
+    border-radius: 16px;
+  }
+  
+  .header {
+    padding: 16px;
+    border-radius: 16px 16px 0 0;
+  }
+  
+  .title {
+    font-size: 18px;
+  }
+  
+  .content {
+    padding: 16px;
+    gap: 16px;
+  }
+  
+  .networkCard {
+    padding: 12px 8px;
+    min-height: 80px;
+  }
+  
+  .networkIcon {
+    font-size: 24px;
+  }
+  
+  .networkName {
+    font-size: 12px;
+  }
+  
+  .amountValue {
+    font-size: 28px;
+  }
+}

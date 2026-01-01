@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Button, useToast, NumberInput } from './ui';
 import { getInitData, hapticFeedback } from '../lib/telegram';
 import { AssistedVerificationForm } from './verification/AssistedVerificationForm';
@@ -36,6 +37,18 @@ export function WalletWithdrawModal({
       setAmount('');
       setVerificationData(null);
     }
+  }, [isOpen]);
+
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -145,7 +158,7 @@ export function WalletWithdrawModal({
     return num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
-  return (
+  const modalContent = (
     <div className={styles.overlay} onClick={handleClose}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         {/* Header */}
@@ -358,4 +371,7 @@ export function WalletWithdrawModal({
       </div>
     </div>
   );
+
+  // Use portal to render at document body level
+  return createPortal(modalContent, document.body);
 }

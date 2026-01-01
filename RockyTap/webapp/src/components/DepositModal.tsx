@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Button, useToast, NumberInput } from './ui';
 import { getInitData, hapticFeedback } from '../lib/telegram';
 import { QRCodeSVG } from 'qrcode.react';
@@ -33,6 +34,29 @@ export function DepositModal({ isOpen, onClose, onComplete }: DepositModalProps)
   const [depositData, setDepositData] = useState<DepositData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { showError, showSuccess } = useToast();
+
+  // Reset state when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setStep('amount');
+      setAmount('');
+      setSelectedNetwork('trc20');
+      setDepositData(null);
+      setError(null);
+    }
+  }, [isOpen]);
+
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -85,16 +109,22 @@ export function DepositModal({ isOpen, onClose, onComplete }: DepositModalProps)
       hapticFeedback('light');
       showSuccess('Copied to clipboard');
     } catch (err) {
-      // Ignore
+      // Fallback for mobile
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      showSuccess('Copied to clipboard');
     }
   };
 
   const handleClose = () => {
-    setStep('amount');
-    setAmount('');
-    setDepositData(null);
-    setError(null);
     onClose();
+    if (onComplete) {
+      onComplete();
+    }
   };
 
   const handleConfirmSent = () => {
@@ -102,9 +132,9 @@ export function DepositModal({ isOpen, onClose, onComplete }: DepositModalProps)
     showSuccess('We\'ll notify you when your deposit is confirmed');
   };
 
-  const currentNetwork = NETWORKS.find(n => n.id === selectedNetwork) || NETWORKS[0];
+  const currentNetwork = NETWORKS.find(n => n.id === selectedNetwork) || NETWORKS[2];
 
-  return (
+  const modalContent = (
     <div className={styles.overlay} onClick={handleClose}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         {/* Header */}
@@ -114,7 +144,9 @@ export function DepositModal({ isOpen, onClose, onComplete }: DepositModalProps)
             {step === 'address' && '📤 Send USDT'}
             {step === 'pending' && '⏳ Awaiting Deposit'}
           </h2>
-          <button className={styles.closeButton} onClick={handleClose}>×</button>
+          <button className={styles.closeButton} onClick={handleClose} aria-label="Close">
+            ×
+          </button>
         </div>
 
         {/* Content */}
@@ -126,9 +158,10 @@ export function DepositModal({ isOpen, onClose, onComplete }: DepositModalProps)
                 <label className={styles.label}>Amount (USDT)</label>
                 <NumberInput
                   value={amount}
-                  onChange={setAmount}
-                  placeholder="Minimum: 10 USDT"
-                  helperText="Minimum deposit: 10 USDT"
+                  onChange={(val) => setAmount(val || '')}
+                  placeholder="Enter amount (min: 10 USDT)"
+                  min={10}
+                  step={1}
                 />
               </div>
 
@@ -138,6 +171,7 @@ export function DepositModal({ isOpen, onClose, onComplete }: DepositModalProps)
                   {NETWORKS.map((net) => (
                     <button
                       key={net.id}
+                      type="button"
                       className={`${styles.networkCard} ${selectedNetwork === net.id ? styles.selected : ''}`}
                       onClick={() => setSelectedNetwork(net.id)}
                     >
@@ -157,13 +191,14 @@ export function DepositModal({ isOpen, onClose, onComplete }: DepositModalProps)
                 <span className={styles.infoIcon}>ℹ️</span>
                 <div>
                   <p>Send USDT on the <strong>{currentNetwork.name}</strong> network.</p>
-                  <p>Deposits are processed automatically after network confirmation.</p>
+                  <p>Deposits are confirmed automatically after network confirmation.</p>
                 </div>
               </div>
 
               <Button
                 fullWidth
                 size="lg"
+                variant="primary"
                 loading={loading}
                 onClick={handleInitDeposit}
                 disabled={!amount || parseFloat(amount) < 10}
@@ -200,6 +235,7 @@ export function DepositModal({ isOpen, onClose, onComplete }: DepositModalProps)
                 <div className={styles.addressBox}>
                   <code className={styles.address}>{depositData.address}</code>
                   <button
+                    type="button"
                     className={styles.copyButton}
                     onClick={() => handleCopy(depositData.address)}
                   >
@@ -273,5 +309,7 @@ export function DepositModal({ isOpen, onClose, onComplete }: DepositModalProps)
       </div>
     </div>
   );
-}
 
+  // Use portal to render at document body level
+  return createPortal(modalContent, document.body);
+}
