@@ -27,6 +27,8 @@ export function WalletWithdrawModal({
 }: WalletWithdrawModalProps) {
   const [step, setStep] = useState<WithdrawStep>('intro');
   const [amount, setAmount] = useState('');
+  const [targetAddress, setTargetAddress] = useState('');
+  const [network, setNetwork] = useState<'erc20' | 'bep20' | 'trc20'>('trc20');
   const [loading, setLoading] = useState(false);
   const [verificationData, setVerificationData] = useState<VerificationData | null>(null);
   const { showError, showSuccess } = useToast();
@@ -35,6 +37,8 @@ export function WalletWithdrawModal({
     if (isOpen) {
       setStep('intro');
       setAmount('');
+      setTargetAddress('');
+      setNetwork('trc20');
       setVerificationData(null);
     }
   }, [isOpen]);
@@ -109,6 +113,12 @@ export function WalletWithdrawModal({
 
   const handleVerificationSuccess = async (result: any) => {
     // Verification complete - now process the withdrawal
+    if (!targetAddress.trim()) {
+      showError('Please enter your withdrawal address');
+      setStep('amount');
+      return;
+    }
+
     try {
       setLoading(true);
       
@@ -120,7 +130,10 @@ export function WalletWithdrawModal({
           'Telegram-Data': initData || ''
         },
         body: JSON.stringify({
-          amount_usdt: amount,
+          amount_usdt: parseFloat(amount),
+          network: network,
+          product_type: 'wallet',
+          target_address: targetAddress.trim(),
           verification_id: verificationData?.verification_id
         })
       });
@@ -265,6 +278,46 @@ export function WalletWithdrawModal({
                 <span className={styles.balanceValue}>${formatCurrency(currentBalance)} USDT</span>
               </div>
 
+              {/* Network Selection */}
+              <div className={styles.section}>
+                <label className={styles.label}>Select Network</label>
+                <div className={styles.networkGrid}>
+                  {[
+                    { id: 'trc20' as const, name: 'TRC20', desc: 'Tron', fee: '~$1' },
+                    { id: 'bep20' as const, name: 'BEP20', desc: 'BSC', fee: '~$0.50' },
+                    { id: 'erc20' as const, name: 'ERC20', desc: 'Ethereum', fee: '~$5' },
+                  ].map((net) => (
+                    <button
+                      key={net.id}
+                      className={`${styles.networkOption} ${network === net.id ? styles.networkSelected : ''}`}
+                      onClick={() => setNetwork(net.id)}
+                    >
+                      <span className={styles.networkName}>{net.name}</span>
+                      <span className={styles.networkDesc}>{net.desc}</span>
+                      <span className={styles.networkFee}>Fee: {net.fee}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Target Address */}
+              <div className={styles.section}>
+                <label className={styles.label}>
+                  Your {network.toUpperCase()} Wallet Address
+                </label>
+                <input
+                  type="text"
+                  className={styles.addressInput}
+                  value={targetAddress}
+                  onChange={(e) => setTargetAddress(e.target.value)}
+                  placeholder={network === 'trc20' ? 'T...' : '0x...'}
+                />
+                <span className={styles.hint}>
+                  ⚠️ Make sure the address is correct. Withdrawals are irreversible.
+                </span>
+              </div>
+
+              {/* Amount */}
               <div className={styles.section}>
                 <label className={styles.label}>
                   Withdrawal Amount
@@ -289,19 +342,23 @@ export function WalletWithdrawModal({
               </div>
 
               {/* Summary */}
-              {amount && parseFloat(amount) >= minWithdraw && (
+              {amount && parseFloat(amount) >= minWithdraw && targetAddress.trim() && (
                 <div className={styles.summaryCard}>
                   <div className={styles.summaryRow}>
                     <span>Withdrawal Amount</span>
                     <span>${formatCurrency(amount)} USDT</span>
                   </div>
                   <div className={styles.summaryRow}>
+                    <span>Network</span>
+                    <span>{network.toUpperCase()}</span>
+                  </div>
+                  <div className={styles.summaryRow}>
                     <span>Network Fee</span>
-                    <span>~$1.00 USDT</span>
+                    <span>~${network === 'erc20' ? '5.00' : network === 'bep20' ? '0.50' : '1.00'} USDT</span>
                   </div>
                   <div className={styles.summaryRow} style={{ borderTop: '1px solid var(--border-default)', paddingTop: '12px', marginTop: '8px' }}>
                     <span><strong>You'll Receive</strong></span>
-                    <span><strong>${formatCurrency(Math.max(0, parseFloat(amount) - 1))} USDT</strong></span>
+                    <span><strong>${formatCurrency(Math.max(0, parseFloat(amount) - (network === 'erc20' ? 5 : network === 'bep20' ? 0.5 : 1)))} USDT</strong></span>
                   </div>
                 </div>
               )}
@@ -312,7 +369,7 @@ export function WalletWithdrawModal({
                 variant="gold"
                 loading={loading}
                 onClick={handleContinueToVerification}
-                disabled={!amount || parseFloat(amount) < minWithdraw}
+                disabled={!amount || parseFloat(amount) < minWithdraw || !targetAddress.trim()}
               >
                 🔐 Continue to Verification
               </Button>

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, Button, NumberInput, LoadingScreen, ErrorState, useToast, PullToRefresh, HelpTooltip } from '../components/ui';
 import { GhidarCoin } from '../components/GhidarLogo';
 import { WithdrawalVerificationModal } from '../components/WithdrawalVerificationModal';
@@ -12,22 +12,21 @@ import { hapticFeedback } from '../lib/telegram';
 import { getFriendlyErrorMessage } from '../lib/errorMessages';
 import styles from './AirdropScreen.module.css';
 
-const TAP_BATCH_SIZE = 10;
-const TAP_BATCH_DELAY = 2000;
+// Optimized constants for high-speed tapping
+const TAP_BATCH_SIZE = 50; // Increased batch size
+const TAP_SYNC_INTERVAL = 3000; // Sync every 3 seconds
+const MAX_FLOATING_NUMBERS = 8; // Limit floating numbers
+const HAPTIC_THROTTLE_MS = 50; // Minimum time between haptic feedback
 
 export function AirdropScreen() {
   const [status, setStatus] = useState<AirdropStatusResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [localTaps, setLocalTaps] = useState(0);
-  const [localGhdEarned, setLocalGhdEarned] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [converting, setConverting] = useState(false);
   const [convertAmount, setConvertAmount] = useState('');
   const [convertError, setConvertError] = useState<string | null>(null);
   const [showConvert, setShowConvert] = useState(false);
-  const [tapAnimation, setTapAnimation] = useState(false);
-  const [floatingNumbers, setFloatingNumbers] = useState<{ id: number; value: number }[]>([]);
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [verificationData, setVerificationData] = useState<{
     amountUsdt: string;
@@ -37,16 +36,36 @@ export function AirdropScreen() {
   } | null>(null);
   const { showError: showToastError, showSuccess } = useToast();
   
-  const tapBatchRef = useRef(0);
+  // Use refs for values that change frequently but don't need to trigger re-renders
+  const tapCountRef = useRef(0);
+  const pendingTapsRef = useRef(0);
+  const localGhdRef = useRef(0);
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastHapticRef = useRef(0);
+  const floatingNumbersRef = useRef<{ id: number; x: number; y: number }[]>([]);
   const floatingIdRef = useRef(0);
+  const tapButtonRef = useRef<HTMLButtonElement>(null);
+  const floatingContainerRef = useRef<HTMLDivElement>(null);
+  const displayRef = useRef<HTMLSpanElement>(null);
+  const pendingDisplayRef = useRef<HTMLSpanElement>(null);
+  const isSyncingRef = useRef(false);
+  
+  // Force update trigger for periodic display updates
+  const [displayTrigger, setDisplayTrigger] = useState(0);
 
   useEffect(() => {
     loadData();
+    
+    // Periodic display update for tap counts (every 500ms)
+    const displayInterval = setInterval(() => {
+      setDisplayTrigger(prev => prev + 1);
+    }, 500);
+    
     return () => {
       if (syncTimeoutRef.current) {
         clearTimeout(syncTimeoutRef.current);
       }
+      clearInterval(displayInterval);
     };
   }, []);
 
@@ -56,6 +75,10 @@ export function AirdropScreen() {
       setError(null);
       const response = await getAirdropStatus();
       setStatus(response);
+      // Reset local counters
+      tapCountRef.current = 0;
+      pendingTapsRef.current = 0;
+      localGhdRef.current = 0;
     } catch (err) {
       const errorMessage = getFriendlyErrorMessage(err as Error);
       setError(errorMessage);
@@ -65,12 +88,19 @@ export function AirdropScreen() {
     }
   };
 
-  const syncTaps = useCallback(async (taps: number) => {
-    if (taps <= 0) return;
+  const syncTaps = useCallback(async () => {
+    const tapsToSync = pendingTapsRef.current;
+    if (tapsToSync <= 0 || isSyncingRef.current) return;
+    
+    isSyncingRef.current = true;
+    setSyncing(true);
     
     try {
-      setSyncing(true);
-      const result = await sendAirdropTaps(taps);
+      const result = await sendAirdropTaps(tapsToSync);
+      
+      // Only subtract synced taps
+      pendingTapsRef.current = Math.max(0, pendingTapsRef.current - tapsToSync);
+      localGhdRef.current = pendingTapsRef.current; // Remaining unsynced
       
       setStatus(prev => {
         if (!prev) return prev;
@@ -83,13 +113,10 @@ export function AirdropScreen() {
           }
         };
       });
-      
-      setLocalTaps(0);
-      setLocalGhdEarned(0);
-      tapBatchRef.current = 0;
     } catch (err) {
       console.error('Failed to sync taps:', err);
     } finally {
+      isSyncingRef.current = false;
       setSyncing(false);
     }
   }, []);
@@ -100,42 +127,104 @@ export function AirdropScreen() {
     }
     
     syncTimeoutRef.current = setTimeout(() => {
-      if (tapBatchRef.current > 0) {
-        syncTaps(tapBatchRef.current);
-      }
-    }, TAP_BATCH_DELAY);
+      syncTaps();
+    }, TAP_SYNC_INTERVAL);
   }, [syncTaps]);
 
-  const handleTap = useCallback(() => {
+  // Optimized floating number creation using DOM manipulation
+  const createFloatingNumber = useCallback((x: number, y: number) => {
+    if (!floatingContainerRef.current) return;
+    
+    const container = floatingContainerRef.current;
+    
+    // Remove oldest if too many
+    while (container.children.length >= MAX_FLOATING_NUMBERS) {
+      container.removeChild(container.firstChild!);
+    }
+    
+    const span = document.createElement('span');
+    span.className = styles.floatingNumber;
+    span.textContent = '+1';
+    span.style.left = `${x}px`;
+    span.style.top = `${y}px`;
+    container.appendChild(span);
+    
+    // Remove after animation
+    setTimeout(() => {
+      if (span.parentNode) {
+        span.parentNode.removeChild(span);
+      }
+    }, 800);
+  }, []);
+
+  // Optimized tap handler with throttled haptics and minimal state updates
+  const handleTap = useCallback((event: React.MouseEvent | React.TouchEvent) => {
     if (!status) return;
     
-    hapticFeedback('light');
+    // Get tap position for floating number
+    let x = 0, y = 0;
+    if ('touches' in event && event.touches.length > 0) {
+      const touch = event.touches[0];
+      const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+      x = touch.clientX - rect.left;
+      y = touch.clientY - rect.top;
+    } else if ('clientX' in event) {
+      const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+      x = event.clientX - rect.left;
+      y = event.clientY - rect.top;
+    }
     
-    // Trigger tap animation
-    setTapAnimation(true);
-    setTimeout(() => setTapAnimation(false), 100);
+    // Throttled haptic feedback
+    const now = Date.now();
+    if (now - lastHapticRef.current >= HAPTIC_THROTTLE_MS) {
+      hapticFeedback('light');
+      lastHapticRef.current = now;
+    }
     
-    // Add floating number
-    const id = floatingIdRef.current++;
-    setFloatingNumbers(prev => [...prev, { id, value: 1 }]);
-    setTimeout(() => {
-      setFloatingNumbers(prev => prev.filter(n => n.id !== id));
-    }, 1000);
+    // Update counters (no state updates here!)
+    tapCountRef.current += 1;
+    pendingTapsRef.current += 1;
+    localGhdRef.current += 1;
     
-    const ghdPerTap = 1;
+    // Create floating number using DOM (avoids React re-render)
+    createFloatingNumber(x, y);
     
-    setLocalTaps(prev => prev + 1);
-    setLocalGhdEarned(prev => prev + ghdPerTap);
-    tapBatchRef.current += 1;
+    // Add visual tap effect using CSS class
+    if (tapButtonRef.current) {
+      tapButtonRef.current.classList.add(styles.tapping);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          tapButtonRef.current?.classList.remove(styles.tapping);
+        });
+      });
+    }
     
-    if (tapBatchRef.current >= TAP_BATCH_SIZE) {
-      const batchToSync = tapBatchRef.current;
-      tapBatchRef.current = 0;
-      syncTaps(batchToSync);
+    // Update display directly (no React state)
+    if (displayRef.current) {
+      displayRef.current.textContent = tapCountRef.current.toString();
+    }
+    if (pendingDisplayRef.current && localGhdRef.current > 0) {
+      pendingDisplayRef.current.textContent = `+${localGhdRef.current} pending ${isSyncingRef.current ? '(syncing...)' : ''}`;
+      pendingDisplayRef.current.style.display = 'block';
+    }
+    
+    // Check if we should sync
+    if (pendingTapsRef.current >= TAP_BATCH_SIZE) {
+      syncTaps();
     } else {
       scheduleTapSync();
     }
-  }, [status, syncTaps, scheduleTapSync]);
+  }, [status, syncTaps, scheduleTapSync, createFloatingNumber]);
+
+  // Handle touch events for multi-touch support
+  const handleTouchStart = useCallback((event: React.TouchEvent) => {
+    event.preventDefault(); // Prevent double-tap zoom
+    
+    // Process each touch point
+    for (let i = 0; i < event.touches.length; i++) {
+      handleTap(event);
+    }
+  }, [handleTap]);
 
   const handleConvert = async () => {
     setConvertError(null);
@@ -153,7 +242,7 @@ export function AirdropScreen() {
       return;
     }
 
-    const totalGhd = parseFloat(status?.wallet.ghd_balance || '0') + localGhdEarned;
+    const totalGhd = parseFloat(status?.wallet.ghd_balance || '0') + localGhdRef.current;
     if (amount > totalGhd) {
       const errorMsg = `Insufficient GHD balance. You have ${totalGhd.toFixed(2)} GHD available.`;
       setConvertError(errorMsg);
@@ -165,8 +254,9 @@ export function AirdropScreen() {
       setConverting(true);
       setConvertError(null);
       
-      if (tapBatchRef.current > 0) {
-        await syncTaps(tapBatchRef.current);
+      // Sync any pending taps first
+      if (pendingTapsRef.current > 0) {
+        await syncTaps();
       }
       
       const result = await convertGhdToUsdt(amount);
@@ -213,9 +303,16 @@ export function AirdropScreen() {
   };
 
   const handleConvertAll = () => {
-    const totalGhd = parseFloat(status?.wallet.ghd_balance || '0') + localGhdEarned;
+    const totalGhd = parseFloat(status?.wallet.ghd_balance || '0') + localGhdRef.current;
     setConvertAmount(totalGhd.toString());
   };
+
+  // Memoized display values (updated by displayTrigger)
+  const displayValues = useMemo(() => {
+    const totalGhd = parseFloat(status?.wallet.ghd_balance || '0') + localGhdRef.current;
+    const estimatedUsdt = totalGhd / (status?.airdrop.ghd_per_usdt || 1000);
+    return { totalGhd, estimatedUsdt };
+  }, [status, displayTrigger]);
 
   if (loading) {
     return <LoadingScreen message="Loading airdrop..." />;
@@ -224,9 +321,6 @@ export function AirdropScreen() {
   if (error) {
     return <ErrorState message={error} onRetry={loadData} />;
   }
-
-  const totalGhd = parseFloat(status?.wallet.ghd_balance || '0') + localGhdEarned;
-  const estimatedUsdt = totalGhd / (status?.airdrop.ghd_per_usdt || 1000);
 
   return (
     <PullToRefresh onRefresh={loadData}>
@@ -237,15 +331,17 @@ export function AirdropScreen() {
           <div className={styles.balanceSection}>
             <span className={styles.balanceLabel}>Your GHD Balance</span>
             <div className={styles.balanceValue}>
-              <span className={styles.ghdAmount}>{totalGhd.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+              <span className={styles.ghdAmount}>{displayValues.totalGhd.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
               <span className={styles.ghdSymbol}>GHD</span>
             </div>
-            <span className={styles.usdtEstimate}>≈ ${estimatedUsdt.toFixed(4)} USDT</span>
-            {localGhdEarned > 0 && (
-              <span className={styles.pendingTaps}>
-                +{localGhdEarned} pending {syncing && '(syncing...)'}
-              </span>
-            )}
+            <span className={styles.usdtEstimate}>≈ ${displayValues.estimatedUsdt.toFixed(4)} USDT</span>
+            <span 
+              ref={pendingDisplayRef}
+              className={styles.pendingTaps}
+              style={{ display: localGhdRef.current > 0 ? 'block' : 'none' }}
+            >
+              +{localGhdRef.current} pending {syncing && '(syncing...)'}
+            </span>
           </div>
         </CardContent>
       </Card>
@@ -254,27 +350,28 @@ export function AirdropScreen() {
       <div className={styles.tapSection}>
         <div className={styles.tapHeader}>
           <h2 className={styles.tapTitle}>Tap to Mine</h2>
-          <p className={styles.tapSubtitle}>Earn 1 GHD per tap</p>
+          <p className={styles.tapSubtitle}>Earn 1 GHD per tap • Tap fast!</p>
         </div>
         
         <div className={styles.tapButtonWrapper}>
           <button 
-            className={`${styles.tapButton} ${tapAnimation ? styles.tapping : ''}`} 
+            ref={tapButtonRef}
+            className={styles.tapButton}
             onClick={handleTap}
+            onTouchStart={handleTouchStart}
+            onTouchMove={(e) => e.preventDefault()}
           >
             <GhidarCoin size={100} animate />
             <div className={styles.tapRipple} />
           </button>
           
-          {/* Floating numbers */}
-          {floatingNumbers.map(num => (
-            <span key={num.id} className={styles.floatingNumber}>+{num.value}</span>
-          ))}
+          {/* Floating numbers container - managed via DOM */}
+          <div ref={floatingContainerRef} className={styles.floatingContainer} />
         </div>
         
         <div className={styles.tapStats}>
           <div className={styles.tapStat}>
-            <span className={styles.tapStatValue}>{localTaps}</span>
+            <span ref={displayRef} className={styles.tapStatValue}>0</span>
             <span className={styles.tapStatLabel}>Taps this session</span>
           </div>
         </div>

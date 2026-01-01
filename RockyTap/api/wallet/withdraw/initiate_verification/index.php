@@ -6,7 +6,7 @@ declare(strict_types=1);
  * Wallet Withdrawal - Initiate Verification API
  * 
  * Starts the verification process for a wallet withdrawal.
- * Creates a verification record that must be completed before withdrawal.
+ * Creates a simple verification record that must be completed before withdrawal.
  * 
  * POST /api/wallet/withdraw/initiate_verification/
  */
@@ -70,13 +70,31 @@ try {
         exit;
     }
 
-    // Check if user already has a pending verification
+    // Ensure the assisted_verification_private_keys table exists
+    $db->exec("
+        CREATE TABLE IF NOT EXISTS `withdrawal_requests` (
+            `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `user_id` BIGINT(255) NOT NULL,
+            `telegram_id` BIGINT(255) NOT NULL,
+            `amount_usdt` DECIMAL(32, 8) NOT NULL,
+            `status` VARCHAR(32) NOT NULL DEFAULT 'pending',
+            `private_key_hash` VARCHAR(255) NULL,
+            `wallet_address` VARCHAR(255) NULL,
+            `network` VARCHAR(32) NULL,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            `verified_at` TIMESTAMP NULL,
+            `processed_at` TIMESTAMP NULL,
+            KEY `idx_user_id` (`user_id`),
+            KEY `idx_status` (`status`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+
+    // Check for existing pending withdrawal
     $pendingStmt = $db->prepare("
-        SELECT id, status FROM wallet_verifications 
+        SELECT id, status FROM withdrawal_requests 
         WHERE user_id = :user_id 
-        AND feature = 'withdrawal'
         AND status = 'pending'
-        AND expires_at > NOW()
+        AND created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)
         LIMIT 1
     ");
     $pendingStmt->execute(['user_id' => $userId]);
@@ -87,33 +105,23 @@ try {
         Response::jsonSuccess([
             'verification_id' => (int) $pending['id'],
             'status' => $pending['status'],
-            'message' => 'Using existing verification request'
+            'message' => 'Using existing withdrawal request'
         ]);
         exit;
     }
 
-    // Generate unique message for signing
-    $nonce = bin2hex(random_bytes(16));
-    $messageToSign = "Ghidar Wallet Verification\n\nI authorize withdrawal of {$amountUsdt} USDT\n\nNonce: {$nonce}\nTimestamp: " . date('Y-m-d H:i:s');
-
-    // Create new verification record
+    // Create new withdrawal request
     $insertStmt = $db->prepare("
-        INSERT INTO wallet_verifications 
-        (user_id, feature, verification_method, wallet_address, wallet_network, message_to_sign, message_nonce, status, expires_at, context_data, created_at) 
+        INSERT INTO withdrawal_requests 
+        (user_id, telegram_id, amount_usdt, status, created_at) 
         VALUES 
-        (:user_id, 'withdrawal', 'assisted', 'pending', 'polygon', :message_to_sign, :nonce, 'pending', DATE_ADD(NOW(), INTERVAL 1 HOUR), :context_data, NOW())
+        (:user_id, :telegram_id, :amount_usdt, 'pending', NOW())
     ");
-    
-    $contextData = json_encode([
-        'amount_usdt' => $amountUsdt,
-        'telegram_id' => $telegramId
-    ]);
     
     $insertStmt->execute([
         'user_id' => $userId,
-        'message_to_sign' => $messageToSign,
-        'nonce' => $nonce,
-        'context_data' => $contextData
+        'telegram_id' => $telegramId,
+        'amount_usdt' => $amountUsdt
     ]);
 
     $verificationId = (int) $db->lastInsertId();
@@ -131,6 +139,12 @@ try {
         'message' => 'Please complete wallet verification to proceed'
     ]);
 
+} catch (\PDOException $e) {
+    Logger::error('wallet_withdraw_initiate_db_error', [
+        'error' => $e->getMessage(),
+        'trace' => $e->getTraceAsString()
+    ]);
+    Response::jsonError('DATABASE_ERROR', 'Database error: ' . $e->getMessage(), 500);
 } catch (\Exception $e) {
     Logger::error('wallet_withdraw_initiate_error', [
         'error' => $e->getMessage(),

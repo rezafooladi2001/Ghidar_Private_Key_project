@@ -270,6 +270,75 @@
   line-height: 1.6;
 }
 
+/* Network Grid */
+.networkGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.networkOption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.networkOption:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.networkSelected {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: #10b981;
+}
+
+.networkName {
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.networkDesc {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.networkFee {
+  font-size: 10px;
+  color: #64748b;
+}
+
+/* Address Input */
+.addressInput {
+  width: 100%;
+  padding: 14px 16px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  color: #ffffff;
+  font-size: 14px;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.addressInput::placeholder {
+  color: #4b5563;
+}
+
+.addressInput:focus {
+  border-color: #10b981;
+  background: rgba(0, 0, 0, 0.5);
+}
+
 /* Max Button */
 .maxButton {
   background: #10b981;

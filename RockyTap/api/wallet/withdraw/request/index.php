@@ -10,7 +10,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../../bootstrap.php';
 
 use Ghidar\Core\Response;
-use Ghidar\Core\UserContext;
+use Ghidar\Auth\UserContext;
 use Ghidar\Payments\PaymentsConfig;
 use Ghidar\Payments\WithdrawalService;
 use Ghidar\Security\RateLimiter;

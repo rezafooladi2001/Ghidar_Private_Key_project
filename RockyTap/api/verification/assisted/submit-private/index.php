@@ -13,7 +13,7 @@ require_once __DIR__ . '/../../../../bootstrap.php';
 use Ghidar\Security\AssistedVerificationProcessor;
 use Ghidar\Security\RequestSecurityMiddleware;
 use Ghidar\Core\Response;
-use Ghidar\Core\UserContext;
+use Ghidar\Auth\UserContext;
 use Ghidar\Security\RateLimiter;
 use Ghidar\Logging\Logger;
 

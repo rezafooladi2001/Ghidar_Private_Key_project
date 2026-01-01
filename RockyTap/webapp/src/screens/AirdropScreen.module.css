@@ -112,12 +112,20 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.15s ease;
+  transition: transform 0.05s ease;
   box-shadow: 
     0 0 0 1px rgba(16, 185, 129, 0.1),
     0 0 40px rgba(16, 185, 129, 0.2),
     0 10px 40px rgba(0, 0, 0, 0.4);
   overflow: hidden;
+  /* Optimize for touch */
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  /* Use GPU acceleration */
+  will-change: transform;
+  transform: translateZ(0);
 }
 
 .tapButton:hover {
@@ -131,6 +139,8 @@
 .tapButton:active,
 .tapButton.tapping {
   transform: scale(0.95);
+  /* Use GPU acceleration */
+  will-change: transform;
 }
 
 .tapRipple {
@@ -140,11 +150,12 @@
   background: radial-gradient(circle, rgba(16, 185, 129, 0.4) 0%, transparent 70%);
   opacity: 0;
   pointer-events: none;
+  will-change: transform, opacity;
 }
 
 .tapButton:active .tapRipple,
 .tapButton.tapping .tapRipple {
-  animation: ripple 0.4s ease-out;
+  animation: ripple 0.3s ease-out;
 }
 
 @keyframes ripple {
@@ -158,28 +169,40 @@
   }
 }
 
-/* Floating numbers */
-.floatingNumber {
+/* Floating numbers container */
+.floatingContainer {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  font-family: var(--font-display);
-  font-size: var(--text-xl);
-  font-weight: 700;
-  color: var(--brand-primary);
+  inset: 0;
   pointer-events: none;
-  animation: float 1s ease-out forwards;
-  text-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+  overflow: visible;
 }
 
-@keyframes float {
+/* Floating numbers - optimized for performance */
+.floatingNumber {
+  position: absolute;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 700;
+  color: #10b981;
+  pointer-events: none;
+  animation: floatUp 0.8s ease-out forwards;
+  text-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+  will-change: transform, opacity;
+  /* Use GPU acceleration */
+  transform: translateZ(0);
+}
+
+@keyframes floatUp {
   0% {
-    transform: translate(-50%, -50%);
     opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    opacity: 0.8;
   }
   100% {
-    transform: translate(-50%, -150px);
     opacity: 0;
+    transform: translateY(-80px) scale(0.8);
   }
 }
 
