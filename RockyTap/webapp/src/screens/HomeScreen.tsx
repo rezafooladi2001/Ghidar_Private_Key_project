@@ -188,6 +188,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
           <WalletSummary
             usdtBalance={data.wallet.usdt_balance}
             ghdBalance={data.wallet.ghd_balance}
+            onBalanceChange={loadData}
           />
         </section>
       )}

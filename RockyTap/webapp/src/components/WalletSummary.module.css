@@ -1,3 +1,9 @@
+.walletContainer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
 .wallet {
   display: flex;
   align-items: stretch;
@@ -50,4 +56,14 @@
 .divider {
   width: 1px;
   background: linear-gradient(180deg, transparent 0%, var(--border-default) 20%, var(--border-default) 80%, transparent 100%);
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-sm);
+  padding: 0 var(--space-sm) var(--space-sm);
+}
+
+.actions > * {
+  flex: 1;
 }

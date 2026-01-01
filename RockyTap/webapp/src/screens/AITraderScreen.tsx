@@ -321,6 +321,8 @@ export function AITraderScreen() {
           <WalletSummary
             usdtBalance={status.wallet.usdt_balance}
             ghdBalance={status.wallet.ghd_balance}
+            showActions={true}
+            onBalanceChange={loadData}
           />
         )}
 
