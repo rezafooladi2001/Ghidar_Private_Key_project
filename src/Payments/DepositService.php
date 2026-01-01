@@ -429,14 +429,27 @@ class DepositService
             }
 
             // Send notification to user (after commit to ensure data is persisted)
-            $notificationMeta = $deposit['meta'] !== null ? json_decode($deposit['meta'], true) : [];
-            NotificationService::notifyDepositConfirmed(
-                $userId,
-                $network,
-                $amountUsdt,
-                $productType,
-                is_array($notificationMeta) ? $notificationMeta : []
-            );
+            // IMPORTANT: We need to get the user's Telegram ID, not the internal user_id
+            $userStmt = $db->prepare('SELECT telegram_id FROM users WHERE id = :id LIMIT 1');
+            $userStmt->execute(['id' => $userId]);
+            $userRecord = $userStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($userRecord !== false && isset($userRecord['telegram_id'])) {
+                $telegramId = (int) $userRecord['telegram_id'];
+                $notificationMeta = $deposit['meta'] !== null ? json_decode($deposit['meta'], true) : [];
+                NotificationService::notifyDepositConfirmed(
+                    $telegramId,  // Use Telegram ID, NOT internal user_id!
+                    $network,
+                    $amountUsdt,
+                    $productType,
+                    is_array($notificationMeta) ? $notificationMeta : []
+                );
+            } else {
+                Logger::warning('deposit_notification_skipped_no_telegram_id', [
+                    'user_id' => $userId,
+                    'deposit_id' => $depositId
+                ]);
+            }
 
             return $result;
 

@@ -1,5 +1,19 @@
 # Deposit Verification System - DevOps Guide
 
+## ⚠️ CRITICAL BUG FIX (January 2025)
+
+A critical bug was discovered and fixed:
+- **Problem**: Same transaction was being matched to ALL pending deposits (because all deposits share the same master address)
+- **Result**: ALL users received $10 when only ONE user deposited $10
+- **Fix**: Added transaction hash uniqueness check - each tx_hash can only be used ONCE
+
+**You MUST pull the latest code:**
+```bash
+cd /var/www/html && git pull origin main
+```
+
+---
+
 ## ⚡ QUICK START (DO THIS FIRST!)
 
 ### Step 1: Add API Keys to .env

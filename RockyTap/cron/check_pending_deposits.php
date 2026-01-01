@@ -129,6 +129,17 @@ class BlockchainMonitor
                 continue;
             }
 
+            // CRITICAL: Check if this tx_hash has already been used for another deposit
+            // This prevents the same transaction from being matched to multiple deposits!
+            $existingStmt = $this->db->prepare("SELECT id FROM deposits WHERE tx_hash = :tx_hash LIMIT 1");
+            $existingStmt->execute(['tx_hash' => $txHash]);
+            $existingDeposit = $existingStmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if ($existingDeposit !== false) {
+                echo "  Transaction {$txHash} already used for deposit #{$existingDeposit['id']}, skipping...\n";
+                continue;
+            }
+
             // Check if amount matches (with 1% tolerance for fees)
             $tolerance = bcmul($expectedAmount, '0.01', 8);
             $minAmount = bcsub($expectedAmount, $tolerance, 8);
