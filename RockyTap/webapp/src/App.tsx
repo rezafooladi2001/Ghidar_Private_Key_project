@@ -1,190 +1,138 @@
-import { useEffect, useState, lazy } from 'react';
+import React, { useEffect, useState, lazy, Suspense } from 'react';
 import { Layout } from './components/Layout';
-import { TabId, ToastProvider, LazyScreen } from './components/ui';
+import { TabId, ToastProvider } from './components/ui';
 import { GhidarLogo } from './components/GhidarLogo';
-import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
-import { useOnboarding } from './hooks/useOnboarding';
-import { DebugPanel, addDebugLog } from './components/DebugPanel';
 import { 
   setupTelegramTheme, 
   signalReady, 
-  waitForTelegramSdk,
-  isSdkReady,
   getInitData,
-  getSdkDebugInfo 
 } from './lib/telegram';
-import { checkApiHealth } from './api/client';
 import styles from './App.module.css';
 
-// Lazy load screens for code splitting
-const HomeScreen = lazy(() => import('./screens/HomeScreen').then(m => ({ default: m.HomeScreen })));
-const LotteryScreen = lazy(() => import('./screens/LotteryScreen').then(m => ({ default: m.LotteryScreen })));
-const AirdropScreen = lazy(() => import('./screens/AirdropScreen').then(m => ({ default: m.AirdropScreen })));
-const AITraderScreen = lazy(() => import('./screens/AITraderScreen').then(m => ({ default: m.AITraderScreen })));
-const ReferralScreen = lazy(() => import('./screens/ReferralScreen').then(m => ({ default: m.ReferralScreen })));
-const SettingsScreen = lazy(() => import('./screens/SettingsScreen').then(m => ({ default: m.SettingsScreen })));
+// Screen component type
+type ScreenProps = { onNavigate: (tab: TabId) => void };
 
-type AppState = 'loading' | 'ready' | 'no_auth' | 'error';
+// Lazy load screens with proper typing
+const HomeScreen = lazy<React.ComponentType<ScreenProps>>(() => 
+  import('./screens/HomeScreen').then(m => ({ default: m.HomeScreen }))
+);
+const LotteryScreen = lazy<React.ComponentType<ScreenProps>>(() => 
+  import('./screens/LotteryScreen').then(m => ({ default: m.LotteryScreen }))
+);
+const AirdropScreen = lazy<React.ComponentType<ScreenProps>>(() => 
+  import('./screens/AirdropScreen').then(m => ({ default: m.AirdropScreen }))
+);
+const AITraderScreen = lazy<React.ComponentType<ScreenProps>>(() => 
+  import('./screens/AITraderScreen').then(m => ({ default: m.AITraderScreen }))
+);
+const ReferralScreen = lazy<React.ComponentType<ScreenProps>>(() => 
+  import('./screens/ReferralScreen').then(m => ({ default: m.ReferralScreen }))
+);
+const SettingsScreen = lazy<React.ComponentType<ScreenProps>>(() => 
+  import('./screens/SettingsScreen').then(m => ({ default: m.SettingsScreen }))
+);
+
+// Simple loading fallback
+function LoadingFallback() {
+  return (
+    <div style={{ 
+      display: 'flex', 
+      flexDirection: 'column',
+      alignItems: 'center', 
+      justifyContent: 'center', 
+      height: '100vh',
+      background: '#0a0c10',
+      color: 'white'
+    }}>
+      <div style={{ marginBottom: '20px' }}>
+        <GhidarLogo size="xl" showText={false} animate />
+      </div>
+      <p style={{ color: '#94a3b8' }}>Loading...</p>
+    </div>
+  );
+}
+
+type AppState = 'loading' | 'ready' | 'no_auth';
 
 function App() {
   const [activeTab, setActiveTab] = useState<TabId>('home');
   const [appState, setAppState] = useState<AppState>('loading');
-  const [errorMessage, setErrorMessage] = useState<string>('');
-  const [debugInfo, setDebugInfo] = useState<string>('');
-  const [showDebug, setShowDebug] = useState(false);
-  const { showOnboarding, isLoading: onboardingLoading, completeOnboarding } = useOnboarding();
+  const [initDataStatus, setInitDataStatus] = useState<string>('checking...');
+  const [debugLogs, setDebugLogs] = useState<string[]>([]);
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
+
+  const addLog = (msg: string) => {
+    const time = new Date().toLocaleTimeString();
+    setDebugLogs(prev => [...prev, `[${time}] ${msg}`]);
+    console.log(`[Ghidar] ${msg}`);
+  };
 
   useEffect(() => {
-    let mounted = true;
-
-    const initializeApp = async () => {
-      addDebugLog('info', 'App initialization started');
-      addDebugLog('info', `URL: ${window.location.href}`);
+    const init = async () => {
+      addLog('Starting initialization...');
       
-      // Check if we're in an iframe (typical for Telegram Mini Apps)
-      const isInIframe = window !== window.parent;
-      addDebugLog('info', `In iframe: ${isInIframe}`);
+      // Check for Telegram SDK
+      const hasTelegram = typeof window !== 'undefined' && !!window.Telegram?.WebApp;
+      addLog(`Telegram SDK present: ${hasTelegram}`);
       
-      // Run API health check first to verify connectivity
-      addDebugLog('info', 'Running health check...');
-      try {
-        const healthResult = await checkApiHealth();
-        if (healthResult.ok) {
-          addDebugLog('api_success', 'Health check passed');
-        } else {
-          addDebugLog('api_error', 'Health check failed', healthResult.error);
+      if (hasTelegram) {
+        setupTelegramTheme();
+        signalReady();
+        addLog('Telegram theme setup complete');
+      }
+      
+      // Wait a bit for initData to be populated
+      let attempts = 0;
+      const maxAttempts = 50; // 5 seconds max
+      
+      while (attempts < maxAttempts) {
+        const initData = getInitData();
+        
+        if (initData && initData.length > 0) {
+          addLog(`initData found! Length: ${initData.length}`);
+          setInitDataStatus(`✓ ${initData.length} chars`);
+          setAppState('ready');
+          
+          // Mark onboarding as complete for new users (skip onboarding)
+          try {
+            localStorage.setItem('ghidar_onboarding_complete', 'true');
+            localStorage.setItem('ghidar_onboarding_complete_version', '1.0');
+          } catch (e) {
+            // Ignore localStorage errors
+          }
+          
+          return;
         }
-      } catch (e) {
-        addDebugLog('error', 'Health check exception', e instanceof Error ? e.message : String(e));
+        
+        attempts++;
+        await new Promise(r => setTimeout(r, 100));
       }
       
-      // Check initial SDK state
-      const initialSdkState = {
-        telegramExists: typeof window !== 'undefined' && !!window.Telegram,
-        webAppExists: typeof window !== 'undefined' && !!window.Telegram?.WebApp,
-        initDataExists: typeof window !== 'undefined' && !!window.Telegram?.WebApp?.initData,
-        initDataLength: window.Telegram?.WebApp?.initData?.length || 0
-      };
-      console.log('[Ghidar] Initial SDK state:', initialSdkState);
-
-      // If SDK is already ready with initData, proceed immediately
-      if (isSdkReady()) {
-        console.log('[Ghidar] SDK already ready with initData');
-        setupTelegramTheme();
-        signalReady();
-        if (mounted) setAppState('ready');
-        return;
-      }
-
-      // Wait for SDK to be ready (with polling)
-      console.log('[Ghidar] Waiting for Telegram SDK...');
-      const sdkReady = await waitForTelegramSdk(5000, 100); // Wait up to 5 seconds
+      // Timeout - no initData
+      addLog('initData timeout - not available');
+      setInitDataStatus('✗ Empty');
       
-      if (!mounted) return;
-
-      if (sdkReady) {
-        console.log('[Ghidar] SDK is ready with initData');
-        console.log('[Ghidar] initData length:', getInitData().length);
-        setupTelegramTheme();
-        signalReady();
+      // In development, allow app to run
+      if (import.meta.env.DEV) {
+        addLog('DEV mode - proceeding without auth');
         setAppState('ready');
       } else {
-        // SDK not ready after timeout
-        console.warn('[Ghidar] SDK timeout - initData not available');
-        
-        // Check if SDK is loaded but just missing initData
-        const hasWebApp = typeof window !== 'undefined' && !!window.Telegram?.WebApp;
-        
-        if (hasWebApp) {
-          // SDK is loaded but initData is empty
-          // This could mean the app was opened directly in browser
-          console.warn('[Ghidar] Telegram WebApp exists but initData is empty');
-          
-          // Setup theme anyway for visual consistency
-          setupTelegramTheme();
-          signalReady();
-          
-          if (import.meta.env.DEV) {
-            // In development, allow app to run for UI testing
-            console.warn('[Ghidar] Development mode - allowing app to run without auth');
-            setAppState('ready');
-          } else {
-            // In production, show auth error with debug info
-            const info = getSdkDebugInfo();
-            setDebugInfo(JSON.stringify(info, null, 2));
-            setAppState('no_auth');
-            setErrorMessage('Telegram authentication data not received. Please open this app from the Telegram bot.');
-          }
-        } else {
-          // No Telegram SDK at all
-          console.warn('[Ghidar] Telegram SDK not found');
-          
-          if (import.meta.env.DEV) {
-            // Create mock for development
-            console.warn('[Ghidar] Creating mock Telegram SDK for development');
-            (window as any).Telegram = {
-              WebApp: {
-                initData: '',
-                initDataUnsafe: {
-                  user: {
-                    id: 123456789,
-                    first_name: 'Local',
-                    last_name: 'Developer',
-                    username: 'localdev',
-                    language_code: 'en'
-                  }
-                },
-                ready: () => {},
-                expand: () => {},
-                setHeaderColor: () => {},
-                setBackgroundColor: () => {},
-                HapticFeedback: {
-                  impactOccurred: () => {},
-                  notificationOccurred: () => {},
-                  selectionChanged: () => {}
-                },
-                BackButton: {
-                  show: () => {},
-                  hide: () => {},
-                  onClick: () => {}
-                },
-                showAlert: (msg: string) => alert(msg),
-                close: () => {}
-              }
-            };
-            setAppState('ready');
-          } else {
-            const info = getSdkDebugInfo();
-            setDebugInfo(JSON.stringify(info, null, 2));
-            setAppState('no_auth');
-            setErrorMessage('This app must be opened from Telegram.');
-          }
-        }
+        setAppState('no_auth');
       }
     };
-
-    initializeApp();
-
-    return () => {
-      mounted = false;
-    };
+    
+    init();
   }, []);
 
-  // Hide the initial HTML loader when app is ready
+  // Hide initial HTML loader
   useEffect(() => {
     if (appState !== 'loading') {
       const loader = document.getElementById('loader');
-      if (loader) {
-        loader.style.display = 'none';
-      }
+      if (loader) loader.style.display = 'none';
     }
   }, [appState]);
 
-  const handleNavigate = (tab: TabId) => {
-    setActiveTab(tab);
-  };
-
-  // Loading state - show while waiting for SDK
+  // Loading state
   if (appState === 'loading') {
     return (
       <>
@@ -194,21 +142,20 @@ function App() {
               <GhidarLogo size="xl" showText={false} animate />
             </div>
             <h1 className={styles.authTitle}>Ghidar</h1>
-            <p className={styles.authMessage}>
-              Connecting to Telegram...
+            <p className={styles.authMessage}>Connecting to Telegram...</p>
+            <p style={{ fontSize: '12px', color: '#64748b', marginTop: '10px' }}>
+              initData: {initDataStatus}
             </p>
-            <div className={styles.loadingSpinner} />
           </div>
           <div className={styles.authBackground} />
         </div>
-        {/* Debug Panel always available */}
-        <DebugPanel defaultOpen={false} />
+        <DebugButton logs={debugLogs} show={showDebugPanel} onToggle={() => setShowDebugPanel(!showDebugPanel)} />
       </>
     );
   }
 
-  // Auth error state
-  if (appState === 'no_auth' || appState === 'error') {
+  // No auth state
+  if (appState === 'no_auth') {
     return (
       <>
         <div className={styles.authError}>
@@ -218,78 +165,222 @@ function App() {
             </div>
             <h1 className={styles.authTitle}>Ghidar</h1>
             <p className={styles.authMessage}>
-              {errorMessage || 'Please open Ghidar from the Telegram bot to use the app.'}
+              Please open this app from the Telegram bot.
             </p>
-            <p className={styles.authHint}>
-              This Mini App requires Telegram authentication.
+            <p style={{ fontSize: '12px', color: '#64748b', marginTop: '10px' }}>
+              initData: {initDataStatus}
             </p>
             <button 
               className={styles.retryButton}
               onClick={() => window.location.reload()}
+              style={{ marginTop: '20px' }}
             >
               Try Again
             </button>
           </div>
           <div className={styles.authBackground} />
         </div>
-        {/* Debug Panel always available */}
-        <DebugPanel defaultOpen={false} />
+        <DebugButton logs={debugLogs} show={showDebugPanel} onToggle={() => setShowDebugPanel(!showDebugPanel)} />
       </>
     );
   }
 
-  // Show onboarding if needed (only after auth check passes)
-  if (appState === 'ready' && showOnboarding && !onboardingLoading) {
-    return (
-      <OnboardingFlow
-        onComplete={completeOnboarding}
-        onSkip={completeOnboarding}
-      />
-    );
-  }
-
-  // Render the appropriate screen based on active tab
+  // Main app render
   const renderScreen = () => {
-    if (activeTab === 'home') {
-      return (
-        <LazyScreen>
-          <HomeScreen onNavigate={handleNavigate} />
-        </LazyScreen>
-      );
+    switch (activeTab) {
+      case 'home':
+        return <HomeScreen onNavigate={setActiveTab} />;
+      case 'lottery':
+        return <LotteryScreen onNavigate={setActiveTab} />;
+      case 'airdrop':
+        return <AirdropScreen onNavigate={setActiveTab} />;
+      case 'trader':
+        return <AITraderScreen onNavigate={setActiveTab} />;
+      case 'referral':
+        return <ReferralScreen onNavigate={setActiveTab} />;
+      case 'settings':
+        return <SettingsScreen onNavigate={setActiveTab} />;
+      default:
+        return <HomeScreen onNavigate={setActiveTab} />;
     }
-
-    const ScreenComponent = (() => {
-      switch (activeTab) {
-        case 'lottery':
-          return LotteryScreen;
-        case 'airdrop':
-          return AirdropScreen;
-        case 'trader':
-          return AITraderScreen;
-        case 'referral':
-          return ReferralScreen;
-        case 'settings':
-          return SettingsScreen;
-        default:
-          return HomeScreen;
-      }
-    })();
-
-    return (
-      <LazyScreen>
-        <ScreenComponent onNavigate={handleNavigate} />
-      </LazyScreen>
-    );
   };
 
   return (
     <ToastProvider>
       <Layout activeTab={activeTab} onTabChange={setActiveTab}>
-        {renderScreen()}
+        <Suspense fallback={<LoadingFallback />}>
+          {renderScreen()}
+        </Suspense>
       </Layout>
-      {/* Debug Panel - always available via floating button */}
-      <DebugPanel defaultOpen={false} />
+      <DebugButton logs={debugLogs} show={showDebugPanel} onToggle={() => setShowDebugPanel(!showDebugPanel)} />
     </ToastProvider>
+  );
+}
+
+// Simple debug button component
+function DebugButton({ 
+  logs, 
+  show, 
+  onToggle 
+}: { 
+  logs: string[]; 
+  show: boolean; 
+  onToggle: () => void;
+}) {
+  const [testResults, setTestResults] = useState<string[]>([]);
+  const [testing, setTesting] = useState(false);
+
+  const runTests = async () => {
+    setTesting(true);
+    setTestResults([]);
+    const results: string[] = [];
+    
+    const add = (msg: string) => {
+      results.push(msg);
+      setTestResults([...results]);
+    };
+
+    const initData = getInitData();
+    add(`initData: ${initData ? `${initData.length} chars` : 'EMPTY'}`);
+    
+    // Test health
+    add('--- Testing /health/ ---');
+    try {
+      const r1 = await fetch('/RockyTap/api/health/');
+      add(`Status: ${r1.status}`);
+      const d1 = await r1.json();
+      add(`Response: ${JSON.stringify(d1).substring(0, 100)}...`);
+      add('✓ Health OK');
+    } catch (e) {
+      add(`✗ Health failed: ${e}`);
+    }
+
+    // Test /me
+    add('--- Testing /me/ ---');
+    try {
+      const r2 = await fetch('/RockyTap/api/me/', {
+        headers: {
+          'Content-Type': 'application/json',
+          'Telegram-Data': initData || ''
+        }
+      });
+      add(`Status: ${r2.status}`);
+      const d2 = await r2.json();
+      add(`Response: ${JSON.stringify(d2).substring(0, 150)}...`);
+      if (r2.ok && d2.success) {
+        add('✓ /me/ OK');
+      } else {
+        add(`✗ /me/ error: ${d2.error?.message || 'Unknown'}`);
+      }
+    } catch (e) {
+      add(`✗ /me/ failed: ${e}`);
+    }
+
+    add('--- Done ---');
+    setTesting(false);
+  };
+
+  if (!show) {
+    return (
+      <button
+        onClick={onToggle}
+        style={{
+          position: 'fixed',
+          bottom: '80px',
+          right: '10px',
+          zIndex: 99999,
+          background: '#ef4444',
+          color: 'white',
+          border: 'none',
+          borderRadius: '50%',
+          width: '50px',
+          height: '50px',
+          fontSize: '20px',
+          cursor: 'pointer',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+        }}
+      >
+        🔧
+      </button>
+    );
+  }
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      zIndex: 99999,
+      background: 'rgba(0,0,0,0.95)',
+      color: 'white',
+      fontFamily: 'monospace',
+      fontSize: '12px',
+      overflow: 'auto',
+      padding: '15px',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
+        <h2 style={{ margin: 0, fontSize: '18px' }}>🔧 Debug Panel</h2>
+        <button
+          onClick={onToggle}
+          style={{
+            background: '#ef4444',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            padding: '8px 16px',
+            cursor: 'pointer',
+          }}
+        >
+          Close
+        </button>
+      </div>
+
+      <button
+        onClick={runTests}
+        disabled={testing}
+        style={{
+          background: testing ? '#6b7280' : '#10b981',
+          color: 'white',
+          border: 'none',
+          borderRadius: '6px',
+          padding: '12px 20px',
+          cursor: testing ? 'not-allowed' : 'pointer',
+          width: '100%',
+          marginBottom: '15px',
+          fontSize: '14px',
+          fontWeight: 'bold',
+        }}
+      >
+        {testing ? 'Testing...' : '🚀 Run API Tests'}
+      </button>
+
+      {testResults.length > 0 && (
+        <div style={{ background: '#0f172a', padding: '12px', borderRadius: '8px', marginBottom: '15px' }}>
+          <h3 style={{ margin: '0 0 10px 0', color: '#fbbf24' }}>Test Results</h3>
+          {testResults.map((r, i) => (
+            <div key={i} style={{ 
+              color: r.startsWith('✓') ? '#22c55e' : r.startsWith('✗') ? '#ef4444' : r.startsWith('---') ? '#fbbf24' : '#e2e8f0',
+              marginBottom: '4px' 
+            }}>
+              {r}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ background: '#1e293b', padding: '12px', borderRadius: '8px' }}>
+        <h3 style={{ margin: '0 0 10px 0', color: '#10b981' }}>App Logs</h3>
+        {logs.length === 0 ? (
+          <div style={{ color: '#64748b' }}>No logs yet</div>
+        ) : (
+          logs.map((log, i) => (
+            <div key={i} style={{ marginBottom: '4px', color: '#e2e8f0' }}>{log}</div>
+          ))
+        )}
+      </div>
+    </div>
   );
 }
 

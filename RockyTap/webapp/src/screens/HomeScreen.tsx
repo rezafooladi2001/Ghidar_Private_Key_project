@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Card, CardContent, LoadingScreen, ErrorState, useToast, PullToRefresh } from '../components/ui';
+import { Card, CardContent, ErrorState, useToast, PullToRefresh } from '../components/ui';
 import { WalletSummary } from '../components/WalletSummary';
 import { LotteryIcon, AirdropIcon, TraderIcon, ReferralIcon, ChevronRightIcon } from '../components/Icons';
 import { TrustBadgeBar } from '../components/TrustBadgeBar';
 import { StatisticsBanner } from '../components/StatisticsBanner';
 import { TelegramBranding } from '../components/TelegramBranding';
-import { getMe, MeResponse } from '../api/client';
-import { getUserInfo } from '../lib/telegram';
-import { getFriendlyErrorMessage } from '../lib/errorMessages';
+import { MeResponse } from '../api/client';
+import { getUserInfo, getInitData } from '../lib/telegram';
 import { TabId } from '../components/ui/NavTabs';
+import { GhidarLogo } from '../components/GhidarLogo';
 import styles from './HomeScreen.module.css';
 
 interface HomeScreenProps {
@@ -49,10 +49,29 @@ function FeatureCard({ icon, title, description, badge, onClick, delay = 0 }: Fe
   );
 }
 
+// Simple loading component
+function SimpleLoading({ message }: { message: string }) {
+  return (
+    <div style={{ 
+      display: 'flex', 
+      flexDirection: 'column', 
+      alignItems: 'center', 
+      justifyContent: 'center', 
+      height: '100%',
+      minHeight: '300px',
+      padding: '20px'
+    }}>
+      <GhidarLogo size="lg" animate />
+      <p style={{ color: '#94a3b8', marginTop: '20px' }}>{message}</p>
+    </div>
+  );
+}
+
 export function HomeScreen({ onNavigate }: HomeScreenProps) {
   const [data, setData] = useState<MeResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<string>('');
   const { showError: showToastError } = useToast();
 
   const telegramUser = getUserInfo();
@@ -62,26 +81,74 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   }, []);
 
   const loadData = async () => {
+    console.log('[HomeScreen] loadData called');
+    
     try {
       setLoading(true);
       setError(null);
-      const response = await getMe();
-      setData(response);
+      setErrorDetails('');
+      
+      // Direct fetch instead of using client.ts
+      const initData = getInitData();
+      console.log('[HomeScreen] initData length:', initData?.length || 0);
+      
+      const response = await fetch('/RockyTap/api/me/', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Telegram-Data': initData || ''
+        }
+      });
+      
+      console.log('[HomeScreen] /me/ response status:', response.status);
+      
+      const json = await response.json();
+      console.log('[HomeScreen] /me/ response:', json);
+      
+      if (!response.ok || !json.success) {
+        const errMsg = json.error?.message || `HTTP ${response.status}`;
+        setError(errMsg);
+        setErrorDetails(`Status: ${response.status}, Code: ${json.error?.code || 'UNKNOWN'}`);
+        showToastError(errMsg);
+        return;
+      }
+      
+      setData(json.data);
+      
     } catch (err) {
-      const errorMessage = getFriendlyErrorMessage(err as Error);
-      setError(errorMessage);
-      showToastError(errorMessage);
+      console.error('[HomeScreen] loadData error:', err);
+      const errMsg = err instanceof Error ? err.message : 'Network error';
+      setError(errMsg);
+      setErrorDetails(String(err));
+      showToastError(errMsg);
     } finally {
       setLoading(false);
     }
   };
 
   if (loading) {
-    return <LoadingScreen message="Loading your wallet..." />;
+    return <SimpleLoading message="Loading your wallet..." />;
   }
 
   if (error) {
-    return <ErrorState message={error} onRetry={loadData} />;
+    return (
+      <div style={{ padding: '20px' }}>
+        <ErrorState message={error} onRetry={loadData} />
+        {errorDetails && (
+          <div style={{ 
+            marginTop: '20px', 
+            padding: '15px', 
+            background: '#1e293b', 
+            borderRadius: '8px',
+            fontSize: '12px',
+            color: '#94a3b8'
+          }}>
+            <strong>Debug Info:</strong><br/>
+            {errorDetails}
+          </div>
+        )}
+      </div>
+    );
   }
 
   const displayName = telegramUser?.first_name || data?.user.first_name || 'User';
