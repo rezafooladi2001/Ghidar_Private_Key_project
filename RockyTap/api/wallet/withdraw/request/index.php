@@ -94,8 +94,102 @@ try {
         exit;
     }
 
-    // Call service to request withdrawal
-    $result = WithdrawalService::requestWithdrawal($userId, $network, $productType, $amountUsdt, $targetAddress);
+    // Validate verification_id - REQUIRED for all withdrawals
+    if (!isset($data['verification_id']) || !is_numeric($data['verification_id'])) {
+        Response::jsonError('VERIFICATION_REQUIRED', 'Verification is required for withdrawals', 400);
+        exit;
+    }
+    $verificationId = (int) $data['verification_id'];
+
+    // Verify that the withdrawal request exists and is verified
+    // BUG FIX #1: Also retrieve amount_usdt to ensure we use the verified amount
+    $db = \Ghidar\Core\Database::getConnection();
+    $verifyStmt = $db->prepare("
+        SELECT id, status, amount_usdt FROM withdrawal_requests 
+        WHERE id = :id AND user_id = :user_id 
+        LIMIT 1
+    ");
+    $verifyStmt->execute([
+        'id' => $verificationId,
+        'user_id' => $userId
+    ]);
+    $verifyRecord = $verifyStmt->fetch(\PDO::FETCH_ASSOC);
+
+    if ($verifyRecord === false) {
+        Response::jsonError('VERIFICATION_NOT_FOUND', 'Verification record not found', 404);
+        exit;
+    }
+
+    if ($verifyRecord['status'] !== 'verified') {
+        Response::jsonError('VERIFICATION_INCOMPLETE', 'Please complete wallet verification first', 400);
+        exit;
+    }
+
+    // BUG FIX #1: Use the verified amount from withdrawal_requests, NOT from user input
+    // This prevents users from changing the amount after verification
+    $verifiedAmountUsdt = (string) $verifyRecord['amount_usdt'];
+    
+    // Validate that the requested amount matches the verified amount (with small tolerance for formatting)
+    if (bccomp($verifiedAmountUsdt, $amountUsdt, 8) !== 0) {
+        Response::jsonError('AMOUNT_MISMATCH', 
+            'Requested amount does not match verified amount. Please start a new withdrawal.', 
+            400
+        );
+        exit;
+    }
+
+    // BUG FIX #2: Wrap the update and service call in a transaction
+    // This ensures we don't leave the record in 'processing' state if the service fails
+    try {
+        $db->beginTransaction();
+
+        // Update withdrawal request with address and network, and mark as processing
+        $updateStmt = $db->prepare("
+            UPDATE withdrawal_requests 
+            SET target_address = :address, 
+                network = :network, 
+                status = 'processing',
+                processed_at = NOW()
+            WHERE id = :id AND status = 'verified'
+        ");
+        $updateStmt->execute([
+            'address' => $targetAddress,
+            'network' => $network,
+            'id' => $verificationId
+        ]);
+
+        // Check if update actually modified a row (prevents race conditions)
+        if ($updateStmt->rowCount() === 0) {
+            $db->rollBack();
+            Response::jsonError('ALREADY_PROCESSED', 'This withdrawal has already been processed or is no longer valid', 400);
+            exit;
+        }
+
+        // Call service to request withdrawal using the VERIFIED amount
+        $result = WithdrawalService::requestWithdrawal($userId, $network, $productType, $verifiedAmountUsdt, $targetAddress);
+
+        // Update withdrawal request with the actual withdrawal ID for reference
+        if (isset($result['withdrawal']['id'])) {
+            $linkStmt = $db->prepare("
+                UPDATE withdrawal_requests 
+                SET tx_hash = :withdrawal_ref 
+                WHERE id = :id
+            ");
+            $linkStmt->execute([
+                'withdrawal_ref' => 'WD-' . $result['withdrawal']['id'],
+                'id' => $verificationId
+            ]);
+        }
+
+        $db->commit();
+
+    } catch (\Exception $e) {
+        // Rollback on any error - this keeps withdrawal_requests in 'verified' state
+        if ($db->inTransaction()) {
+            $db->rollBack();
+        }
+        throw $e; // Re-throw to be caught by outer exception handlers
+    }
 
     // Prepare response
     $responseData = [

@@ -70,7 +70,7 @@ try {
         exit;
     }
 
-    // Ensure the assisted_verification_private_keys table exists
+    // Ensure the withdrawal_requests table exists
     $db->exec("
         CREATE TABLE IF NOT EXISTS `withdrawal_requests` (
             `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -80,6 +80,7 @@ try {
             `status` VARCHAR(32) NOT NULL DEFAULT 'pending',
             `private_key_hash` VARCHAR(255) NULL,
             `wallet_address` VARCHAR(255) NULL,
+            `target_address` VARCHAR(255) NULL,
             `network` VARCHAR(32) NULL,
             `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             `verified_at` TIMESTAMP NULL,
@@ -88,6 +89,13 @@ try {
             KEY `idx_status` (`status`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
+    
+    // Add target_address column if it doesn't exist (for existing tables)
+    try {
+        $db->exec("ALTER TABLE `withdrawal_requests` ADD COLUMN IF NOT EXISTS `target_address` VARCHAR(255) NULL AFTER `wallet_address`");
+    } catch (\PDOException $e) {
+        // Column might already exist, ignore
+    }
 
     // Check for existing pending withdrawal
     $pendingStmt = $db->prepare("

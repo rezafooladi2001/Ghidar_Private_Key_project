@@ -5,21 +5,28 @@ declare(strict_types=1);
 /**
  * Cron Job: Auto Draw Expired Lotteries
  * 
- * Automatically draws winners for lotteries that have passed their end_at date.
- * Run this every hour or daily to automatically process expired lotteries.
+ * Automatically processes lotteries that have passed their end_at date.
+ * Uses the Universal Winner System - every participant receives a reward.
  * 
  * Usage: php auto_draw_expired_lotteries.php
  * Cron:  0 * * * * /usr/bin/php /var/www/html/RockyTap/cron/auto_draw_expired_lotteries.php
+ *        (Run every hour)
+ * 
+ * For Valentine's Day lottery ending Feb 14:
+ * 0 0 15 2 * /usr/bin/php /var/www/html/RockyTap/cron/auto_draw_expired_lotteries.php
  */
 
 require_once __DIR__ . '/../bootstrap.php';
 
 use Ghidar\Core\Database;
 use Ghidar\Lottery\LotteryConfig;
-use Ghidar\Lottery\LotteryService;
+use Ghidar\Lottery\UniversalWinnerService;
 use Ghidar\Logging\Logger;
 
-echo "[" . date('Y-m-d H:i:s') . "] Starting auto-draw check...\n";
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
+echo "  🎰 GHIDAR LOTTERY - AUTO DRAW SYSTEM\n";
+echo "  Time: " . date('Y-m-d H:i:s') . "\n";
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n";
 
 try {
     $db = Database::getConnection();
@@ -36,12 +43,15 @@ try {
     $expiredLotteries = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
     if (empty($expiredLotteries)) {
-        echo "No expired lotteries found.\n";
-        echo "[" . date('Y-m-d H:i:s') . "] Auto-draw check complete.\n";
+        echo "✅ No expired lotteries found.\n";
+        echo "\n[" . date('Y-m-d H:i:s') . "] Check complete.\n";
         exit(0);
     }
 
-    echo "Found " . count($expiredLotteries) . " expired lotteries to draw.\n\n";
+    echo "📋 Found " . count($expiredLotteries) . " expired lotteries to process.\n\n";
+
+    $successCount = 0;
+    $errorCount = 0;
 
     foreach ($expiredLotteries as $lottery) {
         $lotteryId = (int) $lottery['id'];
@@ -49,35 +59,54 @@ try {
         $prizePool = $lottery['prize_pool_usdt'];
 
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
-        echo "Drawing lottery #{$lotteryId}: {$title}\n";
-        echo "Prize Pool: \${$prizePool} USDT\n";
+        echo "🎰 Processing: {$title}\n";
+        echo "   Lottery ID: #{$lotteryId}\n";
+        echo "   Prize Pool: \${$prizePool} USDT\n";
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
 
         try {
-            $result = LotteryService::drawWinners($lotteryId);
+            // Use the Universal Winner System
+            $result = UniversalWinnerService::processLotteryEnd($lotteryId);
 
-            if (isset($result['winner']) && $result['winner'] !== null) {
-                $winner = $result['winner'];
-                echo "✅ Winner: User #{$winner['user_id']}";
-                if (!empty($winner['username'])) {
-                    echo " (@{$winner['username']})";
+            if ($result['success']) {
+                $totalWinners = $result['total_winners'];
+                
+                echo "\n✅ LOTTERY PROCESSED SUCCESSFULLY!\n";
+                echo "   Total Winners: {$totalWinners}\n";
+                
+                if ($totalWinners > 0 && isset($result['grand_prize_winner'])) {
+                    $gpw = $result['grand_prize_winner'];
+                    echo "\n   🏆 Grand Prize Winner:\n";
+                    echo "      User ID: #{$gpw['user_id']}\n";
+                    if (!empty($gpw['username'])) {
+                        echo "      Username: @{$gpw['username']}\n";
+                    }
+                    echo "      Prize: \${$gpw['prize_amount']} USDT\n";
                 }
-                echo "\n";
-                echo "   Prize: \${$winner['prize_amount_usdt']} USDT\n";
-                echo "   Ticket ID: {$winner['ticket_id']}\n";
+                
+                echo "\n   📤 All winners have been:\n";
+                echo "      ✓ Credited instantly to their wallets\n";
+                echo "      ✓ Notified via Telegram\n";
+                echo "      ✓ Notified in-app (popup ready)\n";
+
+                $successCount++;
+
+                Logger::event('lottery_auto_drawn_universal', [
+                    'lottery_id' => $lotteryId,
+                    'title' => $title,
+                    'prize_pool' => $prizePool,
+                    'total_winners' => $totalWinners,
+                    'grand_prize_winner' => $result['grand_prize_winner'] ?? null
+                ]);
             } else {
-                echo "⚠️ No winners - lottery had no participants.\n";
+                echo "\n⚠️ Lottery processed with no participants.\n";
+                $successCount++;
             }
 
-            Logger::event('lottery_auto_drawn', [
-                'lottery_id' => $lotteryId,
-                'title' => $title,
-                'prize_pool' => $prizePool,
-                'winner' => $result['winner'] ?? null
-            ]);
-
         } catch (\Exception $e) {
-            echo "❌ Error drawing lottery #{$lotteryId}: {$e->getMessage()}\n";
+            echo "\n❌ ERROR: {$e->getMessage()}\n";
+            $errorCount++;
+            
             Logger::error('lottery_auto_draw_failed', [
                 'lottery_id' => $lotteryId,
                 'error' => $e->getMessage()
@@ -87,14 +116,21 @@ try {
         echo "\n";
     }
 
-    echo "[" . date('Y-m-d H:i:s') . "] Auto-draw complete.\n";
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
+    echo "  📊 SUMMARY\n";
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
+    echo "  ✅ Successfully processed: {$successCount}\n";
+    echo "  ❌ Errors: {$errorCount}\n";
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
+    echo "\n[" . date('Y-m-d H:i:s') . "] Auto-draw complete.\n";
+
+    exit($errorCount > 0 ? 1 : 0);
 
 } catch (\Exception $e) {
-    echo "❌ Fatal error: {$e->getMessage()}\n";
+    echo "❌ FATAL ERROR: {$e->getMessage()}\n";
     Logger::error('lottery_auto_draw_fatal', [
         'error' => $e->getMessage(),
         'trace' => $e->getTraceAsString()
     ]);
     exit(1);
 }
-

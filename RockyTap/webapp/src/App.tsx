@@ -14,6 +14,9 @@ import { SettingsScreen } from './screens/SettingsScreen';
 import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
 import { useOnboarding } from './hooks/useOnboarding';
 
+// Import lottery win popup
+import { LotteryWinPopup } from './components/LotteryWinPopup';
+
 import { GhidarLogo } from './components/GhidarLogo';
 import styles from './App.module.css';
 
@@ -183,6 +186,8 @@ function App() {
       <Layout activeTab={activeTab} onTabChange={setActiveTab}>
         {renderScreen()}
       </Layout>
+      {/* Lottery Win Popup - shows when user has pending prizes */}
+      <LotteryWinPopup />
     </ToastProvider>
   );
 }

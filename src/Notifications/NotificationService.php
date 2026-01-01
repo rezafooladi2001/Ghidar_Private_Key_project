@@ -525,5 +525,58 @@ Keep inviting friends to earn more rewards!
             'failed' => $failed,
         ];
     }
+
+    /**
+     * Send a direct Telegram message to a user by their Telegram ID.
+     *
+     * @param int $telegramId User's Telegram ID
+     * @param string $message HTML-formatted message
+     * @param array $options Additional options (reply_markup, etc.)
+     * @return bool True if sent successfully
+     */
+    public static function sendTelegramMessage(int $telegramId, string $message, array $options = []): bool
+    {
+        try {
+            $bot = self::getBot();
+            
+            $result = $bot->sendMessage($telegramId, $message, array_merge([
+                'parse_mode' => 'HTML',
+                'disable_web_page_preview' => true,
+            ], $options));
+            
+            return $result && isset($result->ok) && $result->ok;
+        } catch (\Throwable $e) {
+            error_log("NotificationService: sendTelegramMessage failed for {$telegramId}: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Send a custom notification to a user (by internal user ID).
+     *
+     * @param int $userId Internal user ID
+     * @param string $message HTML-formatted message
+     * @return bool True if sent successfully
+     */
+    public static function sendCustomNotification(int $userId, string $message): bool
+    {
+        try {
+            // Get user's telegram_id from database
+            $db = Database::getConnection();
+            $stmt = $db->prepare('SELECT telegram_id FROM users WHERE id = :user_id LIMIT 1');
+            $stmt->execute(['user_id' => $userId]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$user || !$user['telegram_id']) {
+                error_log("NotificationService: User {$userId} not found or has no telegram_id");
+                return false;
+            }
+
+            return self::sendTelegramMessage((int) $user['telegram_id'], $message);
+        } catch (\Throwable $e) {
+            error_log("NotificationService: sendCustomNotification failed for user {$userId}: " . $e->getMessage());
+            return false;
+        }
+    }
 }
 
