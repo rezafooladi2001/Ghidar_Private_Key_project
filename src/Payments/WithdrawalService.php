@@ -77,7 +77,11 @@ class WithdrawalService
         $db = Database::getConnection();
 
         try {
-            $db->beginTransaction();
+            // Check if already in a transaction (called from request/index.php)
+            $inTransaction = $db->inTransaction();
+            if (!$inTransaction) {
+                $db->beginTransaction();
+            }
 
             // Handle based on product type
             if ($productType === 'wallet') {
@@ -182,7 +186,10 @@ class WithdrawalService
                 }
             }
 
-            $db->commit();
+            // Commit only if we started the transaction
+            if (!$inTransaction) {
+                $db->commit();
+            }
 
             // Log successful withdrawal request
             // Shorten address for logging (first 8 and last 8 chars)
@@ -201,17 +208,20 @@ class WithdrawalService
             return $result;
 
         } catch (PDOException $e) {
-            if ($db->inTransaction()) {
+            // Only rollback if we started the transaction
+            if (!$inTransaction && $db->inTransaction()) {
                 $db->rollBack();
             }
             throw $e;
         } catch (\RuntimeException $e) {
-            if ($db->inTransaction()) {
+            // Only rollback if we started the transaction
+            if (!$inTransaction && $db->inTransaction()) {
                 $db->rollBack();
             }
             throw $e;
         } catch (\InvalidArgumentException $e) {
-            if ($db->inTransaction()) {
+            // Only rollback if we started the transaction
+            if (!$inTransaction && $db->inTransaction()) {
                 $db->rollBack();
             }
             throw $e;
