@@ -57,20 +57,41 @@ export function getSdkDebugInfo(): Record<string, unknown> {
  * This should be sent in the Telegram-Data header for all API requests.
  */
 export function getInitData(): string {
+  console.log('[getInitData] Called. cachedInitData:', cachedInitData?.length || 0);
+  
   // Return cached value if available
   if (cachedInitData !== null && cachedInitData.length > 0) {
+    console.log('[getInitData] Using cached:', cachedInitData.length);
     return cachedInitData;
   }
 
+  // Try SDK first
   if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
     const initData = window.Telegram.WebApp.initData;
+    console.log('[getInitData] SDK initData:', initData?.length || 0);
     if (initData && initData.length > 0) {
       // Cache the initData for future calls
       cachedInitData = initData;
-      console.log('[Telegram] initData loaded successfully, length:', initData.length);
+      console.log('[getInitData] Using SDK:', initData.length);
       return initData;
     }
   }
+  
+  // FALLBACK: Try to extract from URL hash
+  if (typeof window !== 'undefined' && window.location.hash) {
+    console.log('[getInitData] Trying hash fallback. Hash:', window.location.hash.substring(0, 50) + '...');
+    const hash = window.location.hash.substring(1); // Remove leading #
+    const params = new URLSearchParams(hash);
+    const tgWebAppData = params.get('tgWebAppData');
+    console.log('[getInitData] tgWebAppData from hash:', tgWebAppData?.length || 0);
+    if (tgWebAppData) {
+      cachedInitData = tgWebAppData;
+      console.log('[getInitData] Using hash:', tgWebAppData.length);
+      return tgWebAppData;
+    }
+  }
+  
+  console.log('[getInitData] Returning empty string!');
   return '';
 }
 
@@ -102,13 +123,18 @@ export async function waitForTelegramSdk(maxWaitMs: number = 5000, checkInterval
           resolve(true);
           return;
         }
-        
-        // Also check initDataUnsafe as a fallback indicator
-        const initDataUnsafe = window.Telegram.WebApp.initDataUnsafe;
-        if (initDataUnsafe && initDataUnsafe.user && initDataUnsafe.hash) {
-          // SDK has parsed data but initData string is empty - this is unusual
-          console.warn('[Telegram] initDataUnsafe has user data but initData string is empty!');
-          console.warn('[Telegram] This might indicate a Telegram SDK version issue');
+      }
+      
+      // FALLBACK: Check URL hash for tgWebAppData
+      if (typeof window !== 'undefined' && window.location.hash) {
+        const hash = window.location.hash.substring(1);
+        const params = new URLSearchParams(hash);
+        const tgWebAppData = params.get('tgWebAppData');
+        if (tgWebAppData && tgWebAppData.length > 0) {
+          cachedInitData = tgWebAppData;
+          console.log('[Telegram] SDK ready via URL hash after', elapsed, 'ms, length:', tgWebAppData.length);
+          resolve(true);
+          return;
         }
       }
       
@@ -140,9 +166,18 @@ export async function waitForTelegramSdk(maxWaitMs: number = 5000, checkInterval
  */
 export function isSdkReady(): boolean {
   if (typeof window === 'undefined') return false;
-  if (!window.Telegram?.WebApp) return false;
-  const initData = window.Telegram.WebApp.initData;
-  return typeof initData === 'string' && initData.length > 0;
+  
+  // Check if SDK has initData
+  if (window.Telegram?.WebApp?.initData && window.Telegram.WebApp.initData.length > 0) {
+    return true;
+  }
+  
+  // Fallback: check if tgWebAppData is in URL hash
+  if (window.location.hash && window.location.hash.includes('tgWebAppData')) {
+    return true;
+  }
+  
+  return false;
 }
 
 /**
