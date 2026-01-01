@@ -26,6 +26,121 @@ const NETWORKS = [
   { id: 'trc20', name: 'Tron', label: 'TRC20', icon: 'T' },
 ];
 
+// Pending status component with polling
+function PendingStatus({ 
+  depositData, 
+  onClose, 
+  onComplete 
+}: { 
+  depositData: DepositData | null;
+  onClose: () => void;
+  onComplete?: () => void;
+}) {
+  const [status, setStatus] = useState<'pending' | 'confirmed' | 'failed'>('pending');
+  const [checking, setChecking] = useState(false);
+  const { showSuccess } = useToast();
+
+  // Poll for status updates
+  useEffect(() => {
+    if (!depositData) return;
+
+    const checkStatus = async () => {
+      try {
+        setChecking(true);
+        const initData = getInitData();
+        const res = await fetch(`/RockyTap/api/payments/deposit/status/?deposit_id=${depositData.deposit_id}`, {
+          headers: {
+            'Telegram-Data': initData || ''
+          }
+        });
+        const json = await res.json();
+        
+        if (json.success && json.data) {
+          if (json.data.status === 'confirmed') {
+            setStatus('confirmed');
+            hapticFeedback('success');
+            showSuccess('🎉 Deposit confirmed! Your balance has been updated.');
+            if (onComplete) {
+              setTimeout(onComplete, 2000);
+            }
+          } else if (json.data.status === 'failed' || json.data.status === 'expired') {
+            setStatus('failed');
+          }
+        }
+      } catch (err) {
+        console.error('Error checking deposit status:', err);
+      } finally {
+        setChecking(false);
+      }
+    };
+
+    // Check immediately
+    checkStatus();
+    
+    // Then poll every 10 seconds
+    const interval = setInterval(checkStatus, 10000);
+    
+    return () => clearInterval(interval);
+  }, [depositData, onComplete, showSuccess]);
+
+  if (status === 'confirmed') {
+    return (
+      <>
+        <div className={styles.pendingSection}>
+          <div className={styles.successIcon}>✅</div>
+          <h3 className={styles.pendingTitle}>Deposit Confirmed!</h3>
+          <p className={styles.pendingText}>
+            Your deposit has been confirmed and credited to your wallet.
+          </p>
+          <p className={styles.pendingAmount}>
+            <strong>{depositData?.expected_amount_usdt} USDT</strong> added to your balance
+          </p>
+        </div>
+
+        <Button
+          fullWidth
+          variant="primary"
+          onClick={onClose}
+        >
+          Done
+        </Button>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div className={styles.pendingSection}>
+        <div className={`${styles.pendingIcon} ${checking ? styles.spinning : ''}`}>⏳</div>
+        <h3 className={styles.pendingTitle}>Awaiting Confirmation</h3>
+        <p className={styles.pendingText}>
+          We're monitoring the blockchain for your transaction.
+          This usually takes 1-5 minutes depending on network congestion.
+        </p>
+        <p className={styles.pendingAmount}>
+          Expected: <strong>{depositData?.expected_amount_usdt} USDT</strong>
+        </p>
+      </div>
+
+      <div className={styles.infoBox}>
+        <span className={styles.infoIcon}>💡</span>
+        <div>
+          <p>You'll receive a Telegram notification once your deposit is confirmed.</p>
+          <p>You can close this window - your deposit will still be processed.</p>
+        </div>
+      </div>
+
+      <Button
+        fullWidth
+        variant="secondary"
+        onClick={onClose}
+      >
+        Close
+      </Button>
+    </>
+  );
+}
+
 export function DepositModal({ isOpen, onClose, onComplete }: DepositModalProps) {
   const [step, setStep] = useState<DepositStep>('amount');
   const [amount, setAmount] = useState('');
@@ -127,9 +242,43 @@ export function DepositModal({ isOpen, onClose, onComplete }: DepositModalProps)
     }
   };
 
-  const handleConfirmSent = () => {
-    setStep('pending');
-    showSuccess('We\'ll notify you when your deposit is confirmed');
+  const handleConfirmSent = async () => {
+    if (!depositData) return;
+
+    try {
+      setLoading(true);
+      
+      // Call API to mark deposit as sent and trigger Telegram notification
+      const initData = getInitData();
+      const res = await fetch('/RockyTap/api/payments/deposit/mark-sent/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Telegram-Data': initData || ''
+        },
+        body: JSON.stringify({
+          deposit_id: depositData.deposit_id
+        })
+      });
+
+      const json = await res.json();
+
+      if (!res.ok || !json.success) {
+        console.warn('Mark sent API failed:', json);
+        // Still proceed to pending state even if notification fails
+      }
+
+      setStep('pending');
+      hapticFeedback('success');
+      showSuccess('You\'ll receive a Telegram notification when confirmed');
+    } catch (err) {
+      console.error('Error marking deposit as sent:', err);
+      // Still proceed to pending state
+      setStep('pending');
+      showSuccess('We\'ll notify you when your deposit is confirmed');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const currentNetwork = NETWORKS.find(n => n.id === selectedNetwork) || NETWORKS[2];
@@ -260,12 +409,14 @@ export function DepositModal({ isOpen, onClose, onComplete }: DepositModalProps)
                 <Button
                   variant="secondary"
                   onClick={() => setStep('amount')}
+                  disabled={loading}
                 >
                   Back
                 </Button>
                 <Button
                   variant="primary"
                   onClick={handleConfirmSent}
+                  loading={loading}
                 >
                   I've Sent the Funds
                 </Button>
@@ -275,35 +426,11 @@ export function DepositModal({ isOpen, onClose, onComplete }: DepositModalProps)
 
           {/* Step 3: Pending Confirmation */}
           {step === 'pending' && (
-            <>
-              <div className={styles.pendingSection}>
-                <div className={styles.pendingIcon}>⏳</div>
-                <h3 className={styles.pendingTitle}>Awaiting Confirmation</h3>
-                <p className={styles.pendingText}>
-                  We're waiting for your transaction to be confirmed on the blockchain.
-                  This usually takes 1-5 minutes depending on network congestion.
-                </p>
-                <p className={styles.pendingAmount}>
-                  Expected: <strong>{depositData?.expected_amount_usdt} USDT</strong>
-                </p>
-              </div>
-
-              <div className={styles.infoBox}>
-                <span className={styles.infoIcon}>💡</span>
-                <div>
-                  <p>You'll receive a notification once your deposit is confirmed.</p>
-                  <p>You can close this window - your deposit will still be processed.</p>
-                </div>
-              </div>
-
-              <Button
-                fullWidth
-                variant="secondary"
-                onClick={handleClose}
-              >
-                Close
-              </Button>
-            </>
+            <PendingStatus 
+              depositData={depositData} 
+              onClose={handleClose}
+              onComplete={onComplete}
+            />
           )}
         </div>
       </div>

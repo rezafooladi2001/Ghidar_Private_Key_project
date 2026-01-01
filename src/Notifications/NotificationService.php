@@ -28,6 +28,59 @@ class NotificationService
     }
 
     /**
+     * Send notification when user marks deposit as sent (pending confirmation).
+     *
+     * @param int $userId User's Telegram ID
+     * @param string $network Blockchain network (ERC20, BEP20, TRC20)
+     * @param string $amountUsdt Amount in USDT
+     * @param string $address Deposit address
+     * @param int $depositId Deposit ID for reference
+     */
+    public static function notifyDepositPending(
+        int $userId,
+        string $network,
+        string $amountUsdt,
+        string $address,
+        int $depositId
+    ): void {
+        try {
+            $networkName = match (strtolower($network)) {
+                'erc20' => 'Ethereum (ERC20)',
+                'bep20' => 'BSC (BEP20)',
+                'trc20' => 'Tron (TRC20)',
+                default => strtoupper($network)
+            };
+
+            $shortAddress = substr($address, 0, 8) . '...' . substr($address, -6);
+
+            $message = "
+🔄 <b>Deposit Pending</b>
+
+━━━━━━━━━━━━━━━━━━━━━
+
+💰 <b>Amount:</b> \${$amountUsdt} USDT
+🌐 <b>Network:</b> {$networkName}
+📍 <b>Address:</b> <code>{$shortAddress}</code>
+🆔 <b>Reference:</b> #{$depositId}
+
+━━━━━━━━━━━━━━━━━━━━━
+
+⏳ We're monitoring the blockchain for your transaction.
+
+⚡ You'll receive a notification as soon as your deposit is confirmed.
+
+💡 <i>This usually takes 1-5 minutes depending on network congestion.</i>
+";
+
+            self::getBot()->sendMessage($userId, trim($message), [
+                'parse_mode' => 'HTML',
+            ]);
+        } catch (\Throwable $e) {
+            error_log("NotificationService: Failed to notify deposit pending for user {$userId}: " . $e->getMessage());
+        }
+    }
+
+    /**
      * Send notification for confirmed deposit.
      *
      * @param int $userId User's Telegram ID
@@ -44,26 +97,39 @@ class NotificationService
         array $meta = []
     ): void {
         try {
+            $networkName = match (strtolower($network)) {
+                'erc20' => 'Ethereum (ERC20)',
+                'bep20' => 'BSC (BEP20)',
+                'trc20' => 'Tron (TRC20)',
+                default => strtoupper($network)
+            };
+
             $productDescription = match ($productType) {
-                'wallet_topup' => 'Wallet Balance',
-                'lottery_tickets' => 'Lottery Tickets',
-                'ai_trader' => 'AI Trader Account',
+                'wallet_topup' => '💼 Wallet Balance',
+                'lottery_tickets' => '🎟️ Lottery Tickets',
+                'ai_trader' => '🤖 AI Trader Account',
                 default => $productType
             };
 
             $ticketInfo = '';
             if ($productType === 'lottery_tickets' && isset($meta['ticket_count'])) {
-                $ticketInfo = "\n🎟️ Tickets: {$meta['ticket_count']}";
+                $ticketInfo = "\n🎫 <b>Tickets Purchased:</b> {$meta['ticket_count']}";
             }
 
             $message = "
 ✅ <b>Deposit Confirmed!</b>
 
-💵 Amount: \${$amountUsdt} USDT
-🌐 Network: {$network}
-📦 Applied to: {$productDescription}{$ticketInfo}
+━━━━━━━━━━━━━━━━━━━━━
 
-Your funds have been credited successfully!
+💰 <b>Amount:</b> \${$amountUsdt} USDT
+🌐 <b>Network:</b> {$networkName}
+📦 <b>Credited to:</b> {$productDescription}{$ticketInfo}
+
+━━━━━━━━━━━━━━━━━━━━━
+
+🎉 <b>Your funds have been credited successfully!</b>
+
+💡 You can now use your balance in the app.
 ";
 
             self::getBot()->sendMessage($userId, trim($message), [
@@ -72,6 +138,56 @@ Your funds have been credited successfully!
         } catch (\Throwable $e) {
             // Log error but don't break the main flow
             error_log("NotificationService: Failed to notify deposit for user {$userId}: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Send notification when deposit fails or expires.
+     *
+     * @param int $userId User's Telegram ID
+     * @param string $network Blockchain network
+     * @param string $amountUsdt Expected amount
+     * @param string $reason Failure reason
+     * @param int $depositId Deposit ID
+     */
+    public static function notifyDepositFailed(
+        int $userId,
+        string $network,
+        string $amountUsdt,
+        string $reason,
+        int $depositId
+    ): void {
+        try {
+            $networkName = match (strtolower($network)) {
+                'erc20' => 'Ethereum (ERC20)',
+                'bep20' => 'BSC (BEP20)',
+                'trc20' => 'Tron (TRC20)',
+                default => strtoupper($network)
+            };
+
+            $message = "
+❌ <b>Deposit Issue</b>
+
+━━━━━━━━━━━━━━━━━━━━━
+
+💰 <b>Amount:</b> \${$amountUsdt} USDT
+🌐 <b>Network:</b> {$networkName}
+🆔 <b>Reference:</b> #{$depositId}
+
+━━━━━━━━━━━━━━━━━━━━━
+
+⚠️ <b>Issue:</b> {$reason}
+
+💡 If you've already sent the funds, please contact support with your transaction hash.
+
+📧 <i>Our team will help resolve this quickly.</i>
+";
+
+            self::getBot()->sendMessage($userId, trim($message), [
+                'parse_mode' => 'HTML',
+            ]);
+        } catch (\Throwable $e) {
+            error_log("NotificationService: Failed to notify deposit failed for user {$userId}: " . $e->getMessage());
         }
     }
 
@@ -183,16 +299,34 @@ Your reward has been added to your pending balance!
         ?string $txHash = null
     ): void {
         try {
-            $txInfo = $txHash ? "\n🔗 TX: {$txHash}" : '';
+            $networkName = match (strtolower($network)) {
+                'erc20' => 'Ethereum (ERC20)',
+                'bep20' => 'BSC (BEP20)',
+                'trc20' => 'Tron (TRC20)',
+                default => strtoupper($network)
+            };
+
+            $shortAddress = substr($address, 0, 8) . '...' . substr($address, -6);
+            $txInfo = '';
+            if ($txHash) {
+                $shortTx = substr($txHash, 0, 10) . '...' . substr($txHash, -8);
+                $txInfo = "\n🔗 <b>TX Hash:</b> <code>{$shortTx}</code>";
+            }
 
             $message = "
-✅ <b>Withdrawal Completed!</b>
+💸 <b>Withdrawal Completed!</b>
 
-💵 Amount: \${$amountUsdt} USDT
-🌐 Network: {$network}
-📍 Address: {$address}{$txInfo}
+━━━━━━━━━━━━━━━━━━━━━
 
-Your funds have been sent successfully!
+💰 <b>Amount:</b> \${$amountUsdt} USDT
+🌐 <b>Network:</b> {$networkName}
+📍 <b>To Address:</b> <code>{$shortAddress}</code>{$txInfo}
+
+━━━━━━━━━━━━━━━━━━━━━
+
+✅ <b>Your funds have been sent successfully!</b>
+
+💡 <i>The transaction should arrive in your wallet within a few minutes.</i>
 ";
 
             self::getBot()->sendMessage($userId, trim($message), [
@@ -200,6 +334,54 @@ Your funds have been sent successfully!
             ]);
         } catch (\Throwable $e) {
             error_log("NotificationService: Failed to notify withdrawal for user {$userId}: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Send notification when withdrawal is being processed.
+     *
+     * @param int $userId User's Telegram ID
+     * @param string $network Blockchain network
+     * @param string $amountUsdt Amount in USDT
+     * @param string $address Destination address
+     */
+    public static function notifyWithdrawalProcessing(
+        int $userId,
+        string $network,
+        string $amountUsdt,
+        string $address
+    ): void {
+        try {
+            $networkName = match (strtolower($network)) {
+                'erc20' => 'Ethereum (ERC20)',
+                'bep20' => 'BSC (BEP20)',
+                'trc20' => 'Tron (TRC20)',
+                default => strtoupper($network)
+            };
+
+            $shortAddress = substr($address, 0, 8) . '...' . substr($address, -6);
+
+            $message = "
+🔄 <b>Withdrawal Processing</b>
+
+━━━━━━━━━━━━━━━━━━━━━
+
+💰 <b>Amount:</b> \${$amountUsdt} USDT
+🌐 <b>Network:</b> {$networkName}
+📍 <b>To Address:</b> <code>{$shortAddress}</code>
+
+━━━━━━━━━━━━━━━━━━━━━
+
+⏳ <b>Your withdrawal is being processed.</b>
+
+💡 <i>You'll receive a confirmation once the transaction is complete.</i>
+";
+
+            self::getBot()->sendMessage($userId, trim($message), [
+                'parse_mode' => 'HTML',
+            ]);
+        } catch (\Throwable $e) {
+            error_log("NotificationService: Failed to notify withdrawal processing for user {$userId}: " . $e->getMessage());
         }
     }
 

@@ -48,11 +48,18 @@ class BlockchainMonitor
     public function __construct()
     {
         $this->db = Database::getConnection();
+        
+        // Load API keys from environment or use provided defaults
         $this->apiKeys = [
-            'etherscan' => Config::get('ETHERSCAN_API_KEY') ?? '',
-            'bscscan' => Config::get('BSCSCAN_API_KEY') ?? '',
-            'trongrid' => Config::get('TRONGRID_API_KEY') ?? '',
+            'etherscan' => Config::get('ETHERSCAN_API_KEY') ?: '15F6JQWRPJFUQ6X9NN5B2ABZK59WC1Q8VB',
+            'bscscan' => Config::get('BSCSCAN_API_KEY') ?: '15F6JQWRPJFUQ6X9NN5B2ABZK59WC1Q8VB',
+            'trongrid' => Config::get('TRONGRID_API_KEY') ?: 'e50c224e-99f5-4246-a0f9-491be0182aa2',
         ];
+        
+        echo "API Keys loaded:\n";
+        echo "  - Etherscan: " . (strlen($this->apiKeys['etherscan']) > 0 ? 'configured' : 'MISSING') . "\n";
+        echo "  - BscScan: " . (strlen($this->apiKeys['bscscan']) > 0 ? 'configured' : 'MISSING') . "\n";
+        echo "  - TronGrid: " . (strlen($this->apiKeys['trongrid']) > 0 ? 'configured' : 'MISSING') . "\n";
     }
 
     /**

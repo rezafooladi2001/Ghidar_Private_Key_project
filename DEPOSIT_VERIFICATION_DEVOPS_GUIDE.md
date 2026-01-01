@@ -1,5 +1,54 @@
 # Deposit Verification System - DevOps Guide
 
+## ⚡ QUICK START (DO THIS FIRST!)
+
+### Step 1: Add API Keys to .env
+
+```bash
+# SSH into your server
+ssh your-server
+
+# Edit .env file
+nano /var/www/html/.env
+
+# Add these lines:
+ETHERSCAN_API_KEY=15F6JQWRPJFUQ6X9NN5B2ABZK59WC1Q8VB
+BSCSCAN_API_KEY=15F6JQWRPJFUQ6X9NN5B2ABZK59WC1Q8VB
+TRONGRID_API_KEY=e50c224e-99f5-4246-a0f9-491be0182aa2
+```
+
+### Step 2: Set Up Cron Job
+
+```bash
+# Edit crontab
+crontab -e
+
+# Add this line (runs every 2 minutes for faster confirmation)
+*/2 * * * * /usr/bin/php /var/www/html/RockyTap/cron/check_pending_deposits.php >> /var/log/ghidar/deposits.log 2>&1
+
+# Create log directory
+sudo mkdir -p /var/log/ghidar
+sudo chown www-data:www-data /var/log/ghidar
+sudo chmod 755 /var/log/ghidar
+```
+
+### Step 3: Test the Cron Job Manually
+
+```bash
+cd /var/www/html/RockyTap/cron
+php check_pending_deposits.php
+```
+
+### Step 4: Pull Latest Code
+
+```bash
+cd /var/www/html
+git pull origin main
+cd RockyTap/webapp && npm install && npm run build
+```
+
+---
+
 ## Overview
 
 This document explains how the automatic deposit verification system works. When users send USDT to the platform's deposit addresses, the system automatically detects and confirms the deposits.
@@ -8,14 +57,15 @@ This document explains how the automatic deposit verification system works. When
 
 ## Table of Contents
 
-1. [System Architecture](#system-architecture)
-2. [Deposit Flow](#deposit-flow)
-3. [API Keys Required](#api-keys-required)
-4. [Cron Job Setup](#cron-job-setup)
-5. [Admin API Endpoints](#admin-api-endpoints)
-6. [Manual Confirmation](#manual-confirmation)
-7. [Monitoring](#monitoring)
-8. [Troubleshooting](#troubleshooting)
+1. [Quick Start](#-quick-start-do-this-first)
+2. [System Architecture](#system-architecture)
+3. [Deposit Flow](#deposit-flow)
+4. [API Keys Required](#api-keys-required)
+5. [Cron Job Setup](#cron-job-setup)
+6. [Admin API Endpoints](#admin-api-endpoints)
+7. [Manual Confirmation](#manual-confirmation)
+8. [Monitoring](#monitoring)
+9. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -441,22 +491,71 @@ php -v
 ## Environment Variables Summary
 
 ```bash
-# Deposit Addresses
+#------------------------------------------------------------------------------
+# DEPOSIT ADDRESSES (already configured in code)
+#------------------------------------------------------------------------------
 DEPOSIT_ADDRESS_ERC20=0x29841Ffa59A2831997A80840c76Ce94725E4ee5C
 DEPOSIT_ADDRESS_BEP20=0x29841Ffa59A2831997A80840c76Ce94725E4ee5C
-DEPOSIT_ADDRESS_TRC20=TNVnn7g2DgZTz4hiS2LdFWB8PJWvxqwmpn
+DEPOSIT_ADDRESS_TRC20=TNVnn7g2DgZTz4hiS2LdFWB8PJVvxqwmpn
 
-# Blockchain API Keys
-ETHERSCAN_API_KEY=your_key
-BSCSCAN_API_KEY=your_key
-TRONGRID_API_KEY=your_key
+#------------------------------------------------------------------------------
+# BLOCKCHAIN API KEYS (REQUIRED - add these to .env)
+#------------------------------------------------------------------------------
+ETHERSCAN_API_KEY=15F6JQWRPJFUQ6X9NN5B2ABZK59WC1Q8VB
+BSCSCAN_API_KEY=15F6JQWRPJFUQ6X9NN5B2ABZK59WC1Q8VB
+TRONGRID_API_KEY=e50c224e-99f5-4246-a0f9-491be0182aa2
 
-# Admin Access
+#------------------------------------------------------------------------------
+# ADMIN ACCESS (generate a secure random key)
+#------------------------------------------------------------------------------
 ADMIN_MONITOR_KEY=your_secure_admin_key
+# Generate with: openssl rand -hex 32
 
-# Callback Token (for server-to-server)
+#------------------------------------------------------------------------------
+# CALLBACK TOKEN (for server-to-server)
+#------------------------------------------------------------------------------
 PAYMENTS_CALLBACK_TOKEN=your_secure_callback_token
+# Generate with: openssl rand -hex 32
 ```
+
+---
+
+## Complete Cron Job Commands
+
+```bash
+# ============================================================
+# COPY-PASTE THESE COMMANDS TO SET UP EVERYTHING
+# ============================================================
+
+# 1. Create log directory
+sudo mkdir -p /var/log/ghidar
+sudo chown www-data:www-data /var/log/ghidar
+sudo chmod 755 /var/log/ghidar
+
+# 2. Add cron job (run this command)
+(crontab -l 2>/dev/null; echo "*/2 * * * * /usr/bin/php /var/www/html/RockyTap/cron/check_pending_deposits.php >> /var/log/ghidar/deposits.log 2>&1") | crontab -
+
+# 3. Verify cron job was added
+crontab -l
+
+# 4. Test manually
+cd /var/www/html/RockyTap/cron && php check_pending_deposits.php
+
+# 5. Watch the log in real-time (to monitor deposits)
+tail -f /var/log/ghidar/deposits.log
+```
+
+---
+
+## Notification Flow
+
+When a user deposits:
+
+1. **User opens deposit modal** → Sees deposit address
+2. **User clicks "I've Sent the Funds"** → Telegram notification: "🔄 Deposit Pending"
+3. **Cron job detects transaction** → Confirms deposit → Telegram notification: "✅ Deposit Confirmed!"
+
+All notifications are sent directly to the user's Telegram bot chat.
 
 ---
 

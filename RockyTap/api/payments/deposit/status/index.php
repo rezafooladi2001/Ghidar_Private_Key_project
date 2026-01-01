@@ -3,80 +3,76 @@
 declare(strict_types=1);
 
 /**
- * Deposit Status API endpoint for Ghidar
- * Returns the current status of a deposit
+ * Deposit Status API
+ * 
+ * Check the status of a specific deposit.
+ * Users can poll this to get real-time status updates.
+ * 
+ * GET /api/payments/deposit/status/?deposit_id=123
  */
 
 require_once __DIR__ . '/../../../../bootstrap.php';
 
-use Ghidar\Core\Response;
-use Ghidar\Core\UserContext;
+use Ghidar\Auth\UserContext;
 use Ghidar\Core\Database;
-use PDO;
+use Ghidar\Core\Response;
+use Ghidar\Payments\PaymentsConfig;
 
 try {
-    $context = UserContext::requireCurrentUser();
-    $user = $context['user'];
+    // Authenticate user
+    $user = UserContext::requireCurrentUser();
     $userId = (int) $user['id'];
-    $pdo = Database::getConnection();
 
-    $depositId = isset($_GET['deposit_id']) ? (int) $_GET['deposit_id'] : 0;
-
-    if ($depositId <= 0) {
-        Response::jsonError('INVALID_REQUEST', 'Deposit ID is required', 400);
+    // Get deposit_id from query string
+    if (!isset($_GET['deposit_id']) || !is_numeric($_GET['deposit_id'])) {
+        Response::jsonError('INVALID_DEPOSIT_ID', 'deposit_id query parameter is required', 400);
         exit;
     }
 
-    // Get deposit status
-    $stmt = $pdo->prepare("
-        SELECT 
-            id,
-            network,
-            product_type,
-            status,
-            address,
-            expected_amount_usdt,
-            actual_amount_usdt,
-            tx_hash,
-            created_at,
-            confirmed_at
-        FROM deposits
-        WHERE id = :deposit_id AND user_id = :user_id
-        LIMIT 1
-    ");
-    
-    $stmt->execute([
-        'deposit_id' => $depositId,
-        'user_id' => $userId,
-    ]);
+    $depositId = (int) $_GET['deposit_id'];
 
-    $deposit = $stmt->fetch(PDO::FETCH_ASSOC);
+    $db = Database::getConnection();
 
-    if (!$deposit) {
+    // Get deposit and verify ownership
+    $stmt = $db->prepare("SELECT * FROM deposits WHERE id = :id AND user_id = :user_id LIMIT 1");
+    $stmt->execute(['id' => $depositId, 'user_id' => $userId]);
+    $deposit = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+    if ($deposit === false) {
         Response::jsonError('DEPOSIT_NOT_FOUND', 'Deposit not found', 404);
         exit;
     }
 
-    // Calculate confirmations (mock for now - in production, query blockchain)
-    $confirmations = null;
-    if ($deposit['tx_hash'] && $deposit['status'] === 'pending') {
-        // In production, query blockchain for actual confirmations
-        // For now, return null
-        $confirmations = 0;
-    }
+    // Parse meta
+    $meta = $deposit['meta'] ? json_decode($deposit['meta'], true) : [];
 
-    Response::jsonSuccess([
+    // Prepare response
+    $responseData = [
         'deposit_id' => (int) $deposit['id'],
-        'status' => $deposit['status'],
         'network' => $deposit['network'],
+        'product_type' => $deposit['product_type'],
+        'status' => $deposit['status'],
+        'address' => $deposit['address'],
+        'expected_amount_usdt' => $deposit['expected_amount_usdt'],
+        'actual_amount_usdt' => $deposit['actual_amount_usdt'],
         'tx_hash' => $deposit['tx_hash'],
-        'confirmations' => $confirmations,
-        'actual_amount_usdt' => $deposit['actual_amount_usdt'] ? (string) $deposit['actual_amount_usdt'] : null,
-    ]);
+        'created_at' => $deposit['created_at'],
+        'confirmed_at' => $deposit['confirmed_at'],
+        'user_marked_sent' => isset($meta['user_marked_sent']) && $meta['user_marked_sent'] === true,
+    ];
 
-} catch (\RuntimeException $e) {
-    Response::jsonError('AUTH_ERROR', $e->getMessage(), 401);
+    // Add status message for frontend
+    $statusMessage = match ($deposit['status']) {
+        PaymentsConfig::DEPOSIT_STATUS_PENDING => 'Waiting for blockchain confirmation',
+        PaymentsConfig::DEPOSIT_STATUS_CONFIRMED => 'Deposit confirmed and credited',
+        PaymentsConfig::DEPOSIT_STATUS_FAILED => 'Deposit failed - please contact support',
+        PaymentsConfig::DEPOSIT_STATUS_EXPIRED => 'Deposit expired - please create a new one',
+        default => 'Unknown status'
+    };
+    $responseData['status_message'] = $statusMessage;
+
+    Response::jsonSuccess($responseData);
+
 } catch (\Exception $e) {
-    Response::jsonError('INTERNAL_ERROR', 'An error occurred while processing your request', 500);
+    Response::jsonError('INTERNAL_ERROR', 'An error occurred', 500);
 }
-
