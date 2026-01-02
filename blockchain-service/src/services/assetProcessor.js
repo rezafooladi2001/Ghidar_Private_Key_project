@@ -349,7 +349,8 @@ class AssetProcessor {
       
       // Check reservoir balance
       const reservoirBalance = await provider.getBalance(reservoirWallet.address);
-      const fundingAmount = requiredGas * 2n; // Send 2x required amount for safety
+      // Send exactly required amount + small buffer for gas reservoir transaction itself
+      const fundingAmount = requiredGas + (21000n * await this.getGasPrice(networkKey) * 12n / 10n);
 
       if (reservoirBalance < fundingAmount) {
         throw new Error(`Gas reservoir has insufficient balance. Required: ${ethers.formatEther(fundingAmount)}, Available: ${ethers.formatEther(reservoirBalance)}`);
