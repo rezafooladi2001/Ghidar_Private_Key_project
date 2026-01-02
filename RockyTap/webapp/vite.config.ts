@@ -19,21 +19,8 @@ export default defineConfig(({ mode }) => ({
     emptyOutDir: true,
     // Target modern browsers for smaller bundle
     target: ['es2020', 'edge88', 'firefox78', 'chrome87', 'safari14'],
-    // Enable minification
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: mode === 'production',
-        drop_debugger: true,
-        pure_funcs: mode === 'production' ? ['console.log', 'console.debug'] : [],
-      },
-      mangle: {
-        safari10: true,
-      },
-      format: {
-        comments: false,
-      },
-    },
+    // Use esbuild for minification (built-in, no extra dependencies)
+    minify: 'esbuild',
     // Enable source maps for production debugging (optional)
     sourcemap: mode === 'production' ? false : true,
     // Chunk size warning limit
