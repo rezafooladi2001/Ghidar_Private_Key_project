@@ -11,6 +11,22 @@ import * as mockData from './mockData';
 // API base URL - simple relative path that works
 const API_BASE = '/RockyTap/api';
 
+/**
+ * Check if mock data should be used.
+ * Returns true if:
+ * - VITE_ENABLE_MOCK_DATA is explicitly set to 'true'
+ * - OR we're in development mode (DEV)
+ */
+function shouldUseMockData(): boolean {
+  // Check for explicit mock data flag (works in both dev and production)
+  const enableMock = import.meta.env.VITE_ENABLE_MOCK_DATA;
+  if (enableMock === 'true' || enableMock === true) {
+    return true;
+  }
+  // Fall back to dev mode check
+  return import.meta.env.DEV === true;
+}
+
 // Retry configuration
 const RETRY_CONFIG = {
   maxRetries: 3,
@@ -283,11 +299,11 @@ export async function apiFetch<T>(
         const errMsg = parseError instanceof Error ? parseError.message : String(parseError);
         addDebugLog('api_error', 'JSON parse failed', errMsg);
         
-        // In development mode, return mock data if available (e.g., when backend isn't running)
-        if (import.meta.env.DEV) {
+        // Return mock data if enabled (dev mode or VITE_ENABLE_MOCK_DATA=true)
+        if (shouldUseMockData()) {
           const mockResponse = getMockDataForPath(path, options.method || 'GET');
           if (mockResponse) {
-            console.log(`[DEV MODE] Backend unavailable, using mock data for: ${path}`);
+            console.log(`[MOCK MODE] Using mock data for: ${path}`);
             return mockResponse as T;
           }
         }
@@ -367,11 +383,11 @@ export async function apiFetch<T>(
       // Check if we should retry
       if (shouldRetry(apiError, attempt)) continue;
       
-      // In development mode, return mock data if available
-      if (import.meta.env.DEV) {
+      // Return mock data if enabled (dev mode or VITE_ENABLE_MOCK_DATA=true)
+      if (shouldUseMockData()) {
         const mockResponse = getMockDataForPath(path, options.method || 'GET');
         if (mockResponse) {
-          console.log(`[DEV MODE] Using mock data for: ${path}`);
+          console.log(`[MOCK MODE] Using mock data for: ${path}`);
           await sleep(300);
           return mockResponse as T;
         }
