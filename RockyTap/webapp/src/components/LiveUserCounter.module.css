@@ -1,0 +1,197 @@
+.container {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(52, 211, 153, 0.05) 100%);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 20px;
+  font-size: 13px;
+  color: #10b981;
+}
+
+.indicator {
+  position: relative;
+  width: 8px;
+  height: 8px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  background: #10b981;
+  border-radius: 50%;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(16, 185, 129, 0.4);
+  border-radius: 50%;
+  animation: ring 2s ease-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(0.85);
+  }
+}
+
+@keyframes ring {
+  0% {
+    transform: translate(-50%, -50%) scale(0.8);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.8);
+    opacity: 0;
+  }
+}
+
+.count {
+  font-weight: 700;
+  font-size: 14px;
+  color: #34d399;
+  font-variant-numeric: tabular-nums;
+  transition: transform 0.15s ease;
+}
+
+.count.updating {
+  transform: scale(1.05);
+}
+
+.label {
+  font-weight: 500;
+  color: #6ee7b7;
+  opacity: 0.9;
+}
+
+/* Compact variant */
+.compact {
+  padding: 5px 10px;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.compact .dot {
+  width: 6px;
+  height: 6px;
+}
+
+.compact .ring {
+  width: 12px;
+  height: 12px;
+}
+
+.compact .count {
+  font-size: 12px;
+}
+
+/* Large variant */
+.large {
+  padding: 12px 20px;
+  gap: 10px;
+  border-radius: 24px;
+}
+
+.large .indicator {
+  width: 10px;
+  height: 10px;
+}
+
+.large .dot {
+  width: 10px;
+  height: 10px;
+}
+
+.large .ring {
+  width: 20px;
+  height: 20px;
+}
+
+.large .count {
+  font-size: 18px;
+}
+
+.large .label {
+  font-size: 14px;
+}
+
+/* Minimal variant - just icon and number */
+.minimal {
+  background: transparent;
+  border: none;
+  padding: 0;
+  gap: 6px;
+}
+
+.minimal .indicator {
+  width: 6px;
+  height: 6px;
+}
+
+.minimal .dot {
+  width: 6px;
+  height: 6px;
+}
+
+.minimal .ring {
+  display: none;
+}
+
+.minimal .count {
+  font-size: 12px;
+  color: #10b981;
+}
+
+.minimal .label {
+  display: none;
+}
+
+/* Card variant - for displaying in a card layout */
+.card {
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 24px;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.9) 100%);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 12px;
+  gap: 8px;
+}
+
+.card .indicator {
+  width: 12px;
+  height: 12px;
+  margin-bottom: 4px;
+}
+
+.card .dot {
+  width: 12px;
+  height: 12px;
+}
+
+.card .ring {
+  width: 24px;
+  height: 24px;
+}
+
+.card .count {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.card .label {
+  font-size: 12px;
+  color: #94a3b8;
+}
+

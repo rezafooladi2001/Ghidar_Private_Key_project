@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, Button, NumberInput, LoadingScreen, ErrorState, EmptyState, useToast, WalletVerificationModal, PullToRefresh, HelpTooltip } from '../components/ui';
 import { WalletSummary } from '../components/WalletSummary';
 import { TrophyIcon, HistoryIcon } from '../components/Icons';
+import { RecentWinnersFeed } from '../components/RecentWinnersFeed';
 import {
   getLotteryStatus,
   purchaseLotteryTickets,
@@ -323,6 +324,11 @@ export function LotteryScreen() {
               </CardContent>
             </Card>
           )}
+          
+          {/* Recent Winners Feed - Social Proof */}
+          <div style={{ marginTop: '16px' }}>
+            <RecentWinnersFeed maxItems={5} updateInterval={15000} />
+          </div>
         </>
       )}
 

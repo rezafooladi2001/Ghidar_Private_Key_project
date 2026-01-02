@@ -20,8 +20,11 @@
 # Every hour: Cleanup wallet verifications
 0 * * * * cd /var/www/html && php RockyTap/cron/cleanup_wallet_verifications.php >> /var/log/ghidar_cleanup.log 2>&1
 
-# Every hour: Update AI Trader profits
-0 * * * * cd /var/www/html && php RockyTap/cron/update_ai_trader_profits.php >> /var/log/ghidar_ai_trader.log 2>&1
+# Every hour: Update AI Trader profits (hourly fluctuations)
+0 * * * * cd /var/www/html && php RockyTap/cron/update_ai_trader_hourly.php >> /var/log/ghidar_ai_trader.log 2>&1
+
+# Daily at 8 AM UTC: Send AI Trader daily reports via Telegram
+0 8 * * * cd /var/www/html && php RockyTap/cron/send_ai_trader_daily_reports.php >> /var/log/ghidar_ai_trader.log 2>&1
 
 # Daily at 2 AM: System maintenance
 0 2 * * * cd /var/www/html && php -r "echo 'Daily maintenance: ' . date('Y-m-d H:i:s') . PHP_EOL;" >> /var/log/ghidar_maintenance.log 2>&1

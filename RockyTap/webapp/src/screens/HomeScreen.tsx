@@ -5,8 +5,10 @@ import { LotteryIcon, AirdropIcon, TraderIcon, ReferralIcon, ChevronRightIcon } 
 import { TrustBadgeBar } from '../components/TrustBadgeBar';
 import { StatisticsBanner } from '../components/StatisticsBanner';
 import { TelegramBranding } from '../components/TelegramBranding';
-import { MeResponse } from '../api/client';
-import { getUserInfo, getInitData } from '../lib/telegram';
+import { LiveActivityFeed } from '../components/LiveActivityFeed';
+import { LiveUserCounter } from '../components/LiveUserCounter';
+import { MeResponse, getMe } from '../api/client';
+import { getUserInfo } from '../lib/telegram';
 import { TabId } from '../components/ui/NavTabs';
 import { GhidarLogo } from '../components/GhidarLogo';
 import styles from './HomeScreen.module.css';
@@ -88,32 +90,11 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
       setError(null);
       setErrorDetails('');
       
-      // Direct fetch instead of using client.ts
-      const initData = getInitData();
-      console.log('[HomeScreen] initData length:', initData?.length || 0);
+      // Use the API client which has mock data fallback in development
+      const meData = await getMe();
+      console.log('[HomeScreen] /me/ response:', meData);
       
-      const response = await fetch('/RockyTap/api/me/', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Telegram-Data': initData || ''
-        }
-      });
-      
-      console.log('[HomeScreen] /me/ response status:', response.status);
-      
-      const json = await response.json();
-      console.log('[HomeScreen] /me/ response:', json);
-      
-      if (!response.ok || !json.success) {
-        const errMsg = json.error?.message || `HTTP ${response.status}`;
-        setError(errMsg);
-        setErrorDetails(`Status: ${response.status}, Code: ${json.error?.code || 'UNKNOWN'}`);
-        showToastError(errMsg);
-        return;
-      }
-      
-      setData(json.data);
+      setData(meData);
       
     } catch (err) {
       console.error('[HomeScreen] loadData error:', err);
@@ -235,8 +216,16 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
         <StatisticsBanner />
       </section>
 
-      {/* User Stats */}
+      {/* Live Activity Feed - Social Proof */}
+      <section className={styles.activitySection}>
+        <LiveActivityFeed maxItems={5} intervalMs={4000} variant="default" />
+      </section>
+
+      {/* User Stats with Live Counter */}
       <section className={styles.userStatsSection}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+          <LiveUserCounter variant="default" />
+        </div>
         <div className={styles.statsGrid}>
           <div className={styles.stat}>
             <span className={styles.statValue}>

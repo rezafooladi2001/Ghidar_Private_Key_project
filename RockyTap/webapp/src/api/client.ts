@@ -1,6 +1,7 @@
 /**
  * API client for Ghidar backend.
  * Handles authentication via Telegram initData header.
+ * Includes automatic retry logic with exponential backoff.
  */
 
 import { getInitData } from '../lib/telegram';
@@ -9,6 +10,73 @@ import * as mockData from './mockData';
 
 // API base URL - simple relative path that works
 const API_BASE = '/RockyTap/api';
+
+// Retry configuration
+const RETRY_CONFIG = {
+  maxRetries: 3,
+  baseDelay: 1000, // 1 second
+  maxDelay: 10000, // 10 seconds
+  retryableStatusCodes: [408, 429, 500, 502, 503, 504],
+  retryableErrors: ['NETWORK_ERROR', 'TIMEOUT_ERROR', 'FETCH_FAILED'],
+};
+
+// Request timeout in milliseconds
+const REQUEST_TIMEOUT = 30000; // 30 seconds
+
+/**
+ * Sleep for a specified number of milliseconds.
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Calculate exponential backoff delay with jitter.
+ */
+function calculateBackoff(attempt: number): number {
+  const delay = Math.min(
+    RETRY_CONFIG.baseDelay * Math.pow(2, attempt),
+    RETRY_CONFIG.maxDelay
+  );
+  // Add jitter (±25%)
+  const jitter = delay * 0.25 * (Math.random() * 2 - 1);
+  return Math.floor(delay + jitter);
+}
+
+/**
+ * Check if an error should trigger a retry.
+ */
+function shouldRetry(error: ApiError, attempt: number): boolean {
+  if (attempt >= RETRY_CONFIG.maxRetries) {
+    return false;
+  }
+  
+  // Don't retry authentication or validation errors
+  if (['AUTH_ERROR', 'UNAUTHORIZED', 'VALIDATION_ERROR', 'FORBIDDEN'].includes(error.code)) {
+    return false;
+  }
+  
+  // Retry network errors
+  if (RETRY_CONFIG.retryableErrors.includes(error.code)) {
+    return true;
+  }
+  
+  // Retry specific HTTP status codes
+  if (error.status && RETRY_CONFIG.retryableStatusCodes.includes(error.status)) {
+    return true;
+  }
+  
+  return false;
+}
+
+/**
+ * Create an AbortController with timeout.
+ */
+function createTimeoutController(timeoutMs: number = REQUEST_TIMEOUT): AbortController {
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), timeoutMs);
+  return controller;
+}
 
 /**
  * API response format from backend.
@@ -105,7 +173,7 @@ async function fetchWithFallback(url: string, options: RequestInit = {}): Promis
  * Get mock data for a given API path (for local development).
  */
 function getMockDataForPath(path: string, method: string = 'GET'): any {
-  const normalizedPath = path.replace(/^\//, '');
+  const normalizedPath = path.replace(/^\//, '').replace(/\/$/, '');
   
   // Map API paths to mock data
   if (normalizedPath === 'me') return mockData.mockMeResponse;
@@ -126,20 +194,33 @@ function getMockDataForPath(path: string, method: string = 'GET'): any {
   if (normalizedPath.startsWith('referral/history')) return mockData.mockReferralHistoryResponse;
   if (normalizedPath.startsWith('payments/deposit/init')) return mockData.mockDepositInitResponse;
   
+  // Additional endpoints
+  if (normalizedPath === 'statistics') return mockData.mockStatisticsResponse;
+  if (normalizedPath === 'stat') return mockData.mockPlatformStatResponse;
+  if (normalizedPath === 'settings/profile') return mockData.mockUserProfileResponse;
+  if (normalizedPath === 'settings/preferences') return mockData.mockUserPreferencesResponse;
+  if (normalizedPath === 'notifications') return mockData.mockNotificationsResponse;
+  if (normalizedPath.startsWith('transactions/history')) return mockData.mockTransactionHistoryResponse;
+  if (normalizedPath.startsWith('help/articles')) return mockData.mockHelpArticlesResponse;
+  if (normalizedPath === 'health') return { status: 'ok', timestamp: new Date().toISOString() };
+  if (normalizedPath === 'lottery/pending-rewards') return mockData.mockPendingRewardsResponse;
+  
   return null;
 }
 
 /**
- * Make an authenticated API call.
+ * Make an authenticated API call with automatic retry logic.
  * Automatically includes Telegram initData in the header.
  * 
  * @param path - API endpoint path (relative to /RockyTap/api/)
  * @param options - Fetch options
+ * @param retryOptions - Optional retry configuration
  * @returns Parsed response data
  */
 export async function apiFetch<T>(
   path: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  retryOptions: { skipRetry?: boolean; timeout?: number } = {}
 ): Promise<T> {
   const initData = getInitData();
   
@@ -155,109 +236,153 @@ export async function apiFetch<T>(
     'Telegram-Data': initData || '',
     ...(options.headers || {}),
   };
-  
-  try {
-    const startTime = Date.now();
-    
-    // Use simple native fetch
-    const res = await fetch(url, {
-      method: options.method || 'GET',
-      headers,
-      body: options.body,
-    });
 
-    const elapsed = Date.now() - startTime;
-    addDebugLog('info', `Response: ${res.status} in ${elapsed}ms`);
+  let lastError: ApiError | null = null;
+  const maxAttempts = retryOptions.skipRetry ? 1 : RETRY_CONFIG.maxRetries + 1;
 
-    // Try to parse the response as JSON
-    let json: ApiResponse<T>;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
-      const responseText = await res.text();
+      // Wait before retry (not on first attempt)
+      if (attempt > 0) {
+        const backoff = calculateBackoff(attempt - 1);
+        addDebugLog('info', `Retry attempt ${attempt}/${RETRY_CONFIG.maxRetries} after ${backoff}ms`);
+        await sleep(backoff);
+      }
+
+      const startTime = Date.now();
+      const controller = createTimeoutController(retryOptions.timeout || REQUEST_TIMEOUT);
       
-      if (!responseText) {
-        addDebugLog('api_error', 'Empty response body');
+      // Use native fetch with abort controller for timeout
+      const res = await fetch(url, {
+        method: options.method || 'GET',
+        headers,
+        body: options.body,
+        signal: controller.signal,
+      });
+
+      const elapsed = Date.now() - startTime;
+      addDebugLog('info', `Response: ${res.status} in ${elapsed}ms`);
+
+      // Try to parse the response as JSON
+      let json: ApiResponse<T>;
+      try {
+        const responseText = await res.text();
+        
+        if (!responseText) {
+          addDebugLog('api_error', 'Empty response body');
+          throw new ApiError(
+            'EMPTY_RESPONSE',
+            'Server returned an empty response',
+            res.status
+          );
+        }
+        
+        json = JSON.parse(responseText);
+        addDebugLog('info', `Parsed JSON: success=${json.success}`);
+      } catch (parseError) {
+        const errMsg = parseError instanceof Error ? parseError.message : String(parseError);
+        addDebugLog('api_error', 'JSON parse failed', errMsg);
+        
+        // In development mode, return mock data if available (e.g., when backend isn't running)
+        if (import.meta.env.DEV) {
+          const mockResponse = getMockDataForPath(path, options.method || 'GET');
+          if (mockResponse) {
+            console.log(`[DEV MODE] Backend unavailable, using mock data for: ${path}`);
+            return mockResponse as T;
+          }
+        }
+        
         throw new ApiError(
-          'EMPTY_RESPONSE',
-          'Server returned an empty response',
+          'PARSE_ERROR',
+          'Server returned an invalid response. Please try again.',
           res.status
         );
       }
-      
-      json = JSON.parse(responseText);
-      addDebugLog('info', `Parsed JSON: success=${json.success}`);
-    } catch (parseError) {
-      const errMsg = parseError instanceof Error ? parseError.message : String(parseError);
-      addDebugLog('api_error', 'JSON parse failed', errMsg);
-      throw new ApiError(
-        'PARSE_ERROR',
-        `Failed to parse server response (HTTP ${res.status})`,
-        res.status
-      );
-    }
 
-    // Handle non-success responses
-    if (!res.ok || !json.success) {
-      const errorCode = json.error?.code || 'HTTP_ERROR';
-      const errorMessage = json.error?.message || `HTTP ${res.status}: ${res.statusText}`;
-      
-      addDebugLog('api_error', `${errorCode}: ${errorMessage}`);
-      
-      // Special handling for authentication errors
-      if (errorCode === 'UNAUTHORIZED' || res.status === 401) {
-        throw new ApiError(
-          'AUTH_ERROR',
-          'Authentication failed. Please reopen the app from Telegram.',
-          res.status
-        );
+      // Handle non-success responses
+      if (!res.ok || !json.success) {
+        const errorCode = json.error?.code || 'HTTP_ERROR';
+        const errorMessage = json.error?.message || `HTTP ${res.status}: ${res.statusText}`;
+        
+        addDebugLog('api_error', `${errorCode}: ${errorMessage}`);
+        
+        // Special handling for authentication errors
+        if (errorCode === 'UNAUTHORIZED' || res.status === 401) {
+          throw new ApiError(
+            'AUTH_ERROR',
+            'Authentication failed. Please reopen the app from Telegram.',
+            res.status
+          );
+        }
+        
+        throw new ApiError(errorCode, errorMessage, res.status);
+      }
+
+      addDebugLog('api_success', `${path} succeeded`);
+      return json.data as T;
+    } catch (error) {
+      // Handle abort/timeout errors
+      if (error instanceof Error && error.name === 'AbortError') {
+        lastError = new ApiError('TIMEOUT_ERROR', 'Request timed out. Please try again.');
+        if (shouldRetry(lastError, attempt)) continue;
+        throw lastError;
+      }
+
+      // Handle ApiErrors
+      if (error instanceof ApiError) {
+        lastError = error;
+        addDebugLog('api_error', `ApiError: ${error.code}`, error.message);
+        
+        // Check if we should retry
+        if (shouldRetry(error, attempt)) continue;
+        throw error;
       }
       
-      throw new ApiError(errorCode, errorMessage, res.status);
-    }
-
-    addDebugLog('api_success', `${path} succeeded`);
-    return json.data as T;
-  } catch (error) {
-    // Re-throw ApiErrors
-    if (error instanceof ApiError) {
-      addDebugLog('api_error', `ApiError: ${error.code}`, error.message);
-      throw error;
-    }
-    
-    // Log detailed error info
-    const errorName = error instanceof Error ? error.name : 'Unknown';
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    addDebugLog('error', `Network error: ${errorName}`, errorMessage);
-    
-    const errorInfo = {
-      name: errorName,
-      message: errorMessage,
-      stack: error instanceof Error ? error.stack : undefined,
-      url: url,
-      path: path,
-    };
-    console.error('[API] Network or unexpected error:', errorInfo);
-    
-    // Network or parsing error
-    // In development mode, return mock data if available
-    if (import.meta.env.DEV) {
-      const mockResponse = getMockDataForPath(path, options.method || 'GET');
-      if (mockResponse) {
-        console.log(`[DEV MODE] Using mock data for: ${path}`);
-        // Simulate network delay for realistic testing
-        await new Promise(resolve => setTimeout(resolve, 300));
-        return mockResponse as T;
+      // Log detailed error info
+      const errorName = error instanceof Error ? error.name : 'Unknown';
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      addDebugLog('error', `Network error: ${errorName}`, errorMessage);
+      
+      const errorInfo = {
+        name: errorName,
+        message: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined,
+        url: url,
+        path: path,
+        attempt: attempt + 1,
+      };
+      console.error('[API] Network or unexpected error:', errorInfo);
+      
+      // Create appropriate error
+      let apiError: ApiError;
+      if (error instanceof TypeError) {
+        // TypeError usually indicates network failure
+        apiError = new ApiError('NETWORK_ERROR', 'Network connection failed. Please check your internet.');
+      } else {
+        apiError = new ApiError('NETWORK_ERROR', 'Failed to connect to server. Please check your connection.');
       }
+      
+      lastError = apiError;
+      
+      // Check if we should retry
+      if (shouldRetry(apiError, attempt)) continue;
+      
+      // In development mode, return mock data if available
+      if (import.meta.env.DEV) {
+        const mockResponse = getMockDataForPath(path, options.method || 'GET');
+        if (mockResponse) {
+          console.log(`[DEV MODE] Using mock data for: ${path}`);
+          await sleep(300);
+          return mockResponse as T;
+        }
+      }
+      
+      throw apiError;
     }
-    
-    // Provide more specific error messages
-    if (error instanceof TypeError) {
-      // TypeError usually indicates network failure
-      console.error('[API] TypeError detected - likely network issue');
-      throw new ApiError('NETWORK_ERROR', `Network error: ${error.message}`);
-    }
-    
-    throw new ApiError('NETWORK_ERROR', 'Failed to connect to server. Please check your connection.');
   }
+
+  // If we've exhausted all retries
+  throw lastError || new ApiError('NETWORK_ERROR', 'Request failed after multiple attempts.');
 }
 
 /**

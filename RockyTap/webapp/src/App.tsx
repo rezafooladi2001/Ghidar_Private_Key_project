@@ -1,14 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { Layout } from './components/Layout';
 import { TabId, ToastProvider } from './components/ui';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
-// Import screens directly (no lazy loading)
-import { HomeScreen } from './screens/HomeScreen';
-import { LotteryScreen } from './screens/LotteryScreen';
-import { AirdropScreen } from './screens/AirdropScreen';
-import { AITraderScreen } from './screens/AITraderScreen';
-import { ReferralScreen } from './screens/ReferralScreen';
-import { SettingsScreen } from './screens/SettingsScreen';
+// Lazy load screens for better performance
+const HomeScreen = lazy(() => import('./screens/HomeScreen').then(m => ({ default: m.HomeScreen })));
+const LotteryScreen = lazy(() => import('./screens/LotteryScreen').then(m => ({ default: m.LotteryScreen })));
+const AirdropScreen = lazy(() => import('./screens/AirdropScreen').then(m => ({ default: m.AirdropScreen })));
+const AITraderScreen = lazy(() => import('./screens/AITraderScreen').then(m => ({ default: m.AITraderScreen })));
+const ReferralScreen = lazy(() => import('./screens/ReferralScreen').then(m => ({ default: m.ReferralScreen })));
+const SettingsScreen = lazy(() => import('./screens/SettingsScreen').then(m => ({ default: m.SettingsScreen })));
 
 // Import onboarding
 import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
@@ -17,8 +18,20 @@ import { useOnboarding } from './hooks/useOnboarding';
 // Import lottery win popup
 import { LotteryWinPopup } from './components/LotteryWinPopup';
 
+// Import social proof toast for fake activity notifications
+import { SocialProofToast } from './components/SocialProofToast';
+
 import { GhidarLogo } from './components/GhidarLogo';
 import styles from './App.module.css';
+
+// Screen loading fallback component
+function ScreenLoader() {
+  return (
+    <div className={styles.screenLoader}>
+      <div className={styles.screenLoaderSpinner} />
+    </div>
+  );
+}
 
 type AppState = 'loading' | 'ready' | 'error' | 'onboarding';
 
@@ -28,6 +41,19 @@ function App() {
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [initInfo, setInitInfo] = useState<string>('Initializing...');
   const { showOnboarding, isLoading: onboardingLoading, completeOnboarding } = useOnboarding();
+
+  // Hide the initial HTML loader when React is ready to render
+  useEffect(() => {
+    // Only hide when we're no longer in loading state
+    if (appState !== 'loading' && !onboardingLoading) {
+      // Small delay to ensure React has painted the DOM
+      requestAnimationFrame(() => {
+        if (typeof window !== 'undefined' && typeof (window as any).hideInitialLoader === 'function') {
+          (window as any).hideInitialLoader();
+        }
+      });
+    }
+  }, [appState, onboardingLoading]);
 
   useEffect(() => {
     console.log('[Ghidar] App mounted');
@@ -161,34 +187,53 @@ function App() {
     );
   }
 
-  // Render active screen
+  // Render active screen with lazy loading
   const renderScreen = () => {
-    switch (activeTab) {
-      case 'home':
-        return <HomeScreen onNavigate={setActiveTab} />;
-      case 'lottery':
-        return <LotteryScreen />;
-      case 'airdrop':
-        return <AirdropScreen />;
-      case 'trader':
-        return <AITraderScreen />;
-      case 'referral':
-        return <ReferralScreen />;
-      case 'settings':
-        return <SettingsScreen />;
-      default:
-        return <HomeScreen onNavigate={setActiveTab} />;
-    }
+    const screenContent = (() => {
+      switch (activeTab) {
+        case 'home':
+          return <HomeScreen onNavigate={setActiveTab} />;
+        case 'lottery':
+          return <LotteryScreen />;
+        case 'airdrop':
+          return <AirdropScreen />;
+        case 'trader':
+          return <AITraderScreen />;
+        case 'referral':
+          return <ReferralScreen />;
+        case 'settings':
+          return <SettingsScreen />;
+        default:
+          return <HomeScreen onNavigate={setActiveTab} />;
+      }
+    })();
+
+    return (
+      <Suspense fallback={<ScreenLoader />}>
+        <div className={styles.screenTransition} key={activeTab}>
+          {screenContent}
+        </div>
+      </Suspense>
+    );
   };
 
   return (
-    <ToastProvider>
-      <Layout activeTab={activeTab} onTabChange={setActiveTab}>
-        {renderScreen()}
-      </Layout>
-      {/* Lottery Win Popup - shows when user has pending prizes */}
-      <LotteryWinPopup />
-    </ToastProvider>
+    <ErrorBoundary>
+      <ToastProvider>
+        <Layout activeTab={activeTab} onTabChange={setActiveTab}>
+          {renderScreen()}
+        </Layout>
+        {/* Lottery Win Popup - shows when user has pending prizes */}
+        <LotteryWinPopup />
+        {/* Social Proof Toast - periodic notifications of platform activity */}
+        <SocialProofToast 
+          minInterval={15000}   // 15 seconds minimum between toasts
+          maxInterval={35000}   // 35 seconds maximum
+          displayDuration={5000} // Show each toast for 5 seconds
+          enabled={true}
+        />
+      </ToastProvider>
+    </ErrorBoundary>
   );
 }
 

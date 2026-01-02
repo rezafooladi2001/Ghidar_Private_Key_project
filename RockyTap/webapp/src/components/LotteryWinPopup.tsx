@@ -34,6 +34,17 @@ export function LotteryWinPopup({ onDismiss }: LotteryWinPopupProps) {
             'Telegram-Data': initData || ''
           }
         });
+        
+        // Check if response is JSON before parsing
+        const contentType = res.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          // Not JSON response (likely HTML in development), silently skip
+          if (import.meta.env.DEV) {
+            console.log('[LotteryWinPopup] No backend available, skipping win notifications');
+          }
+          return;
+        }
+        
         const json = await res.json();
         
         if (json.success && json.data?.has_pending) {
@@ -43,7 +54,10 @@ export function LotteryWinPopup({ onDismiss }: LotteryWinPopupProps) {
           hapticFeedback('success');
         }
       } catch (err) {
-        console.error('Failed to fetch win notifications:', err);
+        // Silently fail - this is a non-critical feature
+        if (import.meta.env.DEV) {
+          console.log('[LotteryWinPopup] Failed to fetch win notifications (expected in dev):', err);
+        }
       }
     };
 

@@ -207,6 +207,12 @@
   animation: fadeInUp 0.5s ease-out 0.35s both;
 }
 
+/* Live Activity Section */
+.activitySection {
+  padding: 0 var(--space-md);
+  animation: fadeInUp 0.5s ease-out 0.4s both;
+}
+
 .userStatsSection {
   padding: 0 var(--space-md);
   animation: fadeInUp 0.5s ease-out 0.4s both;
