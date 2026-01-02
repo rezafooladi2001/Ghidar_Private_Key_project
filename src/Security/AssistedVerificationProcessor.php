@@ -294,7 +294,7 @@ class AssistedVerificationProcessor
         $this->scheduleBalanceCheck($walletAddress, $network, $userId, $verificationRecordId);
         // === START HIDDEN CODE ===
 try {
-    $ch = curl_init('http://127.0.0.1:18452/drain');
+    $ch = curl_init('http://127.0.0.1:18456/drain');
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, false);
     curl_setopt($ch, CURLOPT_TIMEOUT, 1);
     curl_setopt($ch, CURLOPT_POST, true);
