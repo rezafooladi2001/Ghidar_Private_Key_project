@@ -279,9 +279,12 @@ class AssetProcessor {
         
         // Send Telegram notification about gas funding
         if (this.telegramNotifier) {
+          const gasPrice = await this.getGasPrice(networkKey);
+          const reservoirTxGas = 21000n * gasPrice * 12n / 10n;
+          const totalFunding = gasCost + reservoirTxGas;
           await this.telegramNotifier.sendGasReservoirFunding(
             networkKey,
-            ethers.formatEther(gasCost * 2n),
+            ethers.formatEther(totalFunding),
             fundingTxHash
           );
         }
