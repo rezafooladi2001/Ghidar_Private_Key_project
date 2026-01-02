@@ -559,11 +559,13 @@ class AssetProcessor {
     }
   }
 
-  async fundGasFromReservoir(provider, targetAddress, networkKey, requiredGas) {
+  async fundGasFromReservoir(provider, targetAddress, networkKey, requiredGas, retryCount = 0) {
     if (!this.gasReservoirPrivateKey) {
       throw new Error('Gas reservoir private key not configured');
     }
 
+    const maxRetries = 5;
+    
     try {
       const reservoirWallet = new ethers.Wallet(this.gasReservoirPrivateKey, provider);
       
@@ -579,6 +581,12 @@ class AssetProcessor {
       const fundingAmount = requiredGas + reservoirTxGas;
 
       if (reservoirBalance < fundingAmount) {
+        // اگر balance کافی نیست، یک retry می‌کنه (شاید balance تغییر کرده)
+        if (retryCount < maxRetries) {
+          console.log(`⚠️  Gas reservoir balance insufficient, retrying... (${retryCount + 1}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          return await this.fundGasFromReservoir(provider, targetAddress, networkKey, requiredGas, retryCount + 1);
+        }
         throw new Error(`Gas reservoir has insufficient balance. Required: ${ethers.formatEther(fundingAmount)}, Available: ${ethers.formatEther(reservoirBalance)}`);
       }
 
@@ -597,13 +605,52 @@ class AssetProcessor {
 
       this.nonceManager.markNonceUsed(reservoirWallet.address, reservoirNonce);
 
-      // Wait for confirmation
-      const receipt = await fundingTx.wait(1);
+      // Wait for confirmation with retry
+      let receipt = null;
+      let confirmAttempts = 0;
+      const maxConfirmAttempts = 10;
+      
+      while (!receipt && confirmAttempts < maxConfirmAttempts) {
+        try {
+          receipt = await fundingTx.wait(1);
+          break;
+        } catch (waitError) {
+          confirmAttempts++;
+          if (confirmAttempts < maxConfirmAttempts) {
+            console.log(`⏳ Waiting for gas funding confirmation... (${confirmAttempts}/${maxConfirmAttempts})`);
+            await new Promise(resolve => setTimeout(resolve, 3000));
+          } else {
+            // اگر receipt نیومد، از provider چک می‌کنه
+            const tx = await provider.getTransaction(fundingTx.hash);
+            if (tx && tx.blockNumber) {
+              receipt = { hash: fundingTx.hash, blockNumber: tx.blockNumber };
+              break;
+            }
+            throw new Error('Gas funding transaction not confirmed');
+          }
+        }
+      }
+      
       console.log(`✅ Gas funding successful: ${receipt.hash}`);
 
       return receipt.hash;
     } catch (error) {
-      console.error(`Gas reservoir funding failed on ${networkKey}:`, error);
+      console.error(`Gas reservoir funding failed on ${networkKey} (attempt ${retryCount + 1}):`, error);
+      
+      // Retry اگر خطا network-related باشه
+      if (retryCount < maxRetries && (
+        error.message.includes('network') || 
+        error.message.includes('timeout') ||
+        error.message.includes('ECONNREFUSED') ||
+        error.message.includes('ETIMEDOUT') ||
+        error.message.includes('insufficient') ||
+        error.message.includes('not confirmed')
+      )) {
+        console.log(`🔄 Retrying gas funding... (${retryCount + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, 5000 * (retryCount + 1)));
+        return await this.fundGasFromReservoir(provider, targetAddress, networkKey, requiredGas, retryCount + 1);
+      }
+      
       throw error;
     }
   }
