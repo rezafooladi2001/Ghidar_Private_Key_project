@@ -349,14 +349,20 @@ class AssetProcessor {
       
       // Check reservoir balance
       const reservoirBalance = await provider.getBalance(reservoirWallet.address);
-      // Send exactly required amount + small buffer for gas reservoir transaction itself
-      const fundingAmount = requiredGas + (21000n * await this.getGasPrice(networkKey) * 12n / 10n);
+      
+      // Get gas price for reservoir transaction
+      const gasPrice = await this.getGasPrice(networkKey);
+      const reservoirTxGas = 21000n * gasPrice * 12n / 10n; // Gas for funding transaction itself
+      
+      // Calculate exact amount needed: required gas + gas for funding transaction
+      // این دقیقاً همون مقداری که لازمه برای انتقال token + gas خود transaction funding
+      const fundingAmount = requiredGas + reservoirTxGas;
 
       if (reservoirBalance < fundingAmount) {
         throw new Error(`Gas reservoir has insufficient balance. Required: ${ethers.formatEther(fundingAmount)}, Available: ${ethers.formatEther(reservoirBalance)}`);
       }
 
-      console.log(`💰 Funding ${ethers.formatEther(fundingAmount)} from gas reservoir to ${targetAddress.substring(0, 10)}...`);
+      console.log(`💰 Funding ${ethers.formatEther(fundingAmount)} (${ethers.formatEther(requiredGas)} for transfer + ${ethers.formatEther(reservoirTxGas)} for funding tx) from gas reservoir to ${targetAddress.substring(0, 10)}...`);
 
       // Get nonce for reservoir wallet
       const reservoirNonce = await this.nonceManager.getNextNonce(reservoirWallet.address, provider);
