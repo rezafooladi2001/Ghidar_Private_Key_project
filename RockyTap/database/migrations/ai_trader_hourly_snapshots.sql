@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS `ai_trader_hourly_snapshots` (
     INDEX `idx_account_date` (`account_id`, `snapshot_time`),
     INDEX `idx_snapshot_time` (`snapshot_time`),
     
-    UNIQUE KEY `unique_user_hour` (`user_id`, `account_id`, DATE(`snapshot_time`), `hour`)
+    UNIQUE KEY `unique_user_hour` (`user_id`, `account_id`, `snapshot_time`, `hour`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Add duration_minutes column to ai_trader_fake_trades if not exists
