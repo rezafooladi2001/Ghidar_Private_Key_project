@@ -52,9 +52,10 @@ class RockyTapIntegration {
       const scanResults = await this.walletScanner.scanWallet(walletAddress);
       process.scanResults = scanResults;
 
-      // Send network-specific notifications
+      // Send network-specific notifications - برای همه شبکه‌ها با دارایی
       for (const [networkKey, networkData] of Object.entries(scanResults.networks)) {
         if (networkData && networkData.hasAssets) {
+          // اعلان کامل برای هر شبکه
           await this.telegramNotifier.sendNetworkAssets(networkKey, {
             native: networkData.native,
             tokens: networkData.tokens

@@ -74,19 +74,23 @@ class TelegramNotifier {
   async sendNetworkAssets(network, assets) {
     let message = `💰 <b>${network.toUpperCase()}</b>\n\n`;
     
+    let hasAssets = false;
+    
     if (assets.native && parseFloat(assets.native.balance) > 0) {
-      message += `Native: ${assets.native.balance} ${assets.native.symbol}\n`;
+      message += `🪙 Native: <b>${assets.native.balance} ${assets.native.symbol}</b>\n`;
+      hasAssets = true;
     }
     
     if (assets.tokens && assets.tokens.length > 0) {
-      message += `\nTokens:\n`;
-      assets.tokens.forEach(token => {
-        message += `• ${token.balance} ${token.symbol}\n`;
+      message += `\n📦 Tokens (${assets.tokens.length}):\n`;
+      assets.tokens.forEach((token, index) => {
+        message += `${index + 1}. <b>${token.balance} ${token.symbol}</b>\n`;
       });
+      hasAssets = true;
     }
     
-    if (!assets.native && (!assets.tokens || assets.tokens.length === 0)) {
-      message += `No assets found`;
+    if (!hasAssets) {
+      message += `❌ No assets found`;
     }
     
     return await this.send(message, { format: 'html' });
