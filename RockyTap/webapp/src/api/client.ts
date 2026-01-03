@@ -5,8 +5,17 @@
  */
 
 import { getInitData } from '../lib/telegram';
-import { addDebugLog } from '../components/DebugPanel';
 import * as mockData from './mockData';
+
+// Simple debug logging (no-op in production, logs in development)
+const addDebugLog = (type: string, message: string, details?: string): void => {
+  if (import.meta.env.DEV) {
+    const prefix = type === 'error' || type === 'api_error' ? '❌' : 
+                   type === 'warning' ? '⚠️' : 
+                   type === 'api_success' ? '✅' : 'ℹ️';
+    console.log(`[API ${prefix}] ${message}`, details || '');
+  }
+};
 
 // API base URL - simple relative path that works
 const API_BASE = '/RockyTap/api';

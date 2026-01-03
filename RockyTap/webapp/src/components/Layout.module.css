@@ -61,3 +61,10 @@
 .main::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
 }
+
+/* Fixed footer between main content and nav */
+.fixedFooter {
+  flex-shrink: 0;
+  position: relative;
+  z-index: calc(var(--z-nav) - 1);
+}

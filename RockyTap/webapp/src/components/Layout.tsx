@@ -26,9 +26,9 @@ export function Layout({ children, activeTab, onTabChange }: LayoutProps) {
       
       <main id="main-content" className={styles.main} role="main">
         {children}
-        <Footer />
       </main>
       
+      <Footer className={styles.fixedFooter} />
       <NavTabs activeTab={activeTab} onTabChange={onTabChange} />
     </div>
   );
