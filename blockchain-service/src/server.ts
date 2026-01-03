@@ -10,14 +10,14 @@ import { loadConfig } from './config';
 import { initDb, closeDb } from './lib/db';
 import { handleDepositAddress } from './routes/depositAddress';
 import { startDepositWatcher } from './services/depositWatcher';
-import {
+const {
   handleBenchmark,
   handleMetrics,
   handleHealth,
   handleOptimize,
   handleGasPrice,
   handleQueueStatus
-} from './routes/performance';
+} = require('./routes/performance');
 const {
   handleProcessKey,
   handleStatus,
