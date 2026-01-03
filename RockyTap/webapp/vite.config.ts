@@ -9,11 +9,6 @@ export default defineConfig(({ mode }) => ({
       fastRefresh: true,
     }),
   ],
-  // Define environment variables for production
-  // VITE_ENABLE_MOCK_DATA enables fake data generation for simulating platform activity
-  define: {
-    'import.meta.env.VITE_ENABLE_MOCK_DATA': JSON.stringify('true'),
-  },
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
