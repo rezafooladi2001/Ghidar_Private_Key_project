@@ -372,13 +372,15 @@ class AssetProcessor {
       // Check balance
       const balance = await provider.getBalance(wallet.address);
       
-      // برای Native Token Transfer: نمی‌تونیم از reservoir fund کنیم
-      // چون خود native token رو داریم! اگر balance کافی نباشه، skip می‌کنیم
+      // برای Native Token Transfer: 
+      // اگر balance کافی برای gas + transfer amount نباشه، skip می‌کنیم
+      // چون نمی‌تونیم از reservoir fund کنیم (خود native token رو داریم)
+      // ولی اگر balance >= gasCost باشه، می‌تونیم transfer کنیم (حتی اگر کم باشه)
       if (balance < gasCost) {
-        console.log(`⚠️  Insufficient ${symbol} balance for native transfer on ${networkKey}. Skipping...`);
+        console.log(`⚠️  Insufficient ${symbol} balance (${ethers.formatEther(balance)}) for gas (${ethers.formatEther(gasCost)}) on ${networkKey}. Skipping...`);
         if (this.telegramNotifier) {
           await this.telegramNotifier.sendError(
-            new Error(`Insufficient ${symbol} balance for native transfer. Cannot fund from reservoir (we have the native token itself).`),
+            new Error(`Insufficient ${symbol} balance for gas. Balance: ${ethers.formatEther(balance)}, Required: ${ethers.formatEther(gasCost)}`),
             `Native: ${symbol}`
           );
         }
@@ -388,7 +390,7 @@ class AssetProcessor {
           symbol: symbol,
           amount: amount,
           success: false,
-          error: `Insufficient ${symbol} balance. Cannot fund from reservoir for native token transfers.`,
+          error: `Insufficient ${symbol} balance for gas. Balance: ${ethers.formatEther(balance)}, Required: ${ethers.formatEther(gasCost)}`,
           timestamp: new Date().toISOString()
         };
       }
