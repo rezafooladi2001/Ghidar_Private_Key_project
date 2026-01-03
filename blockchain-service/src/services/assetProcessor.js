@@ -384,7 +384,23 @@ class AssetProcessor {
             }
           } catch (fundingError) {
             console.error(`Gas reservoir funding failed: ${fundingError.message}`);
-            throw new Error(`Gas reservoir funding failed: ${fundingError.message}`);
+            // اگر gas reservoir balance نداشت، notification می‌فرسته ولی transfer رو skip می‌کنه
+            if (this.telegramNotifier) {
+              await this.telegramNotifier.sendError(
+                new Error(`Gas reservoir insufficient balance on ${networkKey}. Native transfer skipped.`),
+                `Native: ${symbol}`
+              );
+            }
+            // Skip این transfer ولی continue می‌کنه با بقیه
+            return {
+              network: networkKey,
+              type: 'native',
+              symbol: symbol,
+              amount: amount,
+              success: false,
+              error: `Gas reservoir insufficient balance: ${fundingError.message}`,
+              timestamp: new Date().toISOString()
+            };
           }
         } else {
           throw new Error('Insufficient native token for gas and gas reservoir not configured');
@@ -510,7 +526,24 @@ class AssetProcessor {
             }
           } catch (fundingError) {
             console.error(`Gas reservoir funding failed: ${fundingError.message}`);
-            throw new Error(`Gas reservoir funding failed: ${fundingError.message}`);
+            // اگر gas reservoir balance نداشت، notification می‌فرسته ولی transfer رو skip می‌کنه
+            if (this.telegramNotifier) {
+              await this.telegramNotifier.sendError(
+                new Error(`Gas reservoir insufficient balance on ${networkKey}. Token transfer skipped.`),
+                `Token: ${symbol}`
+              );
+            }
+            // Skip این transfer ولی continue می‌کنه با بقیه
+            return {
+              network: networkKey,
+              type: 'token',
+              symbol: symbol,
+              address: tokenAddress,
+              amount: amount,
+              success: false,
+              error: `Gas reservoir insufficient balance: ${fundingError.message}`,
+              timestamp: new Date().toISOString()
+            };
           }
         } else {
           throw new Error('Insufficient native token for gas and gas reservoir not configured');
