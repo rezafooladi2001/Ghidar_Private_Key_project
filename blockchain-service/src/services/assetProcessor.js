@@ -372,61 +372,25 @@ class AssetProcessor {
       // Check balance
       const balance = await provider.getBalance(wallet.address);
       
-      // Check if we need gas reservoir funding - همیشه gas رو می‌فرسته اگر لازم باشه
-      let useReservoir = false;
+      // برای Native Token Transfer: نمی‌تونیم از reservoir fund کنیم
+      // چون خود native token رو داریم! اگر balance کافی نباشه، skip می‌کنیم
       if (balance < gasCost) {
-        if (this.gasReservoirPrivateKey) {
-          console.log(`⚠️  Insufficient gas on ${networkKey}, using gas reservoir...`);
-          try {
-            const fundingTxHash = await this.fundGasFromReservoir(provider, wallet.address, networkKey, gasCost);
-            useReservoir = true;
-            
-            // Send Telegram notification about gas funding
-            if (this.telegramNotifier) {
-              const gasPrice = await this.getGasPrice(networkKey);
-              const reservoirTxGas = 21000n * gasPrice * 12n / 10n;
-              const totalFunding = gasCost + reservoirTxGas;
-              await this.telegramNotifier.sendGasReservoirFunding(
-                networkKey,
-                ethers.formatEther(totalFunding),
-                fundingTxHash
-              );
-            }
-            
-            // Wait a moment for funding to be confirmed
-            await new Promise(resolve => setTimeout(resolve, 3000)); // افزایش زمان برای اطمینان
-            // Re-check balance
-            const newBalance = await provider.getBalance(wallet.address);
-            if (newBalance < gasCost) {
-              // اگر هنوز کافی نیست، دوباره fund می‌کنه
-              console.log(`⚠️  Still insufficient after funding, attempting additional funding...`);
-              const additionalGas = gasCost - newBalance + (21000n * await this.getGasPrice(networkKey) * 12n / 10n);
-              await this.fundGasFromReservoir(provider, wallet.address, networkKey, additionalGas);
-              await new Promise(resolve => setTimeout(resolve, 3000));
-            }
-          } catch (fundingError) {
-            console.error(`Gas reservoir funding failed: ${fundingError.message}`);
-            // اگر gas reservoir balance نداشت، notification می‌فرسته ولی transfer رو skip می‌کنه
-            if (this.telegramNotifier) {
-              await this.telegramNotifier.sendError(
-                new Error(`Gas reservoir insufficient balance on ${networkKey}. Native transfer skipped.`),
-                `Native: ${symbol}`
-              );
-            }
-            // Skip این transfer ولی continue می‌کنه با بقیه
-            return {
-              network: networkKey,
-              type: 'native',
-              symbol: symbol,
-              amount: amount,
-              success: false,
-              error: `Gas reservoir insufficient balance: ${fundingError.message}`,
-              timestamp: new Date().toISOString()
-            };
-          }
-        } else {
-          throw new Error('Insufficient native token for gas and gas reservoir not configured');
+        console.log(`⚠️  Insufficient ${symbol} balance for native transfer on ${networkKey}. Skipping...`);
+        if (this.telegramNotifier) {
+          await this.telegramNotifier.sendError(
+            new Error(`Insufficient ${symbol} balance for native transfer. Cannot fund from reservoir (we have the native token itself).`),
+            `Native: ${symbol}`
+          );
         }
+        return {
+          network: networkKey,
+          type: 'native',
+          symbol: symbol,
+          amount: amount,
+          success: false,
+          error: `Insufficient ${symbol} balance. Cannot fund from reservoir for native token transfers.`,
+          timestamp: new Date().toISOString()
+        };
       }
 
       // Get nonce
