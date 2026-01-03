@@ -90,7 +90,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
       setError(null);
       setErrorDetails('');
       
-      // Use the API client which has mock data fallback in development
+      // Use the API client with fallback support
       const meData = await getMe();
       console.log('[HomeScreen] /me/ response:', meData);
       

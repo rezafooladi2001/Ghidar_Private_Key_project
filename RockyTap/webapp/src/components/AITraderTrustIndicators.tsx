@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getPlatformStats, getActivityMultiplier, randomBetween } from '../lib/fakeDataGenerator';
+import { getPlatformStats, getActivityMultiplier, randomBetween } from '../lib/activityGenerator';
 import styles from './AITraderTrustIndicators.module.css';
 
 interface TrustIndicatorsProps {

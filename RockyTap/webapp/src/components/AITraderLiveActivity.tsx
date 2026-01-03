@@ -3,7 +3,7 @@ import {
   generateAITraderActivity,
   AITraderActivity,
   getActivityMultiplier,
-} from '../lib/fakeDataGenerator';
+} from '../lib/activityGenerator';
 import styles from './AITraderLiveActivity.module.css';
 
 interface AITraderLiveActivityProps {

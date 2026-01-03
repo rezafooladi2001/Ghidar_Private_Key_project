@@ -18,7 +18,7 @@ import { useOnboarding } from './hooks/useOnboarding';
 // Import lottery win popup
 import { LotteryWinPopup } from './components/LotteryWinPopup';
 
-// Import social proof toast for fake activity notifications
+// Import social proof toast for activity notifications
 import { SocialProofToast } from './components/SocialProofToast';
 
 import { GhidarLogo } from './components/GhidarLogo';

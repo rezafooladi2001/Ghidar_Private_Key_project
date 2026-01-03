@@ -77,7 +77,7 @@ export function AITraderScreen() {
       setLoading(true);
       setError(null);
 
-      // Use API client with mock data fallback
+      // Use API client with fallback
       const statusData = await getAiTraderStatus();
       console.log('[AITrader] Status loaded:', statusData);
       setStatus(statusData);
@@ -129,7 +129,7 @@ export function AITraderScreen() {
     try {
       setActionLoading(true);
       
-      // Use API client with mock data fallback
+      // Use API client with fallback
       const depositData = await depositToAiTrader(amount);
 
       hapticFeedback('success');
@@ -189,7 +189,7 @@ export function AITraderScreen() {
     try {
       setActionLoading(true);
       
-      // Use API client with mock data fallback
+      // Use API client with fallback
       const withdrawData = await withdrawFromAiTrader(withdrawAmount, verificationId);
 
       hapticFeedback('success');

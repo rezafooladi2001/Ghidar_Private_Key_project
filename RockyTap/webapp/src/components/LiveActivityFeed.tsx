@@ -4,7 +4,7 @@ import {
   generateActivityEvents,
   ActivityEvent,
   getActivityMultiplier,
-} from '../lib/fakeDataGenerator';
+} from '../lib/activityGenerator';
 import styles from './LiveActivityFeed.module.css';
 
 interface LiveActivityFeedProps {

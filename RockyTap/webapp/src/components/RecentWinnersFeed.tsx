@@ -6,7 +6,7 @@ import {
   FIRST_NAMES,
   randomBetween,
   getActivityMultiplier,
-} from '../lib/fakeDataGenerator';
+} from '../lib/activityGenerator';
 import styles from './RecentWinnersFeed.module.css';
 
 interface RecentWinnersFeedProps {

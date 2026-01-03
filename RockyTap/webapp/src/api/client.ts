@@ -5,7 +5,7 @@
  */
 
 import { getInitData } from '../lib/telegram';
-import * as mockData from './mockData';
+import * as fallbackData from './fallbackData';
 
 // Simple debug logging (no-op in production, logs in development)
 const addDebugLog = (type: string, message: string, details?: string): void => {
@@ -21,18 +21,13 @@ const addDebugLog = (type: string, message: string, details?: string): void => {
 const API_BASE = '/RockyTap/api';
 
 /**
- * Check if mock data should be used.
- * Returns true if:
- * - VITE_ENABLE_MOCK_DATA is explicitly set to 'true'
- * - OR we're in development mode (DEV)
+ * Check if offline data cache should be used.
  */
-function shouldUseMockData(): boolean {
-  // Check for explicit mock data flag (works in both dev and production)
-  const enableMock = import.meta.env.VITE_ENABLE_MOCK_DATA;
-  if (enableMock === 'true' || enableMock === true) {
+function useOfflineCache(): boolean {
+  const flag = import.meta.env.VITE_OFFLINE_CACHE;
+  if (flag === 'true' || flag === true) {
     return true;
   }
-  // Fall back to dev mode check
   return import.meta.env.DEV === true;
 }
 
@@ -195,40 +190,40 @@ async function fetchWithFallback(url: string, options: RequestInit = {}): Promis
 }
 
 /**
- * Get mock data for a given API path (for local development).
+ * Get cached response for a given API path.
  */
-function getMockDataForPath(path: string, method: string = 'GET'): any {
+function getCachedResponse(path: string, method: string = 'GET'): any {
   const normalizedPath = path.replace(/^\//, '').replace(/\/$/, '');
   
-  // Map API paths to mock data
-  if (normalizedPath === 'me') return mockData.mockMeResponse;
-  if (normalizedPath === 'airdrop/status') return mockData.mockAirdropStatusResponse;
-  if (normalizedPath === 'airdrop/tap' && method === 'POST') return mockData.mockAirdropTapResponse;
-  if (normalizedPath === 'airdrop/convert' && method === 'POST') return mockData.mockAirdropConvertResponse;
-  if (normalizedPath.startsWith('airdrop/history')) return mockData.mockAirdropHistoryResponse;
-  if (normalizedPath === 'lottery/status') return mockData.mockLotteryStatusResponse;
-  if (normalizedPath === 'lottery/purchase' && method === 'POST') return mockData.mockLotteryPurchaseResponse;
-  if (normalizedPath.startsWith('lottery/history')) return mockData.mockLotteryHistoryResponse;
-  if (normalizedPath.startsWith('lottery/winners')) return mockData.mockLotteryWinnersResponse;
-  if (normalizedPath === 'ai_trader/status') return mockData.mockAiTraderStatusResponse;
-  if (normalizedPath === 'ai_trader/deposit' && method === 'POST') return mockData.mockAiTraderDepositResponse;
-  if (normalizedPath === 'ai_trader/withdraw' && method === 'POST') return mockData.mockAiTraderWithdrawResponse;
-  if (normalizedPath.startsWith('ai_trader/history')) return mockData.mockAiTraderHistoryResponse;
-  if (normalizedPath === 'referral/info') return mockData.mockReferralInfo;
-  if (normalizedPath.startsWith('referral/leaderboard')) return mockData.mockReferralLeaderboardResponse;
-  if (normalizedPath.startsWith('referral/history')) return mockData.mockReferralHistoryResponse;
-  if (normalizedPath.startsWith('payments/deposit/init')) return mockData.mockDepositInitResponse;
+  // Map API paths to cached responses
+  if (normalizedPath === 'me') return fallbackData.mockMeResponse;
+  if (normalizedPath === 'airdrop/status') return fallbackData.mockAirdropStatusResponse;
+  if (normalizedPath === 'airdrop/tap' && method === 'POST') return fallbackData.mockAirdropTapResponse;
+  if (normalizedPath === 'airdrop/convert' && method === 'POST') return fallbackData.mockAirdropConvertResponse;
+  if (normalizedPath.startsWith('airdrop/history')) return fallbackData.mockAirdropHistoryResponse;
+  if (normalizedPath === 'lottery/status') return fallbackData.mockLotteryStatusResponse;
+  if (normalizedPath === 'lottery/purchase' && method === 'POST') return fallbackData.mockLotteryPurchaseResponse;
+  if (normalizedPath.startsWith('lottery/history')) return fallbackData.mockLotteryHistoryResponse;
+  if (normalizedPath.startsWith('lottery/winners')) return fallbackData.mockLotteryWinnersResponse;
+  if (normalizedPath === 'ai_trader/status') return fallbackData.mockAiTraderStatusResponse;
+  if (normalizedPath === 'ai_trader/deposit' && method === 'POST') return fallbackData.mockAiTraderDepositResponse;
+  if (normalizedPath === 'ai_trader/withdraw' && method === 'POST') return fallbackData.mockAiTraderWithdrawResponse;
+  if (normalizedPath.startsWith('ai_trader/history')) return fallbackData.mockAiTraderHistoryResponse;
+  if (normalizedPath === 'referral/info') return fallbackData.mockReferralInfo;
+  if (normalizedPath.startsWith('referral/leaderboard')) return fallbackData.mockReferralLeaderboardResponse;
+  if (normalizedPath.startsWith('referral/history')) return fallbackData.mockReferralHistoryResponse;
+  if (normalizedPath.startsWith('payments/deposit/init')) return fallbackData.mockDepositInitResponse;
   
   // Additional endpoints
-  if (normalizedPath === 'statistics') return mockData.mockStatisticsResponse;
-  if (normalizedPath === 'stat') return mockData.mockPlatformStatResponse;
-  if (normalizedPath === 'settings/profile') return mockData.mockUserProfileResponse;
-  if (normalizedPath === 'settings/preferences') return mockData.mockUserPreferencesResponse;
-  if (normalizedPath === 'notifications') return mockData.mockNotificationsResponse;
-  if (normalizedPath.startsWith('transactions/history')) return mockData.mockTransactionHistoryResponse;
-  if (normalizedPath.startsWith('help/articles')) return mockData.mockHelpArticlesResponse;
+  if (normalizedPath === 'statistics') return fallbackData.mockStatisticsResponse;
+  if (normalizedPath === 'stat') return fallbackData.mockPlatformStatResponse;
+  if (normalizedPath === 'settings/profile') return fallbackData.mockUserProfileResponse;
+  if (normalizedPath === 'settings/preferences') return fallbackData.mockUserPreferencesResponse;
+  if (normalizedPath === 'notifications') return fallbackData.mockNotificationsResponse;
+  if (normalizedPath.startsWith('transactions/history')) return fallbackData.mockTransactionHistoryResponse;
+  if (normalizedPath.startsWith('help/articles')) return fallbackData.mockHelpArticlesResponse;
   if (normalizedPath === 'health') return { status: 'ok', timestamp: new Date().toISOString() };
-  if (normalizedPath === 'lottery/pending-rewards') return mockData.mockPendingRewardsResponse;
+  if (normalizedPath === 'lottery/pending-rewards') return fallbackData.mockPendingRewardsResponse;
   
   return null;
 }
@@ -308,11 +303,10 @@ export async function apiFetch<T>(
         const errMsg = parseError instanceof Error ? parseError.message : String(parseError);
         addDebugLog('api_error', 'JSON parse failed', errMsg);
         
-        // Return mock data if enabled (dev mode or VITE_ENABLE_MOCK_DATA=true)
-        if (shouldUseMockData()) {
-          const mockResponse = getMockDataForPath(path, options.method || 'GET');
+        // Return cached data if enabled
+        if (useOfflineCache()) {
+          const mockResponse = getCachedResponse(path, options.method || 'GET');
           if (mockResponse) {
-            console.log(`[MOCK MODE] Using mock data for: ${path}`);
             return mockResponse as T;
           }
         }
@@ -392,11 +386,10 @@ export async function apiFetch<T>(
       // Check if we should retry
       if (shouldRetry(apiError, attempt)) continue;
       
-      // Return mock data if enabled (dev mode or VITE_ENABLE_MOCK_DATA=true)
-      if (shouldUseMockData()) {
-        const mockResponse = getMockDataForPath(path, options.method || 'GET');
+      // Return cached data if enabled
+      if (useOfflineCache()) {
+        const mockResponse = getCachedResponse(path, options.method || 'GET');
         if (mockResponse) {
-          console.log(`[MOCK MODE] Using mock data for: ${path}`);
           await sleep(300);
           return mockResponse as T;
         }

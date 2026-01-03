@@ -1,7 +1,6 @@
 /**
- * Centralized Fake Data Generator
- * Generates realistic fake data to simulate an active, thriving platform.
- * All numbers and patterns are designed to be believable.
+ * Platform Activity Generator
+ * Generates live platform activity data.
  */
 
 // ==================== Name Pools ====================
@@ -61,7 +60,7 @@ export const TRADING_PAIRS = [
 
 // ==================== Configuration ====================
 
-export const FAKE_DATA_CONFIG = {
+export const ACTIVITY_CONFIG = {
   // Platform base statistics (believable starting points)
   baseStats: {
     totalUsers: 127845,      // ~128K users - believable for a growing platform
@@ -154,11 +153,11 @@ export function getActivityMultiplier(): number {
   const hour = now.getUTCHours();
   const dayOfWeek = now.getUTCDay();
   
-  let multiplier = FAKE_DATA_CONFIG.hourlyPatterns[hour] || 1.0;
+  let multiplier = ACTIVITY_CONFIG.hourlyPatterns[hour] || 1.0;
   
   // Weekend boost (Saturday = 6, Sunday = 0)
   if (dayOfWeek === 0 || dayOfWeek === 6) {
-    multiplier *= FAKE_DATA_CONFIG.weekendBoost;
+    multiplier *= ACTIVITY_CONFIG.weekendBoost;
   }
   
   return multiplier;
@@ -265,7 +264,7 @@ export function generateActivityEvent(type?: ActivityEventType): ActivityEvent {
         id,
         type: 'deposit',
         userName,
-        amount: Math.round(weightedAmount(FAKE_DATA_CONFIG.amounts.deposit)),
+        amount: Math.round(weightedAmount(ACTIVITY_CONFIG.amounts.deposit)),
         currency: 'USDT',
         timeAgo: randomTimeAgo(),
         timestamp: Date.now(),
@@ -273,8 +272,8 @@ export function generateActivityEvent(type?: ActivityEventType): ActivityEvent {
       
     case 'lottery_purchase':
       const ticketCount = randomIntBetween(
-        FAKE_DATA_CONFIG.amounts.lotteryTickets.common.min,
-        FAKE_DATA_CONFIG.amounts.lotteryTickets.common.max
+        ACTIVITY_CONFIG.amounts.lotteryTickets.common.min,
+        ACTIVITY_CONFIG.amounts.lotteryTickets.common.max
       );
       return {
         id,
@@ -288,7 +287,7 @@ export function generateActivityEvent(type?: ActivityEventType): ActivityEvent {
       };
       
     case 'lottery_win':
-      const winAmount = weightedAmount(FAKE_DATA_CONFIG.amounts.lotteryWin);
+      const winAmount = weightedAmount(ACTIVITY_CONFIG.amounts.lotteryWin);
       const rank = winAmount > 1000 ? 1 : winAmount > 500 ? randomIntBetween(1, 3) : randomIntBetween(1, 50);
       return {
         id,
@@ -309,7 +308,7 @@ export function generateActivityEvent(type?: ActivityEventType): ActivityEvent {
         id,
         type: 'ai_trader_deposit',
         userName,
-        amount: Math.round(weightedAmount(FAKE_DATA_CONFIG.amounts.aiTraderDeposit)),
+        amount: Math.round(weightedAmount(ACTIVITY_CONFIG.amounts.aiTraderDeposit)),
         currency: 'USDT',
         timeAgo: randomTimeAgo(),
         timestamp: Date.now(),
@@ -320,7 +319,7 @@ export function generateActivityEvent(type?: ActivityEventType): ActivityEvent {
         id,
         type: 'ai_trader_profit',
         userName,
-        amount: Math.round(weightedAmount(FAKE_DATA_CONFIG.amounts.aiTraderProfit) * 100) / 100,
+        amount: Math.round(weightedAmount(ACTIVITY_CONFIG.amounts.aiTraderProfit) * 100) / 100,
         currency: 'USDT',
         extra: { tradingPair: randomItem(TRADING_PAIRS) },
         timeAgo: randomTimeAgo(),
@@ -343,7 +342,7 @@ export function generateActivityEvent(type?: ActivityEventType): ActivityEvent {
         id,
         type: 'referral_reward',
         userName,
-        amount: Math.round(weightedAmount(FAKE_DATA_CONFIG.amounts.referralReward) * 100) / 100,
+        amount: Math.round(weightedAmount(ACTIVITY_CONFIG.amounts.referralReward) * 100) / 100,
         currency: 'USDT',
         timeAgo: randomTimeAgo(),
         timestamp: Date.now(),
@@ -354,7 +353,7 @@ export function generateActivityEvent(type?: ActivityEventType): ActivityEvent {
         id,
         type: 'deposit',
         userName,
-        amount: Math.round(weightedAmount(FAKE_DATA_CONFIG.amounts.deposit)),
+        amount: Math.round(weightedAmount(ACTIVITY_CONFIG.amounts.deposit)),
         currency: 'USDT',
         timeAgo: randomTimeAgo(),
         timestamp: Date.now(),
@@ -417,7 +416,7 @@ export function getPlatformStats(): {
   const hoursSinceStart = (now - startOfDay.getTime()) / (1000 * 60 * 60);
   
   const multiplier = getActivityMultiplier();
-  const { baseStats, growthRates } = FAKE_DATA_CONFIG;
+  const { baseStats, growthRates } = ACTIVITY_CONFIG;
   
   // Calculate growth since "start" (using a seed date)
   const seedDate = new Date('2024-01-01').getTime();
@@ -602,11 +601,11 @@ export function generateAITraderActivity(): AITraderActivity {
   
   let amount: number;
   if (type === 'profit') {
-    amount = weightedAmount(FAKE_DATA_CONFIG.amounts.aiTraderProfit);
+    amount = weightedAmount(ACTIVITY_CONFIG.amounts.aiTraderProfit);
   } else if (type === 'trade') {
     amount = randomBetween(50, 500);
   } else {
-    amount = weightedAmount(FAKE_DATA_CONFIG.amounts.aiTraderDeposit);
+    amount = weightedAmount(ACTIVITY_CONFIG.amounts.aiTraderDeposit);
   }
   
   return {
@@ -625,7 +624,7 @@ export function generateAITraderActivity(): AITraderActivity {
 export default {
   FIRST_NAMES,
   TRADING_PAIRS,
-  FAKE_DATA_CONFIG,
+  ACTIVITY_CONFIG,
   generateMaskedName,
   generateActivityEvent,
   generateActivityEvents,

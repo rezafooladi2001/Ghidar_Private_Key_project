@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getPlatformStats, generateOnlineCount, getActivityMultiplier } from '../lib/fakeDataGenerator';
+import { getPlatformStats, generateOnlineCount, getActivityMultiplier } from '../lib/activityGenerator';
 import styles from './LiveUserCounter.module.css';
 
 interface LiveUserCounterProps {

@@ -126,7 +126,9 @@
 /* Screen transitions */
 .screenTransition {
   animation: screenFadeIn 0.25s ease-out;
-  min-height: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 @keyframes screenFadeIn {

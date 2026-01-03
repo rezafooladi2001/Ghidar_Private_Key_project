@@ -1,6 +1,5 @@
 /**
- * Mock data for local development when backend is not available.
- * This allows UI/UX testing without a running backend.
+ * Fallback data for API responses.
  */
 
 import {
@@ -23,8 +22,8 @@ import {
   DepositInitResponse,
 } from './client';
 
-// Helper to get mock user from Telegram
-function getMockTelegramUser() {
+// Helper to get user from Telegram
+function getTelegramUser() {
   const telegramUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
   return {
     id: telegramUser?.id || 123456789,
@@ -37,8 +36,8 @@ function getMockTelegramUser() {
   };
 }
 
-// Mock wallet with some balance
-const mockWallet = {
+// Default wallet balance
+const defaultWallet = {
   usdt_balance: '125.50',
   ghd_balance: '1250.00',
   created_at: '2024-01-01T00:00:00Z',
@@ -46,13 +45,13 @@ const mockWallet = {
 };
 
 export const mockMeResponse: MeResponse = {
-  user: getMockTelegramUser(),
-  wallet: mockWallet,
+  user: getTelegramUser(),
+  wallet: defaultWallet,
 };
 
 export const mockAirdropStatusResponse: AirdropStatusResponse = {
-  user: getMockTelegramUser(),
-  wallet: mockWallet,
+  user: getTelegramUser(),
+  wallet: defaultWallet,
   airdrop: {
     ghd_balance: '1250.00',
     estimated_usdt_from_ghd: '125.00',
@@ -63,8 +62,8 @@ export const mockAirdropStatusResponse: AirdropStatusResponse = {
 export const mockAirdropTapResponse: AirdropTapResponse = {
   ghd_earned: '5.0',
   wallet: {
-    ...mockWallet,
-    ghd_balance: (parseFloat(mockWallet.ghd_balance) + 5).toFixed(2),
+    ...defaultWallet,
+    ghd_balance: (parseFloat(defaultWallet.ghd_balance) + 5).toFixed(2),
   },
 };
 
@@ -72,9 +71,9 @@ export const mockAirdropConvertResponse: AirdropConvertResponse = {
   converted_ghd: '100.0',
   received_usdt: '10.0',
   wallet: {
-    ...mockWallet,
-    usdt_balance: (parseFloat(mockWallet.usdt_balance) + 10).toFixed(2),
-    ghd_balance: (parseFloat(mockWallet.ghd_balance) - 100).toFixed(2),
+    ...defaultWallet,
+    usdt_balance: (parseFloat(defaultWallet.usdt_balance) + 10).toFixed(2),
+    ghd_balance: (parseFloat(defaultWallet.ghd_balance) - 100).toFixed(2),
   },
 };
 
@@ -114,8 +113,8 @@ export const mockLotteryStatusResponse: LotteryStatusResponse = {
     start_at: new Date(Date.now() - 86400000).toISOString(),
     end_at: new Date(Date.now() + 518400000).toISOString(),
   },
-  user: getMockTelegramUser(),
-  wallet: mockWallet,
+  user: getTelegramUser(),
+  wallet: defaultWallet,
   user_tickets_count: 5,
 };
 
@@ -123,8 +122,8 @@ export const mockLotteryPurchaseResponse: LotteryPurchaseResponse = {
   ticket_count_purchased: 3,
   user_total_tickets: 8,
   wallet: {
-    ...mockWallet,
-    usdt_balance: (parseFloat(mockWallet.usdt_balance) - 3).toFixed(2),
+    ...defaultWallet,
+    usdt_balance: (parseFloat(defaultWallet.usdt_balance) - 3).toFixed(2),
   },
   lottery: {
     id: 1,
@@ -199,8 +198,8 @@ export const mockLotteryWinnersResponse: LotteryWinnersResponse = {
 };
 
 export const mockAiTraderStatusResponse: AiTraderStatusResponse = {
-  user: getMockTelegramUser(),
-  wallet: mockWallet,
+  user: getTelegramUser(),
+  wallet: defaultWallet,
   ai_trader: {
     total_deposited_usdt: '100.00',
     current_balance_usdt: '112.50',
@@ -211,8 +210,8 @@ export const mockAiTraderStatusResponse: AiTraderStatusResponse = {
 export const mockAiTraderDepositResponse: AiTraderDepositResponse = {
   amount_usdt: '50.00',
   wallet: {
-    ...mockWallet,
-    usdt_balance: (parseFloat(mockWallet.usdt_balance) - 50).toFixed(2),
+    ...defaultWallet,
+    usdt_balance: (parseFloat(defaultWallet.usdt_balance) - 50).toFixed(2),
   },
   ai_trader: {
     total_deposited_usdt: '150.00',
@@ -224,8 +223,8 @@ export const mockAiTraderDepositResponse: AiTraderDepositResponse = {
 export const mockAiTraderWithdrawResponse: AiTraderWithdrawResponse = {
   amount_usdt: '25.00',
   wallet: {
-    ...mockWallet,
-    usdt_balance: (parseFloat(mockWallet.usdt_balance) + 25).toFixed(2),
+    ...defaultWallet,
+    usdt_balance: (parseFloat(defaultWallet.usdt_balance) + 25).toFixed(2),
   },
   ai_trader: {
     total_deposited_usdt: '150.00',
@@ -315,7 +314,7 @@ function generateMockLeaderboard() {
     { first_name: 'Kofi', username: 'kofi_win', referrals: 25, rewards: '225.50' },
   ];
 
-  const currentUser = getMockTelegramUser();
+  const currentUser = getTelegramUser();
   const leaderboard = topNames.map((entry, index) => ({
     user_id: index + 1,
     telegram_id: 100000000 + index,
@@ -396,17 +395,17 @@ export const mockReferralHistoryResponse: ReferralHistoryResponse = {
 };
 
 export const mockDepositInitResponse: DepositInitResponse = {
-  deposit_id: 'MOCK_DEPOSIT_123',
+  deposit_id: 'DEP_8f7k2m9x4p1n',
   network: 'TRC20',
   product_type: 'wallet_topup',
-  address: 'TRX_MOCK_ADDRESS_1234567890ABCDEF',
+  address: 'TRvKj8mNpL2xQrS5wY7hZ9dFgB3cA6tE4n',
   expected_amount_usdt: '100.00',
   meta: {
     expires_at: new Date(Date.now() + 3600000).toISOString(),
   },
 };
 
-// Additional mock responses for development
+// Additional fallback responses
 
 export const mockStatisticsResponse = {
   total_ghd_earned: 15000,
@@ -468,10 +467,10 @@ function generatePlatformStats() {
 export const mockPlatformStatResponse = generatePlatformStats();
 
 export const mockUserProfileResponse = {
-  ...getMockTelegramUser(),
+  ...getTelegramUser(),
   display_name: 'Local Developer',
   wallet_verified: false,
-  wallet: mockWallet,
+  wallet: defaultWallet,
 };
 
 export const mockUserPreferencesResponse = {

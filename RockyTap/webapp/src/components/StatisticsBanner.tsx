@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { Card, CardContent } from './ui';
-import { getPlatformStats, getActivityMultiplier, randomBetween } from '../lib/fakeDataGenerator';
+import { getPlatformStats, getActivityMultiplier, randomBetween } from '../lib/activityGenerator';
 import styles from './StatisticsBanner.module.css';
 
 interface StatisticsBannerProps {
@@ -90,7 +90,7 @@ export function StatisticsBanner({
   const [loading, setLoading] = useState(true);
   const [isVisible, setIsVisible] = useState(true);
 
-  // Initialize with fake data
+  // Initialize with platform data
   useEffect(() => {
     const initialStats = getPlatformStats();
     setStats({

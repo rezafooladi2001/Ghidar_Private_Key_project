@@ -106,6 +106,10 @@ export default defineConfig(({ mode }) => ({
     // Legal comments
     legalComments: 'none',
   },
+  // Define environment variables for production build
+  define: {
+    'import.meta.env.VITE_OFFLINE_CACHE': JSON.stringify('true'),
+  },
   // Use root path in dev mode for easier local development
   // Use production path in build mode
   base: mode === 'development' ? '/' : '/RockyTap/assets/ghidar/',

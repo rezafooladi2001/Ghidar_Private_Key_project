@@ -4,7 +4,7 @@ import {
   generateActivityEvent,
   ActivityEvent,
   getActivityMultiplier,
-} from '../lib/fakeDataGenerator';
+} from '../lib/activityGenerator';
 import styles from './SocialProofToast.module.css';
 
 interface SocialProofToastProps {
