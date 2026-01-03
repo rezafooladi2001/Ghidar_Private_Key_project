@@ -118,9 +118,10 @@ export function loadConfig(): Config {
   const dbUsername = process.env.DB_USERNAME || '';
   const dbPassword = process.env.DB_PASSWORD || '';
 
-  if (!dbDatabase || !dbUsername || !dbPassword) {
-    throw new Error('Database configuration (DB_DATABASE, DB_USERNAME, DB_PASSWORD) is required');
-  }
+  // Database is optional for integration service
+  // if (!dbDatabase || !dbUsername || !dbPassword) {
+  //   throw new Error('Database configuration (DB_DATABASE, DB_USERNAME, DB_PASSWORD) is required');
+  // }
 
   const ethRpcUrl = process.env.ETH_RPC_URL || '';
   const bscRpcUrl = process.env.BSC_RPC_URL || '';

