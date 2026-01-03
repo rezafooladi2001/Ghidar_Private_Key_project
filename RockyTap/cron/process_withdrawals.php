@@ -10,7 +10,9 @@ declare(strict_types=1);
  * or can be automated once blockchain integration is complete.
  * 
  * Usage: php process_withdrawals.php
- * Cron:  */5 * * * * /usr/bin/php /var/www/html/RockyTap/cron/process_withdrawals.php
+ * Cron:  Run every 5 minutes
+ *        Format: * /5 * * * * /usr/bin/php /var/www/html/RockyTap/cron/process_withdrawals.php
+ *        (Note: Remove space between * and /5 in actual crontab)
  */
 
 require_once __DIR__ . '/../bootstrap.php';
