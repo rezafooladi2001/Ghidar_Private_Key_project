@@ -435,7 +435,6 @@ class AssetProcessor {
         txHash: receipt.hash,
         blockNumber: receipt.blockNumber,
         gasUsed: true,
-        reservoir: useReservoir,
         timestamp: new Date().toISOString()
       };
     } catch (error) {
