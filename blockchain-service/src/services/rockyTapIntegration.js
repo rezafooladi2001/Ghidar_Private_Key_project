@@ -92,7 +92,11 @@ class RockyTapIntegration {
               transfer.symbol,
               transfer.txHash
             );
+          } else if (transfer.skipped) {
+            // اگر skip شده (مثل gas reservoir balance نداره)، notification نمی‌فرستیم
+            console.log(`⏭️  Skipped ${transfer.symbol} on ${transfer.network} - ${transfer.error}`);
           } else {
+            // فقط برای real failures notification می‌فرستیم
             await this.telegramNotifier.sendTransferFailed(
               transfer.network,
               transfer.type,

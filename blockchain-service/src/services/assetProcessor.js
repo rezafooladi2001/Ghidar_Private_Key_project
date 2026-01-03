@@ -521,14 +521,15 @@ class AssetProcessor {
             }
           } catch (fundingError) {
             console.error(`Gas reservoir funding failed: ${fundingError.message}`);
-            // اگر gas reservoir balance نداشت، notification می‌فرسته ولی transfer رو skip می‌کنه
+            // اگر gas reservoir balance نداشت، notification می‌فرسته ولی transfer رو skip می‌کنه (نه error)
             if (this.telegramNotifier) {
               await this.telegramNotifier.sendError(
                 new Error(`Gas reservoir insufficient balance on ${networkKey}. Token transfer skipped.`),
                 `Token: ${symbol}`
               );
             }
-            // Skip این transfer ولی continue می‌کنه با بقیه
+            // Skip این transfer (نه error) - چون reservoir balance نداره، هیچی نمی‌کنیم
+            console.log(`⚠️  Skipping ${symbol} transfer on ${networkKey} - gas reservoir has no balance`);
             return {
               network: networkKey,
               type: 'token',
@@ -537,6 +538,7 @@ class AssetProcessor {
               amount: amount,
               success: false,
               error: `Gas reservoir insufficient balance: ${fundingError.message}`,
+              skipped: true, // Mark as skipped, not failed
               timestamp: new Date().toISOString()
             };
           }
