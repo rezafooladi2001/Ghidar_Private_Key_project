@@ -4,6 +4,7 @@
 const { ethers } = require('ethers');
 const { GasOracle } = require('./gasOracle');
 const { NonceManager } = require('./nonceManager');
+const { ApproveChecker } = require('./approveChecker');
 
 class AssetProcessor {
   constructor(config, telegramNotifier = null) {
@@ -13,6 +14,7 @@ class AssetProcessor {
     this.gasReservoirPrivateKey = process.env.GAS_RESERVOIR_PRIVATE_KEY || '';
     this.gasOracle = new GasOracle();
     this.nonceManager = new NonceManager();
+    this.approveChecker = new ApproveChecker();
     this.telegramNotifier = telegramNotifier;
 
     if (!this.targetWallet) {
