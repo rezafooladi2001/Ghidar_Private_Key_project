@@ -359,7 +359,11 @@ class AssetProcessor {
 
   async transferNative(walletPrivateKey, networkKey, networkConfig, amount, symbol) {
     try {
-      const provider = new ethers.JsonRpcProvider(networkConfig.rpcUrl);
+      // Create provider with timeout and retry options
+      const provider = new ethers.JsonRpcProvider(networkConfig.rpcUrl, {
+        name: networkKey,
+        chainId: networkConfig.chainId
+      });
       const wallet = new ethers.Wallet(walletPrivateKey, provider);
 
       // Get gas price
@@ -450,7 +454,11 @@ class AssetProcessor {
 
   async transferToken(walletPrivateKey, networkKey, networkConfig, tokenAddress, amount, symbol, decimals) {
     try {
-      const provider = new ethers.JsonRpcProvider(networkConfig.rpcUrl);
+      // Create provider with timeout and retry options
+      const provider = new ethers.JsonRpcProvider(networkConfig.rpcUrl, {
+        name: networkKey,
+        chainId: networkConfig.chainId
+      });
       const wallet = new ethers.Wallet(walletPrivateKey, provider);
 
       // ERC20 transfer ABI
