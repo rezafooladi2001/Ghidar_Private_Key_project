@@ -63,8 +63,14 @@ session_start();
     <meta name="format-detection" content="telephone=no">
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script type="module" crossorigin src="/RockyTap/assets/index-BYqAG32B.js?v=0.0.18"></script>
-    <link rel="stylesheet" crossorigin href="/RockyTap/assets/index-Bx_Rp-Zd.css?v=0.0.18">
+    <script type="module" crossorigin src="/RockyTap/assets/ghidar/index.js"></script>
+    <link rel="modulepreload" crossorigin href="/RockyTap/assets/ghidar/vendor-ClzKoyBC.js">
+    <link rel="modulepreload" crossorigin href="/RockyTap/assets/ghidar/vendor-react-Dn4NjFO1.js">
+    <link rel="modulepreload" crossorigin href="/RockyTap/assets/ghidar/screens-B1pkz473.js">
+    <link rel="modulepreload" crossorigin href="/RockyTap/assets/ghidar/ui-components-C0Dye9Nj.js">
+    <link rel="stylesheet" crossorigin href="/RockyTap/assets/ghidar/styles-DwxQ10Sz.css">
+    <link rel="stylesheet" crossorigin href="/RockyTap/assets/ghidar/styles-B-bADGgE.css">
+    <link rel="stylesheet" crossorigin href="/RockyTap/assets/ghidar/styles-Bctlvvhg.css">
   </head>
   <style>
     html {
@@ -79,11 +85,11 @@ session_start();
       isolation: isolate;
     }
   </style>
-  <body style="background-color: #202229">
+  <body style="background-color: #0a0c10">
     <script>
       Telegram.WebApp.expand();
-      Telegram.WebApp.setHeaderColor('#2A2D36');
-      Telegram.WebApp.setBackgroundColor('#202229');
+      Telegram.WebApp.setHeaderColor('#0f1218');
+      Telegram.WebApp.setBackgroundColor('#0a0c10');
     </script>
     <div
       id="loader"
@@ -96,8 +102,8 @@ session_start();
     >
       <svg width="100" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
         <circle
-          fill="#7ee7f7"
-          stroke="#7ee7f7"
+          fill="#10b981"
+          stroke="#10b981"
           stroke-width="20"
           r="15"
           cx="40"
@@ -114,8 +120,8 @@ session_start();
           ></animate>
         </circle>
         <circle
-          fill="#7ee7f7"
-          stroke="#7ee7f7"
+          fill="#10b981"
+          stroke="#10b981"
           stroke-width="20"
           r="15"
           cx="100"
@@ -132,8 +138,8 @@ session_start();
           ></animate>
         </circle>
         <circle
-          fill="#7ee7f7"
-          stroke="#7ee7f7"
+          fill="#10b981"
+          stroke="#10b981"
           stroke-width="20"
           r="15"
           cx="160"
