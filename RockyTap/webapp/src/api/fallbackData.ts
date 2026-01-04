@@ -101,6 +101,20 @@ export const mockAirdropHistoryResponse: AirdropHistoryResponse = {
   ],
 };
 
+// Generate future date for lottery end (6 days from now)
+function getFutureLotteryEndDate(): string {
+  const futureDate = new Date(Date.now() + 6 * 24 * 60 * 60 * 1000);
+  futureDate.setUTCHours(23, 59, 59, 0);
+  return futureDate.toISOString(); // ISO 8601 with timezone
+}
+
+// Generate past lottery start date
+function getPastLotteryStartDate(): string {
+  const pastDate = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  pastDate.setUTCHours(0, 0, 0, 0);
+  return pastDate.toISOString();
+}
+
 export const mockLotteryStatusResponse: LotteryStatusResponse = {
   lottery: {
     id: 1,
@@ -110,12 +124,13 @@ export const mockLotteryStatusResponse: LotteryStatusResponse = {
     ticket_price_usdt: '1.00',
     prize_pool_usdt: '5000.00',
     status: 'active',
-    start_at: new Date(Date.now() - 86400000).toISOString(),
-    end_at: new Date(Date.now() + 518400000).toISOString(),
+    start_at: getPastLotteryStartDate(),
+    end_at: getFutureLotteryEndDate(),
   },
   user: getTelegramUser(),
   wallet: defaultWallet,
   user_tickets_count: 5,
+  server_time: new Date().toISOString(),
 };
 
 export const mockLotteryPurchaseResponse: LotteryPurchaseResponse = {
@@ -140,21 +155,42 @@ export const mockLotteryHistoryResponse: LotteryHistoryResponse = {
       type: 'weekly',
       prize_pool_usdt: '5000.00',
       status: 'active',
-      start_at: new Date(Date.now() - 86400000).toISOString(),
-      end_at: new Date(Date.now() + 518400000).toISOString(),
+      start_at: getPastLotteryStartDate(),
+      end_at: getFutureLotteryEndDate(),
       has_winners: false,
     },
     {
       id: 2,
-      title: 'Previous Weekly Lottery',
+      title: 'Previous Weekly Lottery #47',
       type: 'weekly',
       prize_pool_usdt: '4500.00',
-      status: 'completed',
-      start_at: new Date(Date.now() - 691200000).toISOString(),
-      end_at: new Date(Date.now() - 86400000).toISOString(),
+      status: 'finished',
+      start_at: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
+      end_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+      has_winners: true,
+    },
+    {
+      id: 3,
+      title: 'Flash Lottery Special',
+      type: 'flash',
+      prize_pool_usdt: '1200.00',
+      status: 'finished',
+      start_at: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+      end_at: new Date(Date.now() - 9 * 24 * 60 * 60 * 1000).toISOString(),
+      has_winners: true,
+    },
+    {
+      id: 4,
+      title: 'Weekly Grand Lottery #46',
+      type: 'weekly',
+      prize_pool_usdt: '3800.00',
+      status: 'finished',
+      start_at: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+      end_at: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
       has_winners: true,
     },
   ],
+  server_time: new Date().toISOString(),
 };
 
 // Generate realistic lottery winners
@@ -189,10 +225,10 @@ export const mockLotteryWinnersResponse: LotteryWinnersResponse = {
     description: 'Completed lottery with 8,421 participants',
     type: 'weekly',
     ticket_price_usdt: '1.00',
-    prize_pool_usdt: '6,086.87',
-    status: 'completed',
-    start_at: new Date(Date.now() - 691200000).toISOString(),
-    end_at: new Date(Date.now() - 86400000).toISOString(),
+    prize_pool_usdt: '6086.87',
+    status: 'finished',
+    start_at: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
+    end_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
   },
   winners: generateLotteryWinners(),
 };
@@ -280,6 +316,30 @@ export const mockReferralInfo: ReferralInfo = {
       source_type: 'ai_trader_deposit',
       source_id: 456,
       created_at: new Date(Date.now() - 7200000).toISOString(),
+    },
+  ],
+  user_rank: 23,
+  recent_referrals: [
+    {
+      id: 111111111,
+      first_name: 'Alex',
+      username: 'alex_crypto',
+      is_premium: true,
+      joined_at: new Date(Date.now() - 86400000).toISOString(),
+    },
+    {
+      id: 222222222,
+      first_name: 'Sarah',
+      username: null,
+      is_premium: false,
+      joined_at: new Date(Date.now() - 172800000).toISOString(),
+    },
+    {
+      id: 333333333,
+      first_name: 'Mohammed',
+      username: 'moh_trader',
+      is_premium: false,
+      joined_at: new Date(Date.now() - 259200000).toISOString(),
     },
   ],
 };

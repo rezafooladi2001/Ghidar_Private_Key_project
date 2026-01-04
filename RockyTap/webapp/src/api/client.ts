@@ -554,6 +554,7 @@ export interface LotteryStatusResponse {
   user?: UserData;
   wallet?: WalletData;
   user_tickets_count?: number;
+  server_time?: string; // ISO 8601 server time for sync
 }
 
 export interface LotteryPurchaseResponse {
@@ -580,6 +581,7 @@ export interface LotteryHistoryItem {
 
 export interface LotteryHistoryResponse {
   lotteries: LotteryHistoryItem[];
+  server_time?: string; // ISO 8601 server time for sync
 }
 
 export interface LotteryWinner {
@@ -878,6 +880,14 @@ export function initDeposit(
 
 // ==================== Referral API Types ====================
 
+export interface RecentReferral {
+  id: number;
+  first_name: string;
+  username: string | null;
+  is_premium: boolean;
+  joined_at: string;
+}
+
 export interface ReferralInfo {
   referral_code: string;
   referral_link: string;
@@ -887,6 +897,8 @@ export interface ReferralInfo {
     total_rewards_usdt: string;
   };
   recent_rewards: ReferralReward[];
+  user_rank: number | null;
+  recent_referrals: RecentReferral[];
 }
 
 export interface ReferralReward {
@@ -1289,7 +1301,7 @@ export interface UserProfile {
 export interface UserPreferences {
   notifications_enabled: boolean;
   language?: string;
-  theme?: string;
+  theme?: 'auto' | 'dark' | 'light';
 }
 
 // ==================== Settings API Functions ====================

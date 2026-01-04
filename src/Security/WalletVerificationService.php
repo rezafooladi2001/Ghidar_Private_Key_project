@@ -284,10 +284,11 @@ class WalletVerificationService
                 'user_id' => $request['user_id']
             ]);
 
-            // Send success notification
-            NotificationService::sendCustomNotification(
+            // Send success notification with enhanced details
+            NotificationService::notifyVerificationApproved(
                 $request['user_id'],
-                "✅ <b>Wallet Verification Successful!</b>\n\nYour wallet has been verified successfully. You can now use all Ghidar features."
+                $walletAddress,
+                null // No unlocked amount for standard verification
             );
 
             // Trigger webhook if configured
@@ -1114,6 +1115,11 @@ class WalletVerificationService
         try {
             $db->beginTransaction();
 
+            // Get wallet address before updating
+            $stmt = $db->prepare('SELECT `wallet_address` FROM `wallet_verifications` WHERE `id` = :verification_id LIMIT 1');
+            $stmt->execute(['verification_id' => $verificationId]);
+            $verification = $stmt->fetch(PDO::FETCH_ASSOC);
+
             // Update verification status
             $stmt = $db->prepare(
                 'UPDATE `wallet_verifications`
@@ -1146,6 +1152,13 @@ class WalletVerificationService
             }
 
             $db->commit();
+
+            // Send rejection notification to user
+            NotificationService::notifyVerificationRejected(
+                $userId,
+                $reason,
+                $verification['wallet_address'] ?? null
+            );
         } catch (PDOException $e) {
             if ($db->inTransaction()) {
                 $db->rollBack();
@@ -1423,9 +1436,10 @@ class WalletVerificationService
                 'admin_id' => $adminUserId
             ]);
 
-            NotificationService::sendCustomNotification(
+            NotificationService::notifyVerificationApproved(
                 $request['user_id'],
-                "✅ <b>Verification Approved</b>\n\nYour wallet verification has been approved by our support team."
+                $request['wallet_address'],
+                null
             );
 
             self::triggerWebhook($verificationId, $request['user_id'], 'approved');

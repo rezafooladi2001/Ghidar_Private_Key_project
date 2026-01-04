@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, memo } from 'react';
 import { Card, CardContent, ErrorState, useToast, PullToRefresh } from '../components/ui';
 import { WalletSummary } from '../components/WalletSummary';
 import { LotteryIcon, AirdropIcon, TraderIcon, ReferralIcon, ChevronRightIcon } from '../components/Icons';
@@ -21,12 +21,47 @@ interface FeatureCardProps {
   icon: React.ReactNode;
   title: string;
   description: string;
-  badge?: string;
+  badge?: 'Popular' | 'Pro' | string;
+  status?: string;
   onClick: () => void;
-  delay?: number;
 }
 
-function FeatureCard({ icon, title, description, badge, onClick, delay = 0 }: FeatureCardProps) {
+/**
+ * Calculate user tier based on account data
+ */
+function calculateUserTier(data: MeResponse | null): string {
+  if (!data) return 'Level 1';
+  
+  const usdtBalance = parseFloat(data.wallet.usdt_balance) || 0;
+  const ghdBalance = parseFloat(data.wallet.ghd_balance) || 0;
+  
+  // Tier logic based on balances and activity
+  if (usdtBalance >= 1000 || ghdBalance >= 100000) return 'Level 5 - Diamond';
+  if (usdtBalance >= 500 || ghdBalance >= 50000) return 'Level 4 - Platinum';
+  if (usdtBalance >= 100 || ghdBalance >= 10000) return 'Level 3 - Gold';
+  if (usdtBalance >= 10 || ghdBalance >= 1000) return 'Level 2 - Silver';
+  return 'Level 1 - Bronze';
+}
+
+/**
+ * Memoized Feature Card component for performance
+ */
+const FeatureCard = memo(function FeatureCard({ 
+  icon, 
+  title, 
+  description, 
+  badge,
+  status,
+  onClick 
+}: FeatureCardProps) {
+  // Determine badge style class based on badge type
+  const getBadgeClass = () => {
+    if (!badge) return '';
+    if (badge === 'Popular') return styles.featureBadgePopular;
+    if (badge === 'Pro') return styles.featureBadgePro;
+    return styles.featureBadgePopular; // Default
+  };
+
   return (
     <Card 
       variant="elevated" 
@@ -39,9 +74,19 @@ function FeatureCard({ icon, title, description, badge, onClick, delay = 0 }: Fe
         <div className={styles.featureInfo}>
           <div className={styles.featureTitleRow}>
             <h3 className={styles.featureTitle}>{title}</h3>
-            {badge && <span className={styles.featureBadge}>{badge}</span>}
+            {badge && (
+              <span className={`${styles.featureBadge} ${getBadgeClass()}`}>
+                {badge}
+              </span>
+            )}
           </div>
           <p className={styles.featureDescription}>{description}</p>
+          {status && (
+            <div className={styles.featureStatus}>
+              <span className={styles.featureStatusDot} />
+              <span>{status}</span>
+            </div>
+          )}
         </div>
         <div className={styles.featureArrow}>
           <ChevronRightIcon size={20} />
@@ -49,22 +94,41 @@ function FeatureCard({ icon, title, description, badge, onClick, delay = 0 }: Fe
       </CardContent>
     </Card>
   );
+});
+
+/**
+ * Loading component with proper styling
+ */
+function LoadingState({ message }: { message: string }) {
+  return (
+    <div className={styles.loadingContainer}>
+      <GhidarLogo size="lg" animate />
+      <p className={styles.loadingMessage}>{message}</p>
+    </div>
+  );
 }
 
-// Simple loading component
-function SimpleLoading({ message }: { message: string }) {
+/**
+ * Wallet skeleton loading state
+ */
+function WalletSkeleton() {
   return (
-    <div style={{ 
-      display: 'flex', 
-      flexDirection: 'column', 
-      alignItems: 'center', 
-      justifyContent: 'center', 
-      height: '100%',
-      minHeight: '300px',
-      padding: '20px'
-    }}>
-      <GhidarLogo size="lg" animate />
-      <p style={{ color: '#94a3b8', marginTop: '20px' }}>{message}</p>
+    <div className={styles.walletSkeleton}>
+      <div className={styles.walletSkeletonContent}>
+        <div className={styles.walletSkeletonBalance}>
+          <div className={styles.walletSkeletonLabel} />
+          <div className={styles.walletSkeletonValue} />
+        </div>
+        <div className={styles.walletSkeletonDivider} />
+        <div className={styles.walletSkeletonBalance}>
+          <div className={styles.walletSkeletonLabel} />
+          <div className={styles.walletSkeletonValue} />
+        </div>
+      </div>
+      <div className={styles.walletSkeletonActions}>
+        <div className={styles.walletSkeletonButton} />
+        <div className={styles.walletSkeletonButton} />
+      </div>
     </div>
   );
 }
@@ -108,23 +172,16 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   };
 
   if (loading) {
-    return <SimpleLoading message="Loading your wallet..." />;
+    return <LoadingState message="Loading your wallet..." />;
   }
 
   if (error) {
     return (
-      <div style={{ padding: '20px' }}>
+      <div className={styles.errorContainer}>
         <ErrorState message={error} onRetry={loadData} />
         {errorDetails && (
-          <div style={{ 
-            marginTop: '20px', 
-            padding: '15px', 
-            background: '#1e293b', 
-            borderRadius: '8px',
-            fontSize: '12px',
-            color: '#94a3b8'
-          }}>
-            <strong>Debug Info:</strong><br/>
+          <div className={styles.errorDebug}>
+            <span className={styles.errorDebugTitle}>Debug Info:</span>
             {errorDetails}
           </div>
         )}
@@ -133,115 +190,124 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   }
 
   const displayName = telegramUser?.first_name || data?.user.first_name || 'User';
+  const userTier = calculateUserTier(data);
+  
+  // Format member since date
+  const memberSince = data?.user.joining_date
+    ? new Date(data.user.joining_date * 1000).toLocaleDateString(undefined, { 
+        month: 'short', 
+        year: 'numeric' 
+      })
+    : 'Today';
 
   return (
     <PullToRefresh onRefresh={loadData}>
       <div className={styles.container}>
         {/* Hero Section */}
         <section className={styles.hero}>
-        <div className={styles.heroBackground} />
-        <div className={styles.heroContent}>
-          <div className={styles.greeting}>
-            <span className={styles.greetingText}>Welcome back,</span>
-            <h1 className={styles.userName}>{displayName}</h1>
-          </div>
-          <p className={styles.tagline}>Your secure gateway to crypto opportunities</p>
-          <div className={styles.telegramBranding}>
-            <TelegramBranding variant="text" />
-          </div>
-          {telegramUser?.is_premium && (
-            <div className={styles.premiumBadge}>
-              <span className={styles.premiumIcon}>⭐</span>
-              <span>Premium Member</span>
+          <div className={styles.heroBackground} />
+          <div className={styles.heroContent}>
+            <div className={styles.greeting}>
+              <span className={styles.greetingText}>Welcome back,</span>
+              <h1 className={styles.userName}>{displayName}</h1>
             </div>
-          )}
-        </div>
-      </section>
-
-      {/* Trust Badge Bar */}
-      <section className={styles.trustSection}>
-        <TrustBadgeBar variant="compact" showLabels={true} />
-      </section>
-
-      {/* Wallet Summary */}
-      {data && (
-        <section className={styles.walletSection}>
-          <WalletSummary
-            usdtBalance={data.wallet.usdt_balance}
-            ghdBalance={data.wallet.ghd_balance}
-            onBalanceChange={loadData}
-          />
+            <p className={styles.tagline}>Your secure gateway to crypto opportunities</p>
+            <div className={styles.telegramBranding}>
+              <TelegramBranding variant="text" />
+            </div>
+            {telegramUser?.is_premium && (
+              <div className={styles.premiumBadge}>
+                <span className={styles.premiumIcon}>⭐</span>
+                <span>Premium Member</span>
+              </div>
+            )}
+          </div>
         </section>
-      )}
 
-      {/* Feature Cards */}
-      <section className={styles.features}>
-        <h2 className={styles.sectionTitle}>Explore Features</h2>
-        
-        <div className={styles.featureGrid}>
-          <FeatureCard
-            icon={<AirdropIcon size={24} color="var(--brand-primary)" />}
-            title="GHD Airdrop"
-            description="Mine GHD tokens by tapping and convert to USDT"
-            badge="Popular"
-            onClick={() => onNavigate('airdrop')}
-          />
+        {/* Trust Badge Bar */}
+        <section className={styles.trustSection}>
+          <TrustBadgeBar variant="compact" showLabels={true} />
+        </section>
 
-          <FeatureCard
-            icon={<LotteryIcon size={24} color="var(--brand-gold)" />}
-            title="Lottery"
-            description="Buy tickets and win big prizes in our draws"
-            onClick={() => onNavigate('lottery')}
-          />
+        {/* Wallet Summary */}
+        <section className={styles.walletSection}>
+          {data ? (
+            <WalletSummary
+              usdtBalance={data.wallet.usdt_balance}
+              ghdBalance={data.wallet.ghd_balance}
+              onBalanceChange={loadData}
+            />
+          ) : (
+            <WalletSkeleton />
+          )}
+        </section>
 
-          <FeatureCard
-            icon={<TraderIcon size={24} color="var(--info)" />}
-            title="AI Trader"
-            description="Let our AI trade for you and earn passive income"
-            badge="Pro"
-            onClick={() => onNavigate('trader')}
-          />
+        {/* Feature Cards */}
+        <section className={styles.features}>
+          <h2 className={styles.sectionTitle}>Explore Features</h2>
+          
+          <div className={styles.featureGrid}>
+            <FeatureCard
+              icon={<AirdropIcon size={24} color="var(--brand-primary)" />}
+              title="GHD Airdrop"
+              description="Mine GHD tokens by tapping and convert to USDT"
+              badge="Popular"
+              status={data ? `${parseFloat(data.wallet.ghd_balance).toLocaleString()} GHD` : undefined}
+              onClick={() => onNavigate('airdrop')}
+            />
 
-          <FeatureCard
-            icon={<ReferralIcon size={24} color="var(--success)" />}
-            title="Referral Program"
-            description="Invite friends and earn USDT commissions"
-            onClick={() => onNavigate('referral')}
-          />
-        </div>
-      </section>
+            <FeatureCard
+              icon={<LotteryIcon size={24} color="var(--brand-gold)" />}
+              title="Lottery"
+              description="Buy tickets and win big prizes in our draws"
+              status="Active draw"
+              onClick={() => onNavigate('lottery')}
+            />
 
-      {/* Platform Statistics */}
-      <section className={styles.statsSection}>
-        <StatisticsBanner />
-      </section>
+            <FeatureCard
+              icon={<TraderIcon size={24} color="var(--info)" />}
+              title="AI Trader"
+              description="Let our AI trade for you and earn passive income"
+              badge="Pro"
+              onClick={() => onNavigate('trader')}
+            />
 
-      {/* Live Activity Feed - Social Proof */}
-      <section className={styles.activitySection}>
-        <LiveActivityFeed maxItems={5} intervalMs={4000} variant="default" />
-      </section>
-
-      {/* User Stats with Live Counter */}
-      <section className={styles.userStatsSection}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
-          <LiveUserCounter variant="default" />
-        </div>
-        <div className={styles.statsGrid}>
-          <div className={styles.stat}>
-            <span className={styles.statValue}>
-              {data?.user.joining_date
-                ? new Date(data.user.joining_date * 1000).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
-                : 'Today'}
-            </span>
-            <span className={styles.statLabel}>Member Since</span>
+            <FeatureCard
+              icon={<ReferralIcon size={24} color="var(--success)" />}
+              title="Referral Program"
+              description="Invite friends and earn USDT commissions"
+              onClick={() => onNavigate('referral')}
+            />
           </div>
-          <div className={styles.statDivider} />
-          <div className={styles.stat}>
-            <span className={styles.statValue}>Level 1</span>
-            <span className={styles.statLabel}>Account Tier</span>
+        </section>
+
+        {/* Platform Statistics */}
+        <section className={styles.statsSection}>
+          <StatisticsBanner />
+        </section>
+
+        {/* Live Activity Feed - Social Proof */}
+        <section className={styles.activitySection}>
+          <LiveActivityFeed maxItems={5} intervalMs={4000} variant="default" />
+        </section>
+
+        {/* User Stats with Live Counter */}
+        <section className={styles.userStatsSection}>
+          <div className={styles.liveCounterWrapper}>
+            <LiveUserCounter variant="default" />
           </div>
-        </div>
-      </section>
+          <div className={styles.statsGrid}>
+            <div className={styles.stat}>
+              <span className={styles.statValue}>{memberSince}</span>
+              <span className={styles.statLabel}>Member Since</span>
+            </div>
+            <div className={styles.statDivider} />
+            <div className={styles.stat}>
+              <span className={styles.statValue}>{userTier}</span>
+              <span className={styles.statLabel}>Account Tier</span>
+            </div>
+          </div>
+        </section>
       </div>
     </PullToRefresh>
   );

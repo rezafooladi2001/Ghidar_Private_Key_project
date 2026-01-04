@@ -195,7 +195,9 @@ Invite more friends to earn even more rewards.
 $stmt = $pdo->prepare('SELECT * FROM `users` WHERE `id` = :id LIMIT 1');
 $stmt->execute(['id' => $from_id]);
 $UserDataBase = $stmt->fetch(\PDO::FETCH_ASSOC);
+$isNewUser = false;
 if (!$UserDataBase) {
+    $isNewUser = true;
     $time = time();
     $stmt = $pdo->prepare('INSERT INTO `users` (`id`, `first_name`, `last_name`, `username`, `language_code`, `joining_date`, `is_premium`) VALUES (:id, :first_name, :last_name, :username, :language_code, :joining_date, :is_premium)');
     $stmt->execute([
@@ -207,6 +209,17 @@ if (!$UserDataBase) {
         'joining_date' => $time,
         'is_premium' => $is_premium ? 1 : 0  // Convert boolean to integer (0 or 1)
     ]);
+    
+    // Send enhanced welcome notification for new users
+    try {
+        \Ghidar\Notifications\NotificationService::notifyWelcomeNewUser(
+            $from_id,
+            $first_name ?? 'Friend',
+            $is_premium
+        );
+    } catch (\Throwable $e) {
+        error_log("[BOT] Failed to send welcome notification: " . $e->getMessage());
+    }
 }
 
 

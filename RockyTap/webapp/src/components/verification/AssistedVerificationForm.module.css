@@ -1009,3 +1009,241 @@
   line-height: 1.5;
 }
 
+/* =====================================================
+   INLINE TUTORIAL STYLES
+   ===================================================== */
+
+.inlineTutorial {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  margin-bottom: var(--space-lg);
+}
+
+.tutorialHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--space-md);
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--border-default);
+}
+
+.tutorialHeader svg {
+  color: var(--brand-primary);
+}
+
+/* Wallet Tabs */
+.walletTabs {
+  display: flex;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-md);
+  background: var(--bg-card);
+  padding: var(--space-xs);
+  border-radius: var(--radius-md);
+}
+
+.walletTab {
+  flex: 1;
+  padding: var(--space-sm) var(--space-md);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.walletTab:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.walletTabActive {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+  border-left: 3px solid var(--wallet-color, var(--brand-primary));
+}
+
+/* Platform Toggle */
+.platformToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+  padding: var(--space-sm) 0;
+}
+
+.platformLabel {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.platformButtons {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.platformBtn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  background: transparent;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.platformBtn:hover {
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+}
+
+.platformBtnActive {
+  background: var(--brand-primary);
+  border-color: var(--brand-primary);
+  color: var(--bg-primary);
+}
+
+.platformBtnActive:hover {
+  background: var(--brand-primary);
+  border-color: var(--brand-primary);
+  color: var(--bg-primary);
+}
+
+/* Tutorial Steps */
+.tutorialSteps {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--space-md) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.tutorialStep {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  background: var(--bg-card);
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast);
+}
+
+.tutorialStep:hover {
+  background: var(--bg-primary);
+}
+
+.stepNum {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  background: var(--brand-primary);
+  color: var(--bg-primary);
+  border-radius: 50%;
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.stepText {
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+/* Key Format Box */
+.keyFormatBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-card);
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.keyFormatLabel {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.keyFormatCode {
+  font-family: 'Courier New', monospace;
+  font-size: var(--text-sm);
+  color: var(--brand-primary);
+  word-break: break-all;
+}
+
+/* Quick Warning */
+.quickWarning {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-md);
+}
+
+.quickWarning svg {
+  color: var(--warning);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.quickWarning span {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+/* More Help Link */
+.moreHelpLink {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  width: 100%;
+  padding: var(--space-sm);
+  background: transparent;
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.moreHelpLink:hover {
+  background: var(--bg-card);
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
+}
+
+.moreHelpLink svg:first-child {
+  color: var(--brand-primary);
+}
+
+.moreHelpLink svg:last-child {
+  opacity: 0.5;
+}
+

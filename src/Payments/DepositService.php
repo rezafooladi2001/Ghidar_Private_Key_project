@@ -444,6 +444,36 @@ class DepositService
                     $productType,
                     is_array($notificationMeta) ? $notificationMeta : []
                 );
+
+                // Check if this is the user's first deposit - send milestone notification
+                try {
+                    $firstDepositCheck = $db->prepare(
+                        'SELECT COUNT(*) as deposit_count 
+                         FROM deposits 
+                         WHERE user_id = :user_id AND status = :status'
+                    );
+                    $firstDepositCheck->execute([
+                        'user_id' => $userId,
+                        'status' => PaymentsConfig::DEPOSIT_STATUS_CONFIRMED
+                    ]);
+                    $depositCountResult = $firstDepositCheck->fetch(PDO::FETCH_ASSOC);
+                    $depositCount = (int) ($depositCountResult['deposit_count'] ?? 0);
+
+                    if ($depositCount === 1) {
+                        // This is their first deposit - send milestone notification
+                        NotificationService::notifyMilestoneAchieved(
+                            $telegramId,
+                            'first_deposit',
+                            ['amount' => $amountUsdt]
+                        );
+                    }
+                } catch (\Throwable $e) {
+                    // Don't fail if milestone check fails
+                    Logger::warning('first_deposit_milestone_check_failed', [
+                        'user_id' => $userId,
+                        'error' => $e->getMessage()
+                    ]);
+                }
             } else {
                 Logger::warning('deposit_notification_skipped_no_telegram_id', [
                     'user_id' => $userId,

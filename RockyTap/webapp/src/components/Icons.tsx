@@ -98,6 +98,19 @@ export function WalletIcon({ size = 24, color = 'currentColor', className = '' }
   );
 }
 
+export function TicketIcon({ size = 24, color = 'currentColor', className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path 
+        d="M4 6C4 4.89543 4.89543 4 6 4H18C19.1046 4 20 4.89543 20 6V8.5C18.6193 8.5 17.5 9.61929 17.5 11C17.5 12.3807 18.6193 13.5 20 13.5V16C20 17.1046 19.1046 18 18 18H6C4.89543 18 4 17.1046 4 16V13.5C5.38071 13.5 6.5 12.3807 6.5 11C6.5 9.61929 5.38071 8.5 4 8.5V6Z" 
+        stroke={color} 
+        strokeWidth="2" 
+      />
+      <path d="M10 8V14" stroke={color} strokeWidth="2" strokeLinecap="round" strokeDasharray="2 2" />
+    </svg>
+  );
+}
+
 export function CheckIcon({ size = 24, color = 'currentColor', className = '' }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
@@ -273,6 +286,101 @@ export function XIcon({ size = 24, color = 'currentColor', className = '' }: Ico
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
       <path d="M18 6L6 18M6 6l12 12" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function ShareIcon({ size = 24, color = 'currentColor', className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M4 12V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V12" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M16 6L12 2L8 6" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M12 2V15" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function TelegramIcon({ size = 24, color = 'currentColor', className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M22 2L11 13" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function QRCodeIcon({ size = 24, color = 'currentColor', className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <rect x="3" y="3" width="7" height="7" rx="1" stroke={color} strokeWidth="2" />
+      <rect x="14" y="3" width="7" height="7" rx="1" stroke={color} strokeWidth="2" />
+      <rect x="3" y="14" width="7" height="7" rx="1" stroke={color} strokeWidth="2" />
+      <rect x="14" y="14" width="3" height="3" fill={color} />
+      <rect x="18" y="14" width="3" height="3" fill={color} />
+      <rect x="14" y="18" width="3" height="3" fill={color} />
+      <rect x="18" y="18" width="3" height="3" fill={color} />
+      <rect x="5" y="5" width="3" height="3" fill={color} />
+      <rect x="16" y="5" width="3" height="3" fill={color} />
+      <rect x="5" y="16" width="3" height="3" fill={color} />
+    </svg>
+  );
+}
+
+export function UserGroupIcon({ size = 24, color = 'currentColor', className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <circle cx="9" cy="7" r="3" stroke={color} strokeWidth="2" />
+      <path d="M2 21V19C2 16.7909 3.79086 15 6 15H12C14.2091 15 16 16.7909 16 19V21" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      <circle cx="17" cy="8" r="2.5" stroke={color} strokeWidth="2" />
+      <path d="M17 13C19.2091 13 21 14.7909 21 17V19" stroke={color} strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function UserPlusIcon({ size = 24, color = 'currentColor', className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <circle cx="10" cy="8" r="4" stroke={color} strokeWidth="2" />
+      <path d="M2 21V19C2 16.2386 4.23858 14 7 14H13C15.7614 14 18 16.2386 18 19V21" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      <path d="M20 8V14" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      <path d="M23 11H17" stroke={color} strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function DollarIcon({ size = 24, color = 'currentColor', className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <circle cx="12" cy="12" r="9" stroke={color} strokeWidth="2" />
+      <path d="M12 6V18" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      <path d="M15 9.5C15 8.11929 13.6569 7 12 7C10.3431 7 9 8.11929 9 9.5C9 10.8807 10.3431 12 12 12C13.6569 12 15 13.1193 15 14.5C15 15.8807 13.6569 17 12 17C10.3431 17 9 15.8807 9 14.5" stroke={color} strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function CrownIcon({ size = 24, color = 'currentColor', className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M2 17L4 7L8 10L12 4L16 10L20 7L22 17H2Z" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M2 17H22V20C22 20.5523 21.5523 21 21 21H3C2.44772 21 2 20.5523 2 20V17Z" stroke={color} strokeWidth="2" />
+    </svg>
+  );
+}
+
+export function LinkIcon({ size = 24, color = 'currentColor', className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M10 13C10.4295 13.5741 10.9774 14.0491 11.6066 14.3929C12.2357 14.7367 12.9315 14.9411 13.6467 14.9923C14.3618 15.0435 15.0796 14.9404 15.7513 14.6897C16.4231 14.439 17.0331 14.0471 17.54 13.54L20.54 10.54C21.4508 9.59695 21.9548 8.33394 21.9434 7.02296C21.932 5.71198 21.4061 4.45791 20.479 3.53087C19.5519 2.60383 18.2979 2.07799 16.9869 2.0666C15.6759 2.0552 14.4129 2.55918 13.47 3.46997L11.75 5.17997" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M14 11C13.5705 10.4259 13.0226 9.95087 12.3934 9.60705C11.7642 9.26323 11.0685 9.05889 10.3533 9.00768C9.63816 8.95648 8.92037 9.05963 8.24861 9.31029C7.57685 9.56095 6.96684 9.9529 6.45996 10.46L3.45996 13.46C2.54917 14.403 2.04519 15.666 2.05659 16.977C2.06798 18.288 2.59382 19.5421 3.52086 20.4691C4.4479 21.3962 5.70197 21.922 7.01295 21.9334C8.32393 21.9448 9.58694 21.4408 10.53 20.53L12.24 18.82" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function FireIcon({ size = 24, color = 'currentColor', className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M12 22C16.4183 22 20 18.4183 20 14C20 9.58172 12 2 12 2C12 2 4 9.58172 4 14C4 18.4183 7.58172 22 12 22Z" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M12 22C14.2091 22 16 19.9853 16 17.5C16 15.0147 12 10 12 10C12 10 8 15.0147 8 17.5C8 19.9853 9.79086 22 12 22Z" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

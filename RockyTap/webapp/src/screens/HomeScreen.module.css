@@ -1,30 +1,103 @@
+/**
+ * HomeScreen Styles - Premium Dark Theme
+ * Enhanced with layered gradients, glassmorphism, and micro-interactions
+ */
+
 .container {
   display: flex;
   flex-direction: column;
   gap: var(--space-lg);
   padding-bottom: var(--space-lg);
-  animation: fadeIn 0.4s ease-out;
+  animation: pageEnter 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+@keyframes pageEnter {
+  from { 
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-/* Hero Section */
+/* ============================================
+   HERO SECTION - Premium Visual Impact
+   ============================================ */
+
 .hero {
   position: relative;
   padding: var(--space-xl) var(--space-lg) var(--space-lg);
   overflow: hidden;
+  border-radius: 0 0 var(--radius-2xl) var(--radius-2xl);
+  margin: 0 var(--space-sm);
+  margin-top: calc(-1 * var(--space-md));
 }
 
 .heroBackground {
   position: absolute;
   inset: 0;
   background: 
-    radial-gradient(ellipse at 30% 20%, rgba(16, 185, 129, 0.15) 0%, transparent 50%),
-    radial-gradient(ellipse at 70% 80%, rgba(251, 191, 36, 0.1) 0%, transparent 50%);
+    /* Primary emerald glow */
+    radial-gradient(ellipse 120% 80% at 20% 10%, rgba(16, 185, 129, 0.2) 0%, transparent 50%),
+    /* Secondary gold accent */
+    radial-gradient(ellipse 100% 60% at 80% 90%, rgba(251, 191, 36, 0.12) 0%, transparent 45%),
+    /* Center soft glow */
+    radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.08) 0%, transparent 60%),
+    /* Base gradient */
+    linear-gradient(180deg, rgba(15, 18, 24, 0.3) 0%, rgba(10, 12, 16, 0.8) 100%);
   pointer-events: none;
+  z-index: 0;
+}
+
+/* Animated mesh overlay */
+.heroBackground::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: 
+    repeating-linear-gradient(
+      90deg,
+      transparent 0px,
+      transparent 100px,
+      rgba(16, 185, 129, 0.02) 100px,
+      rgba(16, 185, 129, 0.02) 101px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      transparent 0px,
+      transparent 100px,
+      rgba(16, 185, 129, 0.02) 100px,
+      rgba(16, 185, 129, 0.02) 101px
+    );
+  animation: meshMove 20s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes meshMove {
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(100px, 100px); }
+}
+
+/* Floating particles effect */
+.heroBackground::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: 
+    radial-gradient(circle at 20% 30%, rgba(16, 185, 129, 0.4) 0%, transparent 2px),
+    radial-gradient(circle at 80% 70%, rgba(251, 191, 36, 0.3) 0%, transparent 2px),
+    radial-gradient(circle at 60% 20%, rgba(16, 185, 129, 0.25) 0%, transparent 1.5px),
+    radial-gradient(circle at 30% 80%, rgba(251, 191, 36, 0.2) 0%, transparent 1.5px),
+    radial-gradient(circle at 90% 40%, rgba(16, 185, 129, 0.3) 0%, transparent 2px);
+  animation: particleFloat 8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes particleFloat {
+  0%, 100% { transform: translateY(0) scale(1); opacity: 0.6; }
+  50% { transform: translateY(-8px) scale(1.1); opacity: 1; }
 }
 
 .heroContent {
@@ -41,6 +114,8 @@
   color: var(--text-muted);
   display: block;
   margin-bottom: var(--space-xs);
+  letter-spacing: 0.5px;
+  animation: fadeInUp 0.5s ease-out 0.1s both;
 }
 
 .userName {
@@ -48,15 +123,22 @@
   font-size: var(--text-3xl);
   font-weight: 700;
   margin: 0;
-  background: var(--gradient-premium);
+  background: linear-gradient(135deg, #10b981 0%, #34d399 40%, #fbbf24 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  animation: fadeInUp 0.5s ease-out 0.1s both;
+  background-size: 200% 100%;
+  animation: fadeInUp 0.5s ease-out 0.15s both, gradientShift 8s ease-in-out infinite;
+  text-shadow: 0 0 40px rgba(16, 185, 129, 0.3);
+}
+
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
 }
 
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateY(16px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -65,44 +147,158 @@
   color: var(--text-secondary);
   margin: 0;
   animation: fadeInUp 0.5s ease-out 0.2s both;
+  line-height: 1.5;
 }
 
+.telegramBranding {
+  margin-top: var(--space-md);
+  display: flex;
+  justify-content: flex-start;
+  animation: fadeInUp 0.5s ease-out 0.25s both;
+}
+
+/* Premium Badge - Enhanced with shimmer */
 .premiumBadge {
   display: inline-flex;
   align-items: center;
   gap: var(--space-xs);
   margin-top: var(--space-md);
   padding: var(--space-xs) var(--space-md);
-  background: linear-gradient(135deg, rgba(251, 191, 36, 0.15) 0%, rgba(251, 191, 36, 0.05) 100%);
-  border: 1px solid var(--border-gold);
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.2) 0%, rgba(245, 158, 11, 0.1) 50%, rgba(251, 191, 36, 0.15) 100%);
+  border: 1px solid rgba(251, 191, 36, 0.4);
   border-radius: var(--radius-full);
   font-size: var(--text-xs);
   font-weight: 600;
   color: var(--brand-gold);
   animation: fadeInUp 0.5s ease-out 0.3s both;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.15);
+}
+
+.premiumBadge::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(251, 191, 36, 0.3), transparent);
+  animation: shimmerPremium 3s ease-in-out infinite;
+}
+
+@keyframes shimmerPremium {
+  0% { left: -100%; }
+  50%, 100% { left: 100%; }
 }
 
 .premiumIcon {
   font-size: var(--text-sm);
+  animation: starPulse 2s ease-in-out infinite;
 }
 
-/* Wallet Section */
+@keyframes starPulse {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  50% { transform: scale(1.15) rotate(15deg); }
+}
+
+/* ============================================
+   TRUST SECTION
+   ============================================ */
+
+.trustSection {
+  padding: 0 var(--space-md);
+  animation: fadeInUp 0.5s ease-out 0.2s both;
+}
+
+/* ============================================
+   WALLET SECTION
+   ============================================ */
+
 .walletSection {
   padding: 0 var(--space-md);
-  animation: fadeInUp 0.5s ease-out 0.15s both;
+  animation: fadeInUp 0.5s ease-out 0.25s both;
 }
 
-/* Features Section */
+/* Wallet Skeleton */
+.walletSkeleton {
+  padding: var(--space-lg);
+  background: var(--gradient-card);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+}
+
+.walletSkeletonContent {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.walletSkeletonBalance {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.walletSkeletonLabel {
+  width: 80px;
+  height: 12px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+  animation: skeletonPulse 1.5s ease-in-out infinite;
+}
+
+.walletSkeletonValue {
+  width: 100px;
+  height: 24px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+  animation: skeletonPulse 1.5s ease-in-out infinite 0.1s;
+}
+
+.walletSkeletonDivider {
+  width: 1px;
+  height: 40px;
+  background: var(--border-default);
+}
+
+.walletSkeletonActions {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.walletSkeletonButton {
+  flex: 1;
+  height: 36px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-md);
+  animation: skeletonPulse 1.5s ease-in-out infinite 0.2s;
+}
+
+@keyframes skeletonPulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+}
+
+/* ============================================
+   FEATURES SECTION
+   ============================================ */
+
 .features {
   padding: 0 var(--space-md);
 }
 
 .sectionTitle {
   font-family: var(--font-display);
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   font-weight: 600;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   margin: 0 0 var(--space-md) var(--space-xs);
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
 .featureGrid {
@@ -111,14 +307,56 @@
   gap: var(--space-md);
 }
 
+/* Feature Card - Enhanced with gradient borders and glow */
 .featureCard {
-  animation: fadeInUp 0.4s ease-out both;
+  position: relative;
+  animation: featureEnter 0.4s ease-out both;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: transform var(--transition-normal), box-shadow var(--transition-normal);
 }
 
+.featureCard::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--gradient-brand);
+  opacity: 0;
+  transition: opacity var(--transition-normal);
+}
+
+.featureCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3), 0 0 0 1px var(--border-hover);
+}
+
+.featureCard:hover::before {
+  opacity: 1;
+}
+
+.featureCard:active {
+  transform: translateY(0) scale(0.99);
+}
+
+/* Staggered animation delays */
 .featureCard:nth-child(1) { animation-delay: 0.1s; }
 .featureCard:nth-child(2) { animation-delay: 0.15s; }
 .featureCard:nth-child(3) { animation-delay: 0.2s; }
 .featureCard:nth-child(4) { animation-delay: 0.25s; }
+
+@keyframes featureEnter {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
 .featureContent {
   display: flex;
@@ -127,16 +365,40 @@
   padding: var(--space-md);
 }
 
+/* Feature Icon - Enhanced with glow effect */
 .featureIcon {
-  width: 48px;
-  height: 48px;
+  width: 52px;
+  height: 52px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-tertiary);
+  background: linear-gradient(135deg, var(--bg-tertiary) 0%, var(--bg-elevated) 100%);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   flex-shrink: 0;
+  transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+  position: relative;
+}
+
+.featureIcon::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: var(--gradient-brand);
+  opacity: 0;
+  z-index: -1;
+  transition: opacity var(--transition-normal);
+  filter: blur(8px);
+}
+
+.featureCard:hover .featureIcon {
+  transform: scale(1.05);
+  border-color: var(--border-accent);
+}
+
+.featureCard:hover .featureIcon::after {
+  opacity: 0.4;
 }
 
 .featureInfo {
@@ -159,15 +421,44 @@
   margin: 0;
 }
 
+/* Badge Styles - Differentiated Popular vs Pro */
 .featureBadge {
-  font-size: var(--text-xs);
+  font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  padding: var(--space-xs);
-  background: var(--gradient-brand);
-  color: #fff;
+  padding: 3px 8px;
   border-radius: var(--radius-full);
+  position: relative;
+  overflow: hidden;
+}
+
+.featureBadgePopular {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(52, 211, 153, 0.15) 100%);
+  color: var(--brand-primary);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.featureBadgePro {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.2) 0%, rgba(245, 158, 11, 0.15) 100%);
+  color: var(--brand-gold);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+.featureBadgePro::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(251, 191, 36, 0.4), transparent);
+  animation: shimmerBadge 2s ease-in-out infinite;
+}
+
+@keyframes shimmerBadge {
+  0% { left: -100%; }
+  50%, 100% { left: 100%; }
 }
 
 .featureDescription {
@@ -175,6 +466,29 @@
   color: var(--text-muted);
   margin: 0;
   line-height: 1.4;
+}
+
+/* Feature Status Indicator */
+.featureStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.featureStatusDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  animation: statusPulse 2s ease-in-out infinite;
+}
+
+@keyframes statusPulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
 }
 
 .featureArrow {
@@ -188,43 +502,56 @@
   color: var(--brand-primary);
 }
 
-/* Trust Section */
-.trustSection {
-  padding: 0 var(--space-md) var(--space-md);
-  animation: fadeInUp 0.5s ease-out 0.25s both;
-}
+/* ============================================
+   STATS SECTION
+   ============================================ */
 
-.telegramBranding {
-  margin-top: var(--space-sm);
-  display: flex;
-  justify-content: center;
-  animation: fadeInUp 0.5s ease-out 0.3s both;
-}
-
-/* Stats Section */
 .statsSection {
   padding: 0 var(--space-md);
   animation: fadeInUp 0.5s ease-out 0.35s both;
 }
 
-/* Live Activity Section */
+/* ============================================
+   LIVE ACTIVITY SECTION
+   ============================================ */
+
 .activitySection {
   padding: 0 var(--space-md);
   animation: fadeInUp 0.5s ease-out 0.4s both;
 }
 
+/* ============================================
+   USER STATS SECTION - Enhanced
+   ============================================ */
+
 .userStatsSection {
   padding: 0 var(--space-md);
-  animation: fadeInUp 0.5s ease-out 0.4s both;
+  animation: fadeInUp 0.5s ease-out 0.45s both;
+}
+
+.liveCounterWrapper {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--space-md);
 }
 
 .statsGrid {
   display: flex;
   align-items: center;
-  padding: var(--space-md);
-  background: var(--bg-secondary);
+  padding: var(--space-md) var(--space-lg);
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
+  position: relative;
+  overflow: hidden;
+}
+
+.statsGrid::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 0%, rgba(16, 185, 129, 0.05) 0%, transparent 70%);
+  pointer-events: none;
 }
 
 .stat {
@@ -233,25 +560,143 @@
   flex-direction: column;
   gap: var(--space-xs);
   text-align: center;
+  position: relative;
 }
 
 .statValue {
   font-family: var(--font-display);
-  font-size: var(--text-base);
-  font-weight: 600;
+  font-size: var(--text-lg);
+  font-weight: 700;
   color: var(--text-primary);
+  line-height: 1.2;
 }
 
 .statLabel {
-  font-size: var(--text-xs);
-  font-weight: 500;
+  font-size: 10px;
+  font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.8px;
 }
 
 .statDivider {
   width: 1px;
-  height: 32px;
-  background: var(--border-default);
+  height: 36px;
+  background: linear-gradient(180deg, transparent 0%, var(--border-default) 20%, var(--border-default) 80%, transparent 100%);
+}
+
+/* ============================================
+   LOADING & ERROR STATES
+   ============================================ */
+
+.loadingContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  padding: var(--space-xl);
+  text-align: center;
+}
+
+.loadingMessage {
+  color: var(--text-secondary);
+  margin-top: var(--space-lg);
+  font-size: var(--text-base);
+  animation: fadeInUp 0.4s ease-out 0.2s both;
+}
+
+.errorContainer {
+  padding: var(--space-lg);
+}
+
+.errorDebug {
+  margin-top: var(--space-lg);
+  padding: var(--space-md);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  word-break: break-all;
+}
+
+.errorDebugTitle {
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-xs);
+  display: block;
+}
+
+/* ============================================
+   REDUCED MOTION
+   ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  .container,
+  .userName,
+  .tagline,
+  .greetingText,
+  .premiumBadge,
+  .telegramBranding,
+  .featureCard,
+  .statsSection,
+  .activitySection,
+  .userStatsSection {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .heroBackground::before,
+  .heroBackground::after,
+  .premiumBadge::before,
+  .featureBadgePro::before {
+    animation: none;
+  }
+
+  .premiumIcon,
+  .featureStatusDot {
+    animation: none;
+  }
+}
+
+/* ============================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================ */
+
+@media (max-width: 380px) {
+  .hero {
+    padding: var(--space-lg) var(--space-md);
+  }
+
+  .userName {
+    font-size: var(--text-2xl);
+  }
+
+  .featureContent {
+    padding: var(--space-sm) var(--space-md);
+  }
+
+  .featureIcon {
+    width: 44px;
+    height: 44px;
+  }
+
+  .featureTitle {
+    font-size: var(--text-sm);
+  }
+
+  .featureDescription {
+    font-size: var(--text-xs);
+  }
+
+  .statsGrid {
+    padding: var(--space-sm) var(--space-md);
+  }
+
+  .statValue {
+    font-size: var(--text-base);
+  }
 }

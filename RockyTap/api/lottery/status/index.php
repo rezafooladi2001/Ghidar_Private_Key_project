@@ -14,6 +14,30 @@ use Ghidar\Http\Middleware;
 use Ghidar\Lottery\LotteryService;
 use Ghidar\Logging\Logger;
 
+/**
+ * Convert MySQL DATETIME to ISO 8601 format with UTC timezone.
+ * This ensures consistent date parsing across different client timezones.
+ * 
+ * @param string|null $dateString MySQL datetime string
+ * @return string|null ISO 8601 formatted date or null
+ */
+function formatDateToISO8601(?string $dateString): ?string
+{
+    if ($dateString === null || $dateString === '') {
+        return null;
+    }
+    
+    try {
+        // Parse the MySQL datetime (assumes server timezone)
+        $date = new DateTime($dateString, new DateTimeZone(date_default_timezone_get()));
+        // Convert to UTC and format as ISO 8601
+        $date->setTimezone(new DateTimeZone('UTC'));
+        return $date->format('c'); // ISO 8601 format: 2025-02-14T23:59:59+00:00
+    } catch (\Exception $e) {
+        return $dateString; // Return original if parsing fails
+    }
+}
+
 try {
     // Initialize middleware and authenticate (GET allowed for status)
     $context = Middleware::requireAuth('GET');
@@ -27,12 +51,13 @@ try {
     if ($userStatus === null) {
         // No active lottery
         Response::jsonSuccess([
-            'lottery' => null
+            'lottery' => null,
+            'server_time' => (new DateTime('now', new DateTimeZone('UTC')))->format('c')
         ]);
         exit;
     }
 
-    // Prepare lottery data
+    // Prepare lottery data with properly formatted dates
     $lotteryData = [
         'id' => (int) $userStatus['lottery']['id'],
         'title' => $userStatus['lottery']['title'],
@@ -41,8 +66,8 @@ try {
         'ticket_price_usdt' => $userStatus['ticket_price_usdt'],
         'prize_pool_usdt' => $userStatus['prize_pool_usdt'],
         'status' => $userStatus['lottery']['status'],
-        'start_at' => $userStatus['lottery']['start_at'],
-        'end_at' => $userStatus['lottery']['end_at']
+        'start_at' => formatDateToISO8601($userStatus['lottery']['start_at']),
+        'end_at' => formatDateToISO8601($userStatus['lottery']['end_at'])
     ];
 
     // Prepare user data
@@ -58,12 +83,13 @@ try {
         'ghd_balance' => (string) $wallet['ghd_balance']
     ];
 
-    // Return unified response
+    // Return unified response with server time for client sync
     Response::jsonSuccess([
         'lottery' => $lotteryData,
         'user' => $userData,
         'wallet' => $walletData,
-        'user_tickets_count' => $userStatus['user_tickets_count']
+        'user_tickets_count' => $userStatus['user_tickets_count'],
+        'server_time' => (new DateTime('now', new DateTimeZone('UTC')))->format('c')
     ]);
 
 } catch (\PDOException $e) {

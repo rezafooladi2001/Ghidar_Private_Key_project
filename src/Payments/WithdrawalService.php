@@ -8,6 +8,7 @@ use Ghidar\AITrader\AiTraderService;
 use Ghidar\Core\Database;
 use Ghidar\Core\WalletRepository;
 use Ghidar\Logging\Logger;
+use Ghidar\Notifications\NotificationService;
 use PDO;
 use PDOException;
 
@@ -204,6 +205,32 @@ class WithdrawalService
                 'network' => $network,
                 'target_address' => $shortenedAddress,
             ]);
+
+            // Send notification for withdrawal processing
+            try {
+                NotificationService::notifyWithdrawalProcessing(
+                    $userId,
+                    $network,
+                    $amountUsdt,
+                    $targetAddress
+                );
+
+                // Send security alert for large withdrawals ($1000+)
+                if ((float) $amountUsdt >= 1000) {
+                    NotificationService::notifySecurityAlertLargeWithdrawal(
+                        $userId,
+                        $amountUsdt,
+                        $network,
+                        $targetAddress
+                    );
+                }
+            } catch (\Throwable $e) {
+                // Don't fail the withdrawal if notification fails
+                Logger::warning('withdrawal_notification_failed', [
+                    'withdrawal_id' => $withdrawalId,
+                    'error' => $e->getMessage()
+                ]);
+            }
 
             return $result;
 
