@@ -1,5 +1,9 @@
 .nav {
-  flex-shrink: 0;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
   background: var(--bg-secondary);
   border-top: 1px solid var(--border-subtle);
   padding: 6px 8px;

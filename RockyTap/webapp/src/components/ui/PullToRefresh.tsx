@@ -48,10 +48,10 @@ export function PullToRefresh({
       )}
       <div
         className={styles.content}
-        style={{
-          transform: shouldShowIndicator ? `translateY(${Math.min(pullDistance, threshold)}px)` : 'translateY(0)',
+        style={shouldShowIndicator ? {
+          transform: `translateY(${Math.min(pullDistance, threshold)}px)`,
           transition: isRefreshing ? 'transform 0.2s ease-out' : 'none',
-        }}
+        } : undefined}
       >
         {children}
       </div>

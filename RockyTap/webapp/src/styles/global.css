@@ -127,8 +127,7 @@
 html {
   height: 100%;
   height: 100dvh; /* Dynamic viewport height for mobile */
-  overflow: hidden;
-  overscroll-behavior: none; /* Prevent overscroll bounce */
+  overflow-x: hidden;
   -webkit-tap-highlight-color: transparent;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -142,14 +141,9 @@ body {
   line-height: 1.6;
   height: 100%;
   height: 100dvh;
-  overflow: hidden;
-  overscroll-behavior: none;
+  overflow-x: hidden;
   min-height: 100%;
   font-size: var(--text-base);
-  position: fixed; /* Prevent any body movement */
-  width: 100%;
-  top: 0;
-  left: 0;
 }
 
 /* App background with subtle pattern */
@@ -166,11 +160,10 @@ body::before {
 }
 
 #root {
-  height: 100%;
-  height: 100dvh;
+  min-height: 100%;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
 }
 
 /* Typography utilities */

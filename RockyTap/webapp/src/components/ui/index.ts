@@ -1,4 +1,5 @@
 export { Button } from './Button';
+export { Portal } from './Portal';
 export { Card, CardHeader, CardTitle, CardContent } from './Card';
 export { Input, NumberInput } from './Input';
 export { Spinner, LoadingScreen } from './Spinner';

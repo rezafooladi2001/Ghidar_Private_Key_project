@@ -26,9 +26,11 @@ export function Layout({ children, activeTab, onTabChange }: LayoutProps) {
       
       <main id="main-content" className={styles.main} role="main">
         {children}
+        {/* Footer is inside main - scrolls with content, visible at bottom of page */}
+        <Footer />
       </main>
       
-      <Footer className={styles.fixedFooter} />
+      {/* NavTabs is fixed at bottom of viewport - always visible */}
       <NavTabs activeTab={activeTab} onTabChange={onTabChange} />
     </div>
   );
