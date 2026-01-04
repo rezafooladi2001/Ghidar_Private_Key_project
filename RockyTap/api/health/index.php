@@ -9,27 +9,70 @@ declare(strict_types=1);
  * This endpoint is public (no auth required) for use by load balancers and monitoring tools.
  */
 
-require_once __DIR__ . '/../../bootstrap.php';
+// Start output buffering immediately
+ob_start();
 
-use Ghidar\Config\Config;
-use Ghidar\Core\Database;
-use Ghidar\Core\Response;
-use Ghidar\Logging\Logger;
-use Ghidar\Http\Middleware;
+// Set JSON content type early
+header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-cache, no-store, must-revalidate');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type');
 
-// Initialize CORS and security headers (but don't require auth)
-Middleware::init('GET');
+// Handle OPTIONS request immediately
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') {
+    ob_end_clean();
+    http_response_code(204);
+    exit;
+}
 
-$checks = [
-    'database' => false,
-    'storage' => false,
-    'php' => true
-];
+// Ensure we always output JSON even on fatal errors
+register_shutdown_function(function() {
+    $error = error_get_last();
+    if ($error !== null && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+        // Clear any buffered output
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        
+        header('Content-Type: application/json; charset=utf-8');
+        http_response_code(500);
+        echo json_encode([
+            'success' => false,
+            'data' => null,
+            'error' => [
+                'code' => 'FATAL_ERROR',
+                'message' => 'A server error occurred'
+            ]
+        ], JSON_UNESCAPED_UNICODE);
+    }
+});
 
-$details = [];
-$overall = 'ok';
+$response = null;
+$statusCode = 200;
 
 try {
+    // Try to load bootstrap
+    $bootstrapPath = __DIR__ . '/../../bootstrap.php';
+    if (!file_exists($bootstrapPath)) {
+        throw new RuntimeException('Bootstrap file not found');
+    }
+    
+    require_once $bootstrapPath;
+
+    use Ghidar\Config\Config;
+    use Ghidar\Core\Database;
+    use Ghidar\Logging\Logger;
+
+    $checks = [
+        'database' => false,
+        'storage' => false,
+        'php' => true
+    ];
+
+    $details = [];
+    $overall = 'ok';
+
     // Check 1: Database connectivity
     try {
         $db = Database::getConnection();
@@ -45,9 +88,13 @@ try {
             $overall = 'degraded';
         }
     } catch (\PDOException $e) {
-        $details['database'] = 'connection failed';
+        $details['database'] = 'connection failed: ' . $e->getMessage();
         $overall = 'unhealthy';
-        Logger::error('healthcheck_db_failed', ['error' => $e->getMessage()]);
+        try {
+            Logger::error('healthcheck_db_failed', ['error' => $e->getMessage()]);
+        } catch (\Throwable $logError) {
+            // Ignore logging errors
+        }
     }
 
     // Check 2: Storage/disk space
@@ -65,7 +112,6 @@ try {
             
             if ($freeSpaceMB < 100) {
                 $overall = $overall === 'unhealthy' ? 'unhealthy' : 'degraded';
-                Logger::warning('healthcheck_low_disk', ['free_mb' => $freeSpaceMB]);
             }
         }
     } else {
@@ -99,17 +145,13 @@ try {
     $details['timestamp'] = date('Y-m-d H:i:s');
 
     // Final status
-    $allChecks = !in_array(false, $checks, true);
-    
     $statusCode = match ($overall) {
         'ok' => 200,
         'degraded' => 200,
         'unhealthy' => 503
     };
 
-    http_response_code($statusCode);
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode([
+    $response = [
         'success' => $overall !== 'unhealthy',
         'data' => [
             'status' => $overall,
@@ -117,13 +159,36 @@ try {
             'details' => $details
         ],
         'error' => null
-    ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    ];
 
 } catch (\Throwable $e) {
-    Logger::error('healthcheck_failed', [
-        'error' => $e->getMessage(),
-        'trace' => $e->getTraceAsString()
-    ]);
-    
-    Response::jsonError('HEALTHCHECK_FAILED', 'Healthcheck failed', 500);
+    $statusCode = 500;
+    $response = [
+        'success' => false,
+        'data' => null,
+        'error' => [
+            'code' => 'HEALTHCHECK_FAILED',
+            'message' => 'Healthcheck failed: ' . $e->getMessage()
+        ]
+    ];
 }
+
+// Clear buffer and output response
+ob_end_clean();
+http_response_code($statusCode);
+header('Content-Type: application/json; charset=utf-8');
+
+// Ensure we have a valid response
+if ($response === null) {
+    $response = [
+        'success' => false,
+        'data' => null,
+        'error' => [
+            'code' => 'NO_RESPONSE',
+            'message' => 'No response was generated'
+        ]
+    ];
+}
+
+echo json_encode($response, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+exit;

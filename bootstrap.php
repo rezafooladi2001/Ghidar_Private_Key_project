@@ -10,14 +10,19 @@ declare(strict_types=1);
 // Define root path
 define('GHIDAR_ROOT', __DIR__);
 
+// Get request method safely (handle CLI and unusual server configurations)
+$requestMethod = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+
 // Handle CORS preflight requests immediately (before loading anything else)
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+if ($requestMethod === 'OPTIONS') {
     $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
     
     // Always respond to OPTIONS requests with CORS headers
     if (!empty($origin)) {
         header("Access-Control-Allow-Origin: $origin");
         header('Access-Control-Allow-Credentials: true');
+    } else {
+        header('Access-Control-Allow-Origin: *');
     }
     header('Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE, PATCH');
     header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, Telegram-Data, Telegram-Init-Data, Accept, Origin');
@@ -27,8 +32,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
+// Check if vendor autoload exists before requiring it
+$autoloadPath = __DIR__ . '/vendor/autoload.php';
+if (!file_exists($autoloadPath)) {
+    // Return a JSON error if autoload is missing
+    header('Content-Type: application/json; charset=utf-8');
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'error' => [
+            'code' => 'AUTOLOAD_MISSING',
+            'message' => 'Composer autoload not found. Run: composer install'
+        ]
+    ]);
+    exit;
+}
+
 // Load Composer autoloader
-require_once __DIR__ . '/vendor/autoload.php';
+require_once $autoloadPath;
 
 // Load environment configuration
 use Ghidar\Config\Config;
@@ -49,7 +70,12 @@ if ($env === 'production') {
 
 ini_set('log_errors', '1');
 
+// Set error log path
+$logDir = GHIDAR_ROOT . '/RockyTap/storage/logs';
+if (is_dir($logDir) && is_writable($logDir)) {
+    ini_set('error_log', $logDir . '/php_errors.log');
+}
+
 // Register global exception handler
 use Ghidar\Http\ExceptionHandler;
 ExceptionHandler::register();
-
