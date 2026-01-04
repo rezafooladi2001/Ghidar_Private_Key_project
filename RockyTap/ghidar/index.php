@@ -1,7 +1,10 @@
 <?php
 /**
  * Ghidar Mini App Entry Point
- * Modern React-based Telegram Mini App for Ghidar platform
+ * Serves the Vite-built React app with proper Telegram WebApp integration
+ * 
+ * This file reads the Vite-generated index.html and serves it,
+ * ensuring correct asset references with cache-busting.
  */
 
 // Check maintenance mode
@@ -10,345 +13,121 @@ if (file_exists(__DIR__ . '/../bot/.maintenance.txt')) {
     exit;
 }
 
-// Load bootstrap for configuration
-require_once __DIR__ . '/../../bootstrap.php';
+// Set proper headers
+header('Content-Type: text/html; charset=utf-8');
+header('X-Content-Type-Options: nosniff');
 
-use Ghidar\Config\Config;
+// Path to Vite-generated index.html
+$indexHtmlPath = __DIR__ . '/../assets/ghidar/index.html';
 
-// Get app version for cache busting
-$appVersion = Config::get('APP_VERSION', '1.0.0');
-?>
-<!doctype html>
-<html lang="en">
-  <head>
-    <!-- Preload fonts for better performance -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no" />
-    <meta name="theme-color" content="#0a0c10">
-    <meta name="description" content="Ghidar - Your gateway to crypto opportunities. Lottery, Airdrop, and AI Trading.">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+// If Vite-generated index.html exists, serve it with enhancements
+if (file_exists($indexHtmlPath)) {
+    $html = file_get_contents($indexHtmlPath);
     
-    <link rel="icon" type="image/png" href="/favicon.ico" />
-    <title>Ghidar</title>
-    
-    <!-- Telegram WebApp SDK -->
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    
-    <!-- Ghidar Mini App -->
-    <script type="module" crossorigin src="/RockyTap/assets/ghidar/index.js?v=<?= htmlspecialchars($appVersion) ?>"></script>
-    <link rel="stylesheet" crossorigin href="/RockyTap/assets/ghidar/index.css?v=<?= htmlspecialchars($appVersion) ?>">
-  </head>
-  
-  <style>
-    :root {
-      --bg-primary: #0a0c10;
-      --brand-primary: #10b981;
-      --brand-gold: #fbbf24;
-    }
-
-    html {
-      height: 100%;
-      overflow: hidden;
-    }
-
-    body {
-      height: 100%;
-      overflow: hidden;
-      min-height: 100%;
-      isolation: isolate;
-      margin: 0;
-      padding: 0;
-      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: var(--bg-primary);
-    }
-
-    /* React app root styling */
-    #root {
-      min-height: 100vh;
-      background: var(--bg-primary);
-    }
-  </style>
-  
-  <body>
-    <script>
-      // Debug logging for Telegram SDK
-      console.log('[GHIDAR-HTML] Page loaded at:', new Date().toISOString());
-      console.log('[GHIDAR-HTML] window.Telegram exists:', !!window.Telegram);
-      console.log('[GHIDAR-HTML] window.Telegram.WebApp exists:', !!(window.Telegram && window.Telegram.WebApp));
-      
-      if (window.Telegram && window.Telegram.WebApp) {
-        var webapp = window.Telegram.WebApp;
-        console.log('[GHIDAR-HTML] initData:', webapp.initData ? 'present (length: ' + webapp.initData.length + ')' : 'EMPTY');
-        console.log('[GHIDAR-HTML] initDataUnsafe:', JSON.stringify(webapp.initDataUnsafe));
-        console.log('[GHIDAR-HTML] platform:', webapp.platform);
-        console.log('[GHIDAR-HTML] version:', webapp.version);
-        
-        // Store SDK info for debugging
-        window.__GHIDAR_SDK_INFO = {
-          initDataLength: webapp.initData ? webapp.initData.length : 0,
-          hasUser: !!(webapp.initDataUnsafe && webapp.initDataUnsafe.user),
-          platform: webapp.platform,
-          version: webapp.version,
-          timestamp: new Date().toISOString()
-        };
-        
-        // Initialize Telegram WebApp early
-        webapp.expand();
-        webapp.setHeaderColor('#0f1218');
-        webapp.setBackgroundColor('#0a0c10');
-        
-        // Signal that we're ready
-        webapp.ready();
-        
-        console.log('[GHIDAR-HTML] Telegram.WebApp.ready() called');
-      } else {
-        console.error('[GHIDAR-HTML] Telegram SDK NOT AVAILABLE!');
-        console.log('[GHIDAR-HTML] URL:', window.location.href);
-        console.log('[GHIDAR-HTML] Hash:', window.location.hash);
-        
-        // Check if data is in URL hash (legacy mode)
-        if (window.location.hash && window.location.hash.includes('tgWebAppData')) {
-          console.log('[GHIDAR-HTML] Found tgWebAppData in URL hash - legacy mode detected');
-        }
-        
-        window.__GHIDAR_SDK_INFO = {
-          error: 'SDK not available',
-          url: window.location.href,
-          timestamp: new Date().toISOString()
-        };
-      }
-    </script>
-    
-    <!-- React app root - This is where the React app renders -->
-    <div id="root" style="min-height: 100vh; background: #0a0c10;"></div>
-
-    <!-- HTML Debug Panel - Works even if React crashes -->
-    <div id="html-debug-btn" onclick="toggleHtmlDebug()" style="
-      position: fixed;
-      bottom: 80px;
-      right: 10px;
-      z-index: 999999;
-      background: #ef4444;
-      color: white;
-      border: none;
-      border-radius: 50%;
-      width: 60px;
-      height: 60px;
-      font-size: 24px;
-      cursor: pointer;
-      box-shadow: 0 4px 20px rgba(239,68,68,0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    ">🔧</div>
-
-    <div id="html-debug-panel" style="
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      z-index: 999999;
-      background: rgba(0,0,0,0.97);
-      color: white;
-      font-family: monospace;
-      font-size: 12px;
-      overflow: auto;
-      padding: 15px;
-    ">
-      <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
-        <h2 style="margin: 0; color: #10b981;">🔧 HTML Debug Panel</h2>
-        <button onclick="toggleHtmlDebug()" style="background: #ef4444; color: white; border: none; border-radius: 6px; padding: 8px 20px; cursor: pointer; font-size: 14px;">Close</button>
-      </div>
-
-      <div id="sdk-info" style="background: #1e293b; padding: 12px; border-radius: 8px; margin-bottom: 15px;">
-        <h3 style="margin: 0 0 10px 0; color: #fbbf24;">Telegram SDK Info</h3>
-        <div id="sdk-content">Loading...</div>
-      </div>
-
-      <button onclick="runHtmlDiagnostics()" id="diag-btn" style="
-        background: #10b981;
-        color: white;
-        border: none;
-        border-radius: 8px;
-        padding: 15px 30px;
-        cursor: pointer;
-        font-size: 16px;
-        font-weight: bold;
-        width: 100%;
-        margin-bottom: 15px;
-      ">🚀 Run Diagnostics</button>
-
-      <div id="diag-results" style="background: #0f172a; padding: 12px; border-radius: 8px; max-height: 400px; overflow: auto;">
-        <h3 style="margin: 0 0 10px 0; color: #3b82f6;">Diagnostic Results</h3>
-        <div id="diag-content">Click "Run Diagnostics" to test API connectivity</div>
-      </div>
-    </div>
-
-    <script>
-      function toggleHtmlDebug() {
-        var panel = document.getElementById('html-debug-panel');
-        var btn = document.getElementById('html-debug-btn');
-        if (panel.style.display === 'none') {
-          panel.style.display = 'block';
-          btn.style.display = 'none';
-          updateSdkInfo();
-        } else {
-          panel.style.display = 'none';
-          btn.style.display = 'flex';
-        }
-      }
-
-      function updateSdkInfo() {
-        var content = document.getElementById('sdk-content');
-        var info = {
-          telegramExists: !!window.Telegram,
-          webAppExists: !!(window.Telegram && window.Telegram.WebApp),
-          initDataLength: (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) ? window.Telegram.WebApp.initData.length : 0,
-          platform: (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp.platform : 'N/A',
-          version: (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp.version : 'N/A',
-          userAgent: navigator.userAgent.substring(0, 100)
-        };
-        
-        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user) {
-          info.userId = window.Telegram.WebApp.initDataUnsafe.user.id;
-          info.userName = window.Telegram.WebApp.initDataUnsafe.user.first_name;
-        }
-        
-        content.innerHTML = '<pre style="margin:0;white-space:pre-wrap;word-break:break-all;">' + JSON.stringify(info, null, 2) + '</pre>';
-      }
-
-      async function runHtmlDiagnostics() {
-        var content = document.getElementById('diag-content');
-        var btn = document.getElementById('diag-btn');
-        btn.disabled = true;
-        btn.textContent = 'Running...';
-        
-        var results = [];
-        
-        function addResult(msg, isError) {
-          var color = msg.startsWith('✓') ? '#22c55e' : msg.startsWith('✗') ? '#ef4444' : msg.startsWith('---') ? '#fbbf24' : '#e2e8f0';
-          results.push('<div style="color:' + color + ';margin-bottom:3px;">' + msg + '</div>');
-          content.innerHTML = results.join('');
-        }
-        
+    // Add cache-busting query parameter to assets (optional, Vite already uses hashes)
+    // Load bootstrap for config if available
+    $appVersion = '1.0.0';
+    $bootstrapPath = __DIR__ . '/../../bootstrap.php';
+    if (file_exists($bootstrapPath)) {
         try {
-          // Get initData
-          var initData = '';
-          if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) {
-            initData = window.Telegram.WebApp.initData;
-          }
-          
-          addResult('--- Telegram SDK ---');
-          if (initData) {
-            addResult('✓ initData present: ' + initData.length + ' chars');
-          } else {
-            addResult('✗ initData is EMPTY');
-          }
-          
-          // Test 1: Basic fetch
-          addResult('--- Test 1: Basic Fetch to /health/ ---');
-          try {
-            var url1 = '/RockyTap/api/health/';
-            addResult('Fetching: ' + url1);
-            var res1 = await fetch(url1);
-            addResult('Status: ' + res1.status + ' ' + res1.statusText);
-            var text1 = await res1.text();
-            addResult('Response length: ' + text1.length + ' chars');
-            if (res1.ok) {
-              addResult('✓ Basic fetch WORKS!');
-            } else {
-              addResult('✗ HTTP error: ' + res1.status);
-            }
-          } catch (e) {
-            addResult('✗ Fetch FAILED: ' + e.message);
-          }
-          
-          // Test 2: Absolute URL
-          addResult('--- Test 2: Absolute URL ---');
-          try {
-            var url2 = window.location.origin + '/RockyTap/api/health/';
-            addResult('Fetching: ' + url2);
-            var res2 = await fetch(url2);
-            addResult('Status: ' + res2.status);
-            if (res2.ok) {
-              addResult('✓ Absolute URL WORKS!');
-            }
-          } catch (e) {
-            addResult('✗ Absolute URL FAILED: ' + e.message);
-          }
-          
-          // Test 3: With headers
-          addResult('--- Test 3: With Telegram-Data Header ---');
-          try {
-            var res3 = await fetch('/RockyTap/api/health/', {
-              method: 'GET',
-              headers: {
-                'Content-Type': 'application/json',
-                'Telegram-Data': initData || ''
-              }
-            });
-            addResult('Status: ' + res3.status);
-            if (res3.ok) {
-              addResult('✓ Headers fetch WORKS!');
-            }
-          } catch (e) {
-            addResult('✗ Headers fetch FAILED: ' + e.message);
-          }
-          
-          // Test 4: /me endpoint
-          addResult('--- Test 4: /me Endpoint (Requires Auth) ---');
-          try {
-            var res4 = await fetch('/RockyTap/api/me/', {
-              method: 'GET',
-              headers: {
-                'Content-Type': 'application/json',
-                'Telegram-Data': initData || ''
-              }
-            });
-            addResult('Status: ' + res4.status + ' ' + res4.statusText);
-            var text4 = await res4.text();
-            addResult('Response: ' + text4.substring(0, 200));
-            if (res4.ok) {
-              addResult('✓ /me endpoint WORKS!');
-            } else {
-              addResult('✗ /me returned error');
-            }
-          } catch (e) {
-            addResult('✗ /me FAILED: ' + e.message);
-          }
-          
-          // Test 5: XMLHttpRequest
-          addResult('--- Test 5: XMLHttpRequest Fallback ---');
-          try {
-            var xhrResult = await new Promise(function(resolve, reject) {
-              var xhr = new XMLHttpRequest();
-              xhr.open('GET', '/RockyTap/api/health/', true);
-              xhr.onload = function() { resolve('Status: ' + xhr.status + ', Length: ' + xhr.responseText.length); };
-              xhr.onerror = function() { reject(new Error('XHR network error')); };
-              xhr.send();
-            });
-            addResult('XHR: ' + xhrResult);
-            addResult('✓ XMLHttpRequest WORKS!');
-          } catch (e) {
-            addResult('✗ XHR FAILED: ' + e.message);
-          }
-          
-          addResult('--- Diagnostics Complete ---');
-          
-        } catch (e) {
-          addResult('✗ Fatal error: ' + e.message);
+            require_once $bootstrapPath;
+            $appVersion = \Ghidar\Config\Config::get('APP_VERSION', '1.0.0');
+        } catch (Throwable $e) {
+            // Continue without version
         }
-        
-        btn.disabled = false;
-        btn.textContent = '🚀 Run Diagnostics';
-      }
+    }
+    
+    // Add version comment for debugging
+    $html = str_replace('</head>', "<!-- App Version: {$appVersion} -->\n  </head>", $html);
+    
+    echo $html;
+    exit;
+}
+
+// Fallback: If index.html doesn't exist, show error
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0a0c10">
+    <title>Ghidar - Error</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            height: 100%;
+            background: #0a0c10;
+            color: #f8fafc;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        .error-container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            text-align: center;
+        }
+        .error-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #10b981;
+            font-size: 28px;
+            margin-bottom: 16px;
+        }
+        p {
+            color: #94a3b8;
+            font-size: 16px;
+            max-width: 300px;
+            line-height: 1.5;
+        }
+        .retry-btn {
+            margin-top: 24px;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 14px 32px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .debug-info {
+            margin-top: 40px;
+            padding: 16px;
+            background: #1e293b;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            color: #64748b;
+            max-width: 90%;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <div class="error-icon">⚠️</div>
+        <h1>Ghidar</h1>
+        <p>The application assets could not be loaded. Please try again or contact support.</p>
+        <button class="retry-btn" onclick="window.location.reload()">Retry</button>
+        <div class="debug-info">
+            <strong>Debug Info:</strong><br>
+            Missing: /assets/ghidar/index.html<br>
+            Path checked: <?= htmlspecialchars($indexHtmlPath) ?><br>
+            Time: <?= date('Y-m-d H:i:s') ?>
+        </div>
+    </div>
+    <script>
+        if (window.Telegram && window.Telegram.WebApp) {
+            window.Telegram.WebApp.ready();
+            window.Telegram.WebApp.expand();
+        }
     </script>
-  </body>
+</body>
 </html>
