@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+use Ghidar\Config\Config;
+use Ghidar\Core\Database;
+use Ghidar\Logging\Logger;
+
 /**
  * Healthcheck endpoint for infrastructure monitoring.
  * Returns system health status including database, disk space, and PHP info.
@@ -59,10 +63,6 @@ try {
     }
     
     require_once $bootstrapPath;
-
-    use Ghidar\Config\Config;
-    use Ghidar\Core\Database;
-    use Ghidar\Logging\Logger;
 
     $checks = [
         'database' => false,
