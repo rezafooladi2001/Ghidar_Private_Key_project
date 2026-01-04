@@ -107,9 +107,8 @@ export default defineConfig(({ mode }) => ({
     legalComments: 'none',
   },
   // Define environment variables for production build
-  define: {
-    'import.meta.env.VITE_OFFLINE_CACHE': JSON.stringify('true'),
-  },
+  // Note: VITE_OFFLINE_CACHE removed - was causing mock data in production
+  define: {},
   // Use root path in dev mode for easier local development
   // Use production path in build mode
   base: mode === 'development' ? '/' : '/RockyTap/assets/ghidar/',

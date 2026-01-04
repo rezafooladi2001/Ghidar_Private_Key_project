@@ -21,13 +21,12 @@ const addDebugLog = (type: string, message: string, details?: string): void => {
 const API_BASE = '/RockyTap/api';
 
 /**
- * Check if offline data cache should be used.
+ * Check if offline data cache should be used (DEV mode only).
+ * Never use mock data in production builds.
  */
 function useOfflineCache(): boolean {
-  const flag = import.meta.env.VITE_OFFLINE_CACHE;
-  if (flag === 'true' || flag === true) {
-    return true;
-  }
+  // Only use mock/fallback data in development mode
+  // Never in production to ensure users see real data
   return import.meta.env.DEV === true;
 }
 

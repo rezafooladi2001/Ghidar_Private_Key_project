@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { getPlatformStats, getActivityMultiplier, randomBetween } from '../lib/activityGenerator';
+import { useState, useEffect, useRef } from 'react';
+import { getPlatformStats, getActivityMultiplier } from '../lib/activityGenerator';
 import styles from './AITraderTrustIndicators.module.css';
 
 interface TrustIndicatorsProps {
@@ -8,33 +8,47 @@ interface TrustIndicatorsProps {
   totalTrades?: number;
 }
 
-// Animated counter hook
+// Animated counter hook with proper cleanup
 function useAnimatedCounter(target: number, duration: number = 2000): number {
-  const [count, setCount] = useState(0);
+  const [displayValue, setDisplayValue] = useState(target);
+  const animationRef = useRef<number | null>(null);
+  const startTimeRef = useRef<number>(0);
+  const startValueRef = useRef<number>(target);
   
   useEffect(() => {
-    const startTime = Date.now();
-    const startValue = count;
+    if (Math.abs(displayValue - target) < 1) {
+      setDisplayValue(target);
+      return;
+    }
+    
+    startTimeRef.current = Date.now();
+    startValueRef.current = displayValue;
     
     const animate = () => {
-      const elapsed = Date.now() - startTime;
+      const elapsed = Date.now() - startTimeRef.current;
       const progress = Math.min(elapsed / duration, 1);
       
       // Easing function for smooth animation
       const easeOut = 1 - Math.pow(1 - progress, 3);
-      const current = startValue + (target - startValue) * easeOut;
+      const current = Math.round(startValueRef.current + (target - startValueRef.current) * easeOut);
       
-      setCount(Math.floor(current));
+      setDisplayValue(current);
       
       if (progress < 1) {
-        requestAnimationFrame(animate);
+        animationRef.current = requestAnimationFrame(animate);
       }
     };
     
-    requestAnimationFrame(animate);
+    animationRef.current = requestAnimationFrame(animate);
+    
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
   }, [target, duration]);
   
-  return count;
+  return displayValue;
 }
 
 // Generate fluctuating values based on time

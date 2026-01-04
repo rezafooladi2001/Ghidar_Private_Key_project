@@ -5,6 +5,7 @@ import {
   randomItem,
   FIRST_NAMES,
   randomBetween,
+  randomIntBetween,
   getActivityMultiplier,
 } from '../lib/activityGenerator';
 import styles from './RecentWinnersFeed.module.css';
@@ -22,7 +23,8 @@ interface RecentWinnersFeedProps {
  */
 function generateNewWinner(): LotteryWinner {
   const name = randomItem(FIRST_NAMES);
-  const rank = Math.random() < 0.1 ? 1 : Math.random() < 0.25 ? randomBetween(2, 3) : randomBetween(4, 50);
+  // Use randomIntBetween for rank (must be an integer)
+  const rank = Math.random() < 0.1 ? 1 : Math.random() < 0.25 ? randomIntBetween(2, 3) : randomIntBetween(4, 50);
   
   let prizeAmount: number;
   if (rank === 1) {
