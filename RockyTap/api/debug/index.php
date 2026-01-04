@@ -1,233 +1,179 @@
 <?php
-
-declare(strict_types=1);
-
 /**
- * Debug/Diagnostic endpoint for Ghidar Mini-App.
- * Returns comprehensive system status to help identify issues.
- * 
- * WARNING: This endpoint should be disabled or protected in production!
- * 
- * Access: GET /RockyTap/api/debug/
+ * Debug endpoint to diagnose server issues.
+ * THIS FILE SHOULD BE DELETED IN PRODUCTION AFTER DEBUGGING.
  */
 
-// Set headers first to ensure they're sent even on errors
+// Temporarily enable error display
+ini_set('display_errors', '1');
+error_reporting(E_ALL);
+
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Telegram-Data, telegram-data');
 
-// Handle preflight
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(204);
-    exit;
-}
+$checks = [];
+$errors = [];
 
-$diagnostics = [
-    'timestamp' => date('Y-m-d H:i:s T'),
-    'php_version' => PHP_VERSION,
-    'status' => 'ok',
-    'checks' => [],
-    'errors' => [],
-    'warnings' => []
-];
+// Check 1: PHP version
+$checks['php_version'] = PHP_VERSION;
+$checks['php_ok'] = version_compare(PHP_VERSION, '8.1.0', '>=');
 
-// Check 1: PHP Extensions
+// Check 2: Required extensions
 $requiredExtensions = ['pdo', 'pdo_mysql', 'json', 'curl', 'bcmath', 'openssl'];
-$missingExtensions = [];
+$extensions = [];
 foreach ($requiredExtensions as $ext) {
-    if (!extension_loaded($ext)) {
-        $missingExtensions[] = $ext;
+    $extensions[$ext] = extension_loaded($ext);
+    if (!$extensions[$ext]) {
+        $errors[] = "Missing extension: $ext";
     }
 }
-$diagnostics['checks']['php_extensions'] = [
-    'required' => $requiredExtensions,
-    'missing' => $missingExtensions,
-    'ok' => empty($missingExtensions)
-];
-if (!empty($missingExtensions)) {
-    $diagnostics['errors'][] = 'Missing PHP extensions: ' . implode(', ', $missingExtensions);
-    $diagnostics['status'] = 'error';
+$checks['extensions'] = $extensions;
+
+// Check 3: Project root and vendor
+$rootPath = dirname(__DIR__, 2);
+$checks['project_root'] = $rootPath;
+$checks['vendor_autoload_exists'] = file_exists($rootPath . '/vendor/autoload.php');
+$checks['bootstrap_exists'] = file_exists($rootPath . '/bootstrap.php');
+
+if (!$checks['vendor_autoload_exists']) {
+    $errors[] = 'vendor/autoload.php does not exist. Run: composer install';
 }
 
-// Check 2: Bootstrap file
-$bootstrapPath = __DIR__ . '/../../bootstrap.php';
-$mainBootstrapPath = __DIR__ . '/../../../bootstrap.php';
-$diagnostics['checks']['bootstrap'] = [
-    'rockytap_bootstrap_exists' => file_exists($bootstrapPath),
-    'main_bootstrap_exists' => file_exists($mainBootstrapPath),
-    'rockytap_bootstrap_path' => realpath($bootstrapPath) ?: $bootstrapPath,
-    'main_bootstrap_path' => realpath($mainBootstrapPath) ?: $mainBootstrapPath
-];
+// Check 4: .env file
+$envPath = dirname(__DIR__, 2) . '/.env';
+$checks['env_exists'] = file_exists($envPath);
 
-// Check 3: Try loading bootstrap
-try {
-    // Suppress errors during bootstrap loading for diagnostics
-    $oldErrorReporting = error_reporting(0);
-    require_once $bootstrapPath;
-    error_reporting($oldErrorReporting);
+if ($checks['env_exists']) {
+    $envContent = file_get_contents($envPath);
+    $checks['env_has_placeholders'] = strpos($envContent, 'REPLACE_WITH_') !== false;
     
-    $diagnostics['checks']['bootstrap']['loaded'] = true;
+    if ($checks['env_has_placeholders']) {
+        $errors[] = '.env contains placeholder values (REPLACE_WITH_...). Generate real keys!';
+    }
     
-    // Check 4: Environment variables
+    // Check specific env vars (don't expose values)
     $envVars = [
-        'APP_ENV' => \Ghidar\Config\Config::get('APP_ENV'),
-        'APP_URL' => \Ghidar\Config\Config::get('APP_URL'),
-        'DB_HOST' => \Ghidar\Config\Config::get('DB_HOST'),
-        'DB_PORT' => \Ghidar\Config\Config::get('DB_PORT'),
-        'DB_DATABASE' => \Ghidar\Config\Config::get('DB_DATABASE'),
-        'DB_USERNAME' => \Ghidar\Config\Config::get('DB_USERNAME') ? '[SET]' : '[EMPTY]',
-        'DB_PASSWORD' => \Ghidar\Config\Config::get('DB_PASSWORD') ? '[SET]' : '[EMPTY]',
-        'DB_SSL_CA' => \Ghidar\Config\Config::get('DB_SSL_CA'),
-        'TELEGRAM_BOT_TOKEN' => \Ghidar\Config\Config::get('TELEGRAM_BOT_TOKEN') ? '[SET - ' . strlen(\Ghidar\Config\Config::get('TELEGRAM_BOT_TOKEN')) . ' chars]' : '[EMPTY]',
-        'TELEGRAM_BOT_USERNAME' => \Ghidar\Config\Config::get('TELEGRAM_BOT_USERNAME'),
-        'CORS_ALLOWED_ORIGINS' => \Ghidar\Config\Config::get('CORS_ALLOWED_ORIGINS'),
+        'DB_HOST' => !empty($_ENV['DB_HOST'] ?? getenv('DB_HOST')),
+        'DB_DATABASE' => !empty($_ENV['DB_DATABASE'] ?? getenv('DB_DATABASE')),
+        'DB_USERNAME' => !empty($_ENV['DB_USERNAME'] ?? getenv('DB_USERNAME')),
+        'DB_PASSWORD' => !empty($_ENV['DB_PASSWORD'] ?? getenv('DB_PASSWORD')),
+        'TELEGRAM_BOT_TOKEN' => !empty($_ENV['TELEGRAM_BOT_TOKEN'] ?? getenv('TELEGRAM_BOT_TOKEN')),
     ];
-    
-    $diagnostics['checks']['environment'] = [
-        'variables' => $envVars,
-        'env_file_path' => defined('GHIDAR_ROOT') ? GHIDAR_ROOT . '/.env' : 'unknown',
-        'ghidar_root' => defined('GHIDAR_ROOT') ? GHIDAR_ROOT : 'not defined'
+    $checks['env_vars_set'] = $envVars;
+}
+
+// Check 5: Writable directories
+$writableDirs = [
+    'storage/logs' => $rootPath . '/RockyTap/storage/logs',
+];
+foreach ($writableDirs as $name => $path) {
+    $checks['writable'][$name] = [
+        'exists' => is_dir($path),
+        'writable' => is_writable($path)
     ];
-    
-    // Check if TELEGRAM_BOT_TOKEN is set
-    if (!\Ghidar\Config\Config::get('TELEGRAM_BOT_TOKEN')) {
-        $diagnostics['errors'][] = 'TELEGRAM_BOT_TOKEN is not set - this will cause all authentication to fail';
-        $diagnostics['status'] = 'error';
-    }
-    
-    // Check 5: Database connection
+}
+
+// Check 6: Try to load autoloader
+if ($checks['vendor_autoload_exists']) {
     try {
-        $pdo = \Ghidar\Core\Database::getConnection();
-        $stmt = $pdo->query('SELECT 1 as test');
-        $result = $stmt->fetch();
+        require_once $rootPath . '/vendor/autoload.php';
+        $checks['autoload_success'] = true;
+    } catch (Throwable $e) {
+        $checks['autoload_success'] = false;
+        $errors[] = 'Autoload failed: ' . $e->getMessage();
+    }
+}
+
+// Check 7: Try to load bootstrap (if autoload worked)
+if ($checks['autoload_success'] ?? false) {
+    try {
+        // Don't use the full bootstrap - just load config
+        use Ghidar\Config\Config;
+        Config::load(dirname(__DIR__, 2));
+        $checks['config_loaded'] = true;
         
-        $diagnostics['checks']['database'] = [
-            'connected' => true,
-            'host' => \Ghidar\Config\Config::get('DB_HOST'),
-            'port' => \Ghidar\Config\Config::get('DB_PORT'),
-            'database' => \Ghidar\Config\Config::get('DB_DATABASE'),
-            'ssl_enabled' => (bool) \Ghidar\Config\Config::get('DB_SSL_CA')
-        ];
-    } catch (\PDOException $e) {
-        $diagnostics['checks']['database'] = [
-            'connected' => false,
-            'error' => $e->getMessage()
-        ];
-        $diagnostics['errors'][] = 'Database connection failed: ' . $e->getMessage();
-        $diagnostics['status'] = 'error';
-    }
-    
-    // Check 6: Storage directories
-    $storagePath = defined('GHIDAR_ROOT') ? GHIDAR_ROOT . '/RockyTap/storage' : __DIR__ . '/../../storage';
-    $directories = ['logs', 'cache', 'sessions', 'backups'];
-    $storageChecks = [];
-    
-    foreach ($directories as $dir) {
-        $path = $storagePath . '/' . $dir;
-        $storageChecks[$dir] = [
-            'exists' => is_dir($path),
-            'writable' => is_writable($path)
-        ];
-    }
-    
-    $diagnostics['checks']['storage'] = $storageChecks;
-    
-    // Check 7: Tables exist
-    if (isset($pdo)) {
+        // Check database connection
         try {
-            $tables = ['users', 'wallets', 'missions', 'tasks'];
-            $tableChecks = [];
+            $host = Config::get('DB_HOST', 'localhost');
+            $port = Config::getInt('DB_PORT', 3306);
+            $database = Config::get('DB_DATABASE');
+            $username = Config::get('DB_USERNAME');
+            $password = Config::get('DB_PASSWORD');
             
-            foreach ($tables as $table) {
-                try {
-                    $stmt = $pdo->query("SELECT COUNT(*) as cnt FROM `{$table}` LIMIT 1");
-                    $result = $stmt->fetch();
-                    $tableChecks[$table] = [
-                        'exists' => true,
-                        'row_count' => (int) $result['cnt']
-                    ];
-                } catch (\PDOException $e) {
-                    $tableChecks[$table] = [
-                        'exists' => false,
-                        'error' => $e->getMessage()
-                    ];
+            $checks['db_config'] = [
+                'host' => $host,
+                'port' => $port,
+                'database' => $database ? '***' : null,
+                'username' => $username ? '***' : null,
+            ];
+            
+            if ($database && $username) {
+                $dsn = sprintf('mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4', $host, $port, $database);
+                
+                $options = [
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                    PDO::ATTR_TIMEOUT => 5,
+                ];
+                
+                // SSL for TiDB Cloud
+                $sslCa = Config::get('DB_SSL_CA');
+                $sslPath = null;
+                
+                if ($sslCa && file_exists($sslCa)) {
+                    $sslPath = $sslCa;
+                } else {
+                    // Try system certs
+                    foreach (['/etc/ssl/certs/ca-certificates.crt', '/etc/ssl/cert.pem', '/etc/pki/tls/certs/ca-bundle.crt'] as $certPath) {
+                        if (file_exists($certPath)) {
+                            $sslPath = $certPath;
+                            break;
+                        }
+                    }
                 }
-            }
-            
-            $diagnostics['checks']['tables'] = $tableChecks;
-        } catch (\Exception $e) {
-            $diagnostics['warnings'][] = 'Could not check tables: ' . $e->getMessage();
-        }
-    }
-
-} catch (\Throwable $e) {
-    $diagnostics['checks']['bootstrap']['loaded'] = false;
-    $diagnostics['checks']['bootstrap']['error'] = $e->getMessage();
-    $diagnostics['checks']['bootstrap']['file'] = $e->getFile();
-    $diagnostics['checks']['bootstrap']['line'] = $e->getLine();
-    $diagnostics['errors'][] = 'Bootstrap loading failed: ' . $e->getMessage();
-    $diagnostics['status'] = 'error';
-}
-
-// Check 8: Request headers (useful for debugging Telegram-Data)
-$headers = [];
-if (function_exists('getallheaders')) {
-    $allHeaders = getallheaders();
-    if (is_array($allHeaders)) {
-        foreach ($allHeaders as $key => $value) {
-            // Don't expose sensitive data fully
-            if (strtolower($key) === 'telegram-data') {
-                $headers[$key] = strlen($value) > 0 ? '[SET - ' . strlen($value) . ' chars]' : '[EMPTY]';
+                
+                if ($sslPath) {
+                    $options[PDO::MYSQL_ATTR_SSL_CA] = $sslPath;
+                    $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
+                    $checks['ssl_cert_path'] = $sslPath;
+                }
+                
+                $pdo = new PDO($dsn, $username, $password, $options);
+                $pdo->query('SELECT 1');
+                
+                $checks['database_connected'] = true;
             } else {
-                $headers[$key] = $value;
+                $errors[] = 'Database credentials not configured in .env';
             }
+        } catch (PDOException $e) {
+            $checks['database_connected'] = false;
+            $errors[] = 'Database connection failed: ' . $e->getMessage();
         }
+    } catch (Throwable $e) {
+        $checks['config_loaded'] = false;
+        $errors[] = 'Config load failed: ' . $e->getMessage();
     }
 }
-$diagnostics['checks']['request'] = [
-    'method' => $_SERVER['REQUEST_METHOD'] ?? 'unknown',
-    'uri' => $_SERVER['REQUEST_URI'] ?? 'unknown',
-    'headers' => $headers,
-    'origin' => $_SERVER['HTTP_ORIGIN'] ?? 'not set'
-];
-
-// Check 9: Server info
-$diagnostics['checks']['server'] = [
-    'software' => $_SERVER['SERVER_SOFTWARE'] ?? 'unknown',
-    'document_root' => $_SERVER['DOCUMENT_ROOT'] ?? 'unknown',
-    'script_filename' => $_SERVER['SCRIPT_FILENAME'] ?? 'unknown',
-    'php_sapi' => PHP_SAPI,
-    'memory_limit' => ini_get('memory_limit'),
-    'max_execution_time' => ini_get('max_execution_time'),
-    'error_reporting' => error_reporting(),
-    'display_errors' => ini_get('display_errors')
-];
-
-// Check 10: API endpoints accessibility
-$apiEndpoints = [
-    'health' => __DIR__ . '/../health/index.php',
-    'me' => __DIR__ . '/../me/index.php',
-    'login' => __DIR__ . '/../login/index.php',
-    'getUser' => __DIR__ . '/../getUser/index.php',
-    'airdrop/status' => __DIR__ . '/../airdrop/status.php',
-];
-$endpointChecks = [];
-foreach ($apiEndpoints as $name => $path) {
-    $endpointChecks[$name] = [
-        'file_exists' => file_exists($path),
-        'readable' => is_readable($path)
-    ];
-}
-$diagnostics['checks']['api_endpoints'] = $endpointChecks;
 
 // Summary
-$diagnostics['summary'] = [
-    'total_errors' => count($diagnostics['errors']),
-    'total_warnings' => count($diagnostics['warnings']),
-    'ready_for_production' => $diagnostics['status'] === 'ok' && empty($diagnostics['errors'])
+$status = empty($errors) ? 'OK' : 'ERRORS';
+$response = [
+    'status' => $status,
+    'timestamp' => date('Y-m-d H:i:s'),
+    'checks' => $checks,
+    'errors' => $errors,
+    'recommendations' => []
 ];
 
-// Output
-http_response_code($diagnostics['status'] === 'ok' ? 200 : 500);
-echo json_encode($diagnostics, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+if (!($checks['vendor_autoload_exists'] ?? true)) {
+    $response['recommendations'][] = 'Run: cd /var/www/html && composer install --no-dev --optimize-autoloader';
+}
+
+if ($checks['env_has_placeholders'] ?? false) {
+    $response['recommendations'][] = 'Generate encryption keys and update .env';
+}
+
+if (!($checks['database_connected'] ?? true)) {
+    $response['recommendations'][] = 'Check database credentials and SSL configuration';
+}
+
+echo json_encode($response, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
