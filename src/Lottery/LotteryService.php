@@ -275,8 +275,8 @@ class LotteryService
         // Cap limit at reasonable maximum
         $limit = min($limit, 100);
 
-        // Optimized query: Single JOIN instead of N+1 separate queries
-        // This replaces the previous loop that ran a COUNT query for each lottery
+        // Optimized query using subquery for winner count
+        // This is compatible with MySQL ONLY_FULL_GROUP_BY mode
         $stmt = $db->prepare(
             'SELECT 
                 l.`id`, 
@@ -287,10 +287,8 @@ class LotteryService
                 l.`start_at`, 
                 l.`end_at`, 
                 l.`created_at`,
-                CASE WHEN COUNT(lw.`id`) > 0 THEN 1 ELSE 0 END as has_winners
+                (SELECT COUNT(*) FROM `lottery_winners` lw WHERE lw.`lottery_id` = l.`id`) > 0 as has_winners
              FROM `lotteries` l
-             LEFT JOIN `lottery_winners` lw ON l.`id` = lw.`lottery_id`
-             GROUP BY l.`id`
              ORDER BY l.`created_at` DESC 
              LIMIT :limit'
         );
