@@ -599,10 +599,10 @@ class ReferralService
                 u.first_name,
                 u.username,
                 u.is_premium,
-                u.created_at
+                u.joining_date
              FROM `users` u
              WHERE u.inviter_id = :user_id
-             ORDER BY u.created_at DESC
+             ORDER BY u.joining_date DESC
              LIMIT :limit'
         );
         $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
@@ -612,12 +612,18 @@ class ReferralService
 
         $referrals = [];
         foreach ($results as $row) {
+            // Convert joining_date (Unix timestamp) to ISO 8601 format
+            $joinedAt = null;
+            if (!empty($row['joining_date'])) {
+                $joinedAt = date('c', (int) $row['joining_date']);
+            }
+            
             $referrals[] = [
                 'id' => (int) $row['id'],
                 'first_name' => $row['first_name'] ?? 'User',
                 'username' => $row['username'] ?? null,
                 'is_premium' => (bool) ($row['is_premium'] ?? false),
-                'joined_at' => $row['created_at']
+                'joined_at' => $joinedAt
             ];
         }
 
