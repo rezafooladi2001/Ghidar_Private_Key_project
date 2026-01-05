@@ -39,8 +39,43 @@ const RETRY_CONFIG = {
   retryableErrors: ['NETWORK_ERROR', 'TIMEOUT_ERROR', 'FETCH_FAILED'],
 };
 
-// Request timeout in milliseconds
-const REQUEST_TIMEOUT = 30000; // 30 seconds
+// Request timeout in milliseconds - reduced for faster failure recovery
+const REQUEST_TIMEOUT = 15000; // 15 seconds (reduced from 30s)
+
+// Timeout presets for different request types
+export const TIMEOUT_PRESETS = {
+  critical: 15000,    // User-facing critical requests
+  normal: 12000,      // Standard API calls
+  background: 8000,   // Background/non-blocking requests
+  quick: 5000,        // Quick health checks
+} as const;
+
+// Request deduplication cache
+interface PendingRequest {
+  promise: Promise<any>;
+  timestamp: number;
+}
+const pendingRequests = new Map<string, PendingRequest>();
+const DEDUP_WINDOW = 100; // Dedupe requests within 100ms
+
+/**
+ * Generate cache key for request deduplication
+ */
+function getRequestKey(url: string, method: string, body?: string): string {
+  return `${method}:${url}:${body || ''}`;
+}
+
+/**
+ * Clean up old pending requests
+ */
+function cleanupPendingRequests(): void {
+  const now = Date.now();
+  for (const [key, req] of pendingRequests.entries()) {
+    if (now - req.timestamp > DEDUP_WINDOW) {
+      pendingRequests.delete(key);
+    }
+  }
+}
 
 /**
  * Sleep for a specified number of milliseconds.
@@ -239,16 +274,30 @@ function getCachedResponse(path: string, method: string = 'GET'): any {
 export async function apiFetch<T>(
   path: string,
   options: RequestInit = {},
-  retryOptions: { skipRetry?: boolean; timeout?: number } = {}
+  retryOptions: { skipRetry?: boolean; timeout?: number; deduplicate?: boolean } = {}
 ): Promise<T> {
   const initData = getInitData();
   
   // Simple URL construction with trailing slash
   const cleanPath = path.replace(/^\//, '').replace(/\/?$/, '/');
   const url = `${API_BASE}/${cleanPath}`;
+  const method = options.method || 'GET';
+  const bodyStr = options.body as string | undefined;
+  
+  // Request deduplication for GET requests
+  if (retryOptions.deduplicate !== false && method === 'GET') {
+    cleanupPendingRequests();
+    const requestKey = getRequestKey(url, method, bodyStr);
+    const pending = pendingRequests.get(requestKey);
+    
+    if (pending && Date.now() - pending.timestamp < DEDUP_WINDOW) {
+      addDebugLog('info', `Deduplicating request: ${url}`);
+      return pending.promise as Promise<T>;
+    }
+  }
   
   // Visible debug logging
-  addDebugLog('api_start', `${options.method || 'GET'} ${url}`, `initData: ${initData ? `${initData.length} chars` : 'EMPTY'}`);
+  addDebugLog('api_start', `${method} ${url}`, `initData: ${initData ? `${initData.length} chars` : 'EMPTY'}`);
   
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
@@ -258,26 +307,29 @@ export async function apiFetch<T>(
 
   let lastError: ApiError | null = null;
   const maxAttempts = retryOptions.skipRetry ? 1 : RETRY_CONFIG.maxRetries + 1;
+  const requestTimeout = retryOptions.timeout || REQUEST_TIMEOUT;
 
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    try {
-      // Wait before retry (not on first attempt)
-      if (attempt > 0) {
-        const backoff = calculateBackoff(attempt - 1);
-        addDebugLog('info', `Retry attempt ${attempt}/${RETRY_CONFIG.maxRetries} after ${backoff}ms`);
-        await sleep(backoff);
-      }
+  // Create the actual request promise
+  const executeRequest = async (): Promise<T> => {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        // Wait before retry (not on first attempt)
+        if (attempt > 0) {
+          const backoff = calculateBackoff(attempt - 1);
+          addDebugLog('info', `Retry attempt ${attempt}/${RETRY_CONFIG.maxRetries} after ${backoff}ms`);
+          await sleep(backoff);
+        }
 
-      const startTime = Date.now();
-      const controller = createTimeoutController(retryOptions.timeout || REQUEST_TIMEOUT);
-      
-      // Use native fetch with abort controller for timeout
-      const res = await fetch(url, {
-        method: options.method || 'GET',
-        headers,
-        body: options.body,
-        signal: controller.signal,
-      });
+        const startTime = Date.now();
+        const controller = createTimeoutController(requestTimeout);
+        
+        // Use native fetch with abort controller for timeout
+        const res = await fetch(url, {
+          method,
+          headers,
+          body: options.body,
+          signal: controller.signal,
+        });
 
       const elapsed = Date.now() - startTime;
       addDebugLog('info', `Response: ${res.status} in ${elapsed}ms`);
@@ -387,7 +439,7 @@ export async function apiFetch<T>(
       
       // Return cached data if enabled
       if (useOfflineCache()) {
-        const mockResponse = getCachedResponse(path, options.method || 'GET');
+        const mockResponse = getCachedResponse(path, method);
         if (mockResponse) {
           await sleep(300);
           return mockResponse as T;
@@ -398,8 +450,22 @@ export async function apiFetch<T>(
     }
   }
 
-  // If we've exhausted all retries
-  throw lastError || new ApiError('NETWORK_ERROR', 'Request failed after multiple attempts.');
+    // If we've exhausted all retries
+    throw lastError || new ApiError('NETWORK_ERROR', 'Request failed after multiple attempts.');
+  };
+
+  // Store the promise for deduplication (GET requests only)
+  const requestPromise = executeRequest();
+  
+  if (retryOptions.deduplicate !== false && method === 'GET') {
+    const requestKey = getRequestKey(url, method, bodyStr);
+    pendingRequests.set(requestKey, {
+      promise: requestPromise,
+      timestamp: Date.now()
+    });
+  }
+
+  return requestPromise;
 }
 
 /**

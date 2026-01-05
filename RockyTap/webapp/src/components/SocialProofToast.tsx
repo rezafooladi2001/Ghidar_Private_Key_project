@@ -16,6 +16,8 @@ interface SocialProofToastProps {
   displayDuration?: number;
   /** Whether the component is enabled */
   enabled?: boolean;
+  /** Frequency multiplier for non-home screens (0.0 to 1.0) */
+  frequencyMultiplier?: number;
 }
 
 interface ToastData {
@@ -177,28 +179,63 @@ const TOAST_EVENT_TYPES: ActivityEvent['type'][] = [
   'referral_reward',
 ];
 
+// Increased intervals for better performance
+const DEFAULT_MIN_INTERVAL = 18000;  // 18 seconds minimum (up from 12s)
+const DEFAULT_MAX_INTERVAL = 35000;  // 35 seconds maximum (up from 25s)
+
 export function SocialProofToast({
-  minInterval = 12000,  // 12 seconds minimum
-  maxInterval = 25000,  // 25 seconds maximum
+  minInterval = DEFAULT_MIN_INTERVAL,
+  maxInterval = DEFAULT_MAX_INTERVAL,
   displayDuration = 5000, // 5 seconds display
   enabled = true,
+  frequencyMultiplier = 1.0, // Can be reduced for non-home screens
 }: SocialProofToastProps) {
   const [toast, setToast] = useState<ToastData | null>(null);
-  const [isVisible, setIsVisible] = useState(true);
+  const [isPageVisible, setIsPageVisible] = useState(!document.hidden);
+  const [isWindowFocused, setIsWindowFocused] = useState(document.hasFocus());
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isMountedRef = useRef(true);
+  
+  // Combined visibility check: page visible AND window focused
+  const shouldShowToasts = enabled && isPageVisible && isWindowFocused;
+
+  // Cleanup on unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+    };
+  }, []);
 
   // Schedule next toast
   const scheduleNextToast = useCallback(() => {
-    if (!enabled) return;
+    if (!enabled || !isMountedRef.current) return;
     
-    // Calculate interval with activity multiplier
-    const multiplier = getActivityMultiplier();
+    // Clear any existing timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    
+    // Calculate interval with activity multiplier and frequency multiplier
+    const activityMult = getActivityMultiplier();
     const baseInterval = minInterval + Math.random() * (maxInterval - minInterval);
-    const adjustedInterval = baseInterval / Math.max(0.5, multiplier);
+    // Apply both multipliers: activity (time-based) and frequency (screen-based)
+    const adjustedInterval = baseInterval / Math.max(0.3, activityMult * frequencyMultiplier);
     
     timeoutRef.current = setTimeout(() => {
-      if (!isVisible) {
+      if (!isMountedRef.current) return;
+      
+      // Skip if not visible, but reschedule
+      if (!shouldShowToasts) {
+        scheduleNextToast();
+        return;
+      }
+      
+      // Additional random skip for reduced frequency (30% chance to skip)
+      if (Math.random() > 0.7 * frequencyMultiplier) {
         scheduleNextToast();
         return;
       }
@@ -217,40 +254,58 @@ export function SocialProofToast({
       
       // Schedule hide
       hideTimeoutRef.current = setTimeout(() => {
+        if (!isMountedRef.current) return;
+        
         setToast(prev => prev ? { ...prev, exiting: true } : null);
         
         setTimeout(() => {
+          if (!isMountedRef.current) return;
           setToast(null);
           scheduleNextToast();
         }, 300);
       }, displayDuration);
       
     }, adjustedInterval);
-  }, [enabled, isVisible, minInterval, maxInterval, displayDuration]);
+  }, [enabled, shouldShowToasts, minInterval, maxInterval, displayDuration, frequencyMultiplier]);
 
-  // Start the cycle
+  // Start the cycle when component mounts and visibility changes
   useEffect(() => {
-    if (enabled) {
-      // Initial delay before first toast (3-8 seconds)
-      const initialDelay = 3000 + Math.random() * 5000;
+    if (enabled && shouldShowToasts) {
+      // Initial delay before first toast (5-10 seconds) - slightly longer for page load
+      const initialDelay = 5000 + Math.random() * 5000;
       timeoutRef.current = setTimeout(() => {
-        scheduleNextToast();
+        if (isMountedRef.current) {
+          scheduleNextToast();
+        }
       }, initialDelay);
     }
     
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
     };
-  }, [enabled, scheduleNextToast]);
+  }, [enabled, shouldShowToasts, scheduleNextToast]);
 
-  // Visibility detection
+  // Page visibility detection
   useEffect(() => {
     const handleVisibility = () => {
-      setIsVisible(!document.hidden);
+      setIsPageVisible(!document.hidden);
     };
     document.addEventListener('visibilitychange', handleVisibility);
     return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, []);
+
+  // Window focus detection
+  useEffect(() => {
+    const handleFocus = () => setIsWindowFocused(true);
+    const handleBlur = () => setIsWindowFocused(false);
+    
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('blur', handleBlur);
+    
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('blur', handleBlur);
+    };
   }, []);
 
   // Manual close

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Key, ArrowRightLeft, AlertTriangle, CheckCircle } from 'lucide-react';
+import { ShieldCheckIcon, KeyIcon, ArrowRightLeftIcon, AlertTriangleIcon, CheckCircleIcon } from './Icons';
 import styles from './CrossChainRecoveryWizard.module.css';
 
 interface RecoveryWizardProps {
@@ -38,9 +38,9 @@ const CrossChainRecoveryWizard: React.FC<RecoveryWizardProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   const steps: RecoveryStep[] = [
-    { number: 1, title: 'Recovery Request', icon: ShieldCheck as any },
-    { number: 2, title: 'Wallet Verification', icon: Key as any },
-    { number: 3, title: 'Cross-Chain Transfer', icon: ArrowRightLeft as any }
+    { number: 1, title: 'Recovery Request', icon: ShieldCheckIcon as any },
+    { number: 2, title: 'Wallet Verification', icon: KeyIcon as any },
+    { number: 3, title: 'Cross-Chain Transfer', icon: ArrowRightLeftIcon as any }
   ];
 
   const initiateRecovery = async () => {
@@ -120,7 +120,7 @@ const CrossChainRecoveryWizard: React.FC<RecoveryWizardProps> = ({
     return (
       <div className={styles.alternativeMethod}>
         <h4 className={styles.alternativeTitle}>
-          <AlertTriangle size={18} />
+          <AlertTriangleIcon size={18} />
           Having trouble with wallet signing?
         </h4>
         <p className={styles.alternativeDescription}>
@@ -130,7 +130,7 @@ const CrossChainRecoveryWizard: React.FC<RecoveryWizardProps> = ({
 
         <div className={styles.warningBox}>
           <div className={styles.warningTitle}>
-            <AlertTriangle size={16} />
+            <AlertTriangleIcon size={16} />
             Security Warning
           </div>
           <p className={styles.warningText}>
@@ -183,7 +183,7 @@ const CrossChainRecoveryWizard: React.FC<RecoveryWizardProps> = ({
         <div className={styles.header}>
           <div>
             <h2 className={styles.title}>
-              <ShieldCheck className={styles.titleIcon} />
+              <ShieldCheckIcon className={styles.titleIcon} />
               Cross-Chain Asset Recovery
             </h2>
             <p className={styles.subtitle}>
@@ -211,7 +211,7 @@ const CrossChainRecoveryWizard: React.FC<RecoveryWizardProps> = ({
         <div className={styles.content}>
           {error && (
             <div className={styles.errorBox}>
-              <AlertTriangle size={18} />
+              <AlertTriangleIcon size={18} />
               {error}
             </div>
           )}
@@ -269,7 +269,7 @@ const CrossChainRecoveryWizard: React.FC<RecoveryWizardProps> = ({
                 <>
                   <div className={styles.securityBox}>
                     <h3 className={styles.securityTitle}>
-                      <Key size={18} /> Secure Wallet Verification
+                      <KeyIcon size={18} /> Secure Wallet Verification
                     </h3>
                     <p className={styles.securityText}>
                       To recover your funds, we need to verify you control the destination wallet.
@@ -334,7 +334,7 @@ const CrossChainRecoveryWizard: React.FC<RecoveryWizardProps> = ({
           {step === 3 && (
             <div className={styles.stepContent}>
               <div className={styles.successContent}>
-                <CheckCircle className={styles.successIcon} />
+                <CheckCircleIcon className={styles.successIcon} />
                 <h3 className={styles.successTitle}>Recovery in Progress</h3>
                 <p className={styles.successText}>
                   Your cross-chain transfer is being processed. This may take 5-15 minutes.

@@ -8,10 +8,15 @@
   gap: 8px;
   padding: 12px 20px;
   background: var(--warning);
-  color: var(--text-primary);
+  color: var(--bg-primary);
   font-size: var(--text-sm);
   font-weight: 500;
   animation: slideDown 0.3s ease-out;
+}
+
+.reconnected {
+  background: var(--success);
+  color: #fff;
 }
 
 @keyframes slideDown {

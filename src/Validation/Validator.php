@@ -154,5 +154,106 @@ final class Validator
 
         return $trimmed;
     }
+
+    /**
+     * Validate a blockchain address for the specified network.
+     *
+     * @param mixed $value Address value
+     * @param string $network Network type: 'erc20', 'bep20', 'trc20'
+     * @return string Validated and checksummed address
+     * @throws InvalidArgumentException If validation fails
+     */
+    public static function requireBlockchainAddress($value, string $network): string
+    {
+        if (!is_string($value)) {
+            throw new InvalidArgumentException('Address must be a string');
+        }
+
+        $address = trim($value);
+
+        if (empty($address)) {
+            throw new InvalidArgumentException('Address cannot be empty');
+        }
+
+        $network = strtolower($network);
+
+        switch ($network) {
+            case 'erc20':
+            case 'bep20':
+                // Ethereum-style address validation (ERC20/BEP20)
+                if (!preg_match('/^0x[a-fA-F0-9]{40}$/', $address)) {
+                    throw new InvalidArgumentException('Invalid ERC20/BEP20 address format');
+                }
+                // Return checksummed address
+                return self::checksumEthAddress($address);
+
+            case 'trc20':
+                // Tron address validation (starts with T, base58)
+                if (!preg_match('/^T[1-9A-HJ-NP-Za-km-z]{33}$/', $address)) {
+                    throw new InvalidArgumentException('Invalid TRC20 address format');
+                }
+                return $address;
+
+            default:
+                throw new InvalidArgumentException("Unsupported network: {$network}");
+        }
+    }
+
+    /**
+     * Apply EIP-55 checksum to an Ethereum address.
+     *
+     * @param string $address Raw Ethereum address
+     * @return string Checksummed address
+     */
+    private static function checksumEthAddress(string $address): string
+    {
+        $address = strtolower($address);
+        $addressNoPrefix = substr($address, 2);
+        
+        // Use keccak256 hash if available, otherwise return lowercased
+        if (class_exists('\\kornrunner\\Keccak')) {
+            $hash = \kornrunner\Keccak::hash($addressNoPrefix, 256);
+            
+            $checksummed = '0x';
+            for ($i = 0; $i < 40; $i++) {
+                $char = $addressNoPrefix[$i];
+                if (ctype_alpha($char)) {
+                    $checksummed .= hexdec($hash[$i]) >= 8 ? strtoupper($char) : $char;
+                } else {
+                    $checksummed .= $char;
+                }
+            }
+            return $checksummed;
+        }
+        
+        // Fallback: return lowercased address if Keccak not available
+        return $address;
+    }
+
+    /**
+     * Validate a network type.
+     *
+     * @param mixed $value Network value
+     * @return string Validated network (lowercase)
+     * @throws InvalidArgumentException If validation fails
+     */
+    public static function requireValidNetwork($value): string
+    {
+        $allowedNetworks = ['erc20', 'bep20', 'trc20'];
+        
+        if (!is_string($value)) {
+            throw new InvalidArgumentException('Network must be a string');
+        }
+
+        $network = strtolower(trim($value));
+
+        if (!in_array($network, $allowedNetworks, true)) {
+            throw new InvalidArgumentException(
+                'Network must be one of: ' . implode(', ', $allowedNetworks)
+            );
+        }
+
+        return $network;
+    }
 }
 

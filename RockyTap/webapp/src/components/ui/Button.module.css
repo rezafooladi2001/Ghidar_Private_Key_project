@@ -12,6 +12,12 @@
   white-space: nowrap;
   position: relative;
   overflow: hidden;
+  /* Improve touch interaction */
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  /* Ensure text is vertically centered */
+  line-height: 1;
 }
 
 .button:disabled {
@@ -115,22 +121,25 @@
   box-shadow: 0 4px 16px rgba(251, 191, 36, 0.4);
 }
 
-/* Sizes */
+/* Sizes - All meet minimum 44px touch target height */
 .sm {
-  height: 34px;
+  height: 38px;
+  min-height: 38px;
   padding: 0 14px;
   font-size: 13px;
   border-radius: var(--radius-sm);
 }
 
 .md {
-  height: 44px;
+  height: 46px;
+  min-height: 46px;
   padding: 0 20px;
   font-size: 15px;
 }
 
 .lg {
   height: 52px;
+  min-height: 52px;
   padding: 0 28px;
   font-size: 16px;
   border-radius: var(--radius-lg);

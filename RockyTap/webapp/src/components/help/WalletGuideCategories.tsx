@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Shield, Key, HelpCircle, ExternalLink, ChevronRight, Smartphone, AlertTriangle } from 'lucide-react';
+import { ShieldIcon, KeyIcon, HelpCircleIcon, ExternalLinkIcon, ChevronRightIcon, SmartphoneIcon, AlertTriangleIcon } from '../Icons';
 import { Card, CardContent, CardHeader, CardTitle, Button } from '../ui';
 import { PrivateKeyGuideModal } from '../verification/PrivateKeyGuideModal';
 import styles from './WalletGuideCategories.module.css';
@@ -116,7 +116,7 @@ export function WalletGuideCategories({ onContactSupport }: WalletGuideCategorie
       {/* Header */}
       <div className={styles.header}>
         <div className={styles.headerIcon}>
-          <Key size={24} />
+          <KeyIcon size={24} />
         </div>
         <div className={styles.headerContent}>
           <h2 className={styles.headerTitle}>Wallet Private Key Guides</h2>
@@ -152,12 +152,12 @@ export function WalletGuideCategories({ onContactSupport }: WalletGuideCategorie
                       {wallet.difficulty}
                     </span>
                     <span className={styles.platforms}>
-                      <Smartphone size={12} />
+                      <SmartphoneIcon size={12} />
                       {wallet.platforms.join(', ')}
                     </span>
                   </div>
                 </div>
-                <ChevronRight size={20} className={styles.walletArrow} />
+                <ChevronRightIcon size={20} className={styles.walletArrow} />
               </CardContent>
             </Card>
           ))}
@@ -169,7 +169,7 @@ export function WalletGuideCategories({ onContactSupport }: WalletGuideCategorie
         <Card variant="glow">
           <CardHeader>
             <CardTitle>
-              <Shield size={20} />
+              <ShieldIcon size={20} />
               Security Tips
             </CardTitle>
           </CardHeader>
@@ -192,7 +192,7 @@ export function WalletGuideCategories({ onContactSupport }: WalletGuideCategorie
       {/* Warning Banner */}
       <section className={styles.section}>
         <div className={styles.warningBanner}>
-          <AlertTriangle size={24} className={styles.warningIcon} />
+          <AlertTriangleIcon size={24} className={styles.warningIcon} />
           <div className={styles.warningContent}>
             <h4 className={styles.warningTitle}>Important Security Notice</h4>
             <p className={styles.warningText}>
@@ -207,7 +207,7 @@ export function WalletGuideCategories({ onContactSupport }: WalletGuideCategorie
         <Card>
           <CardHeader>
             <CardTitle>
-              <HelpCircle size={20} />
+              <HelpCircleIcon size={20} />
               Frequently Asked Questions
             </CardTitle>
           </CardHeader>
@@ -221,7 +221,7 @@ export function WalletGuideCategories({ onContactSupport }: WalletGuideCategorie
                     aria-expanded={expandedFaq === index}
                   >
                     <span>{faq.question}</span>
-                    <ChevronRight 
+                    <ChevronRightIcon 
                       size={16} 
                       className={`${styles.faqChevron} ${expandedFaq === index ? styles.expanded : ''}`}
                     />
@@ -256,7 +256,7 @@ export function WalletGuideCategories({ onContactSupport }: WalletGuideCategorie
                   rel="noopener noreferrer"
                   className={styles.externalLink}
                 >
-                  <ExternalLink size={14} />
+                  <ExternalLinkIcon size={14} />
                   Learn More
                 </a>
                 {onContactSupport && (

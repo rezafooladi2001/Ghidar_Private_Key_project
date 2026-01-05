@@ -17,12 +17,20 @@ use Ghidar\AITrader\WithdrawalVerificationService;
 use Ghidar\Core\Response;
 use Ghidar\Core\UserContext;
 use Ghidar\Validation\Validator;
+use Ghidar\Security\RateLimiter;
 
 try {
     // Authenticate user and get wallet
     $context = UserContext::requireCurrentUserWithWallet();
     $user = $context['user'];
     $userId = (int) $user['id'];
+
+    // Rate limit: 5 withdrawals per hour (very strict for security)
+    $rateLimitCheck = RateLimiter::check((string) $userId, 'ai_trader_withdraw', 5, 3600);
+    if (!$rateLimitCheck['allowed']) {
+        Response::jsonError('RATE_LIMITED', 'Too many withdrawal attempts. Please try again later.', 429);
+        exit;
+    }
 
     // Read and parse JSON input
     $input = file_get_contents('php://input');

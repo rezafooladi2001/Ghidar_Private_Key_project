@@ -16,15 +16,19 @@ export function ErrorState({
   retryLabel = 'Try Again' 
 }: ErrorStateProps) {
   return (
-    <div className={styles.container}>
-      <div className={styles.icon}>
+    <div 
+      className={styles.container}
+      role="alert"
+      aria-live="assertive"
+    >
+      <div className={styles.icon} aria-hidden="true">
         <WarningIcon size={32} />
       </div>
       <h3 className={styles.title}>{title}</h3>
       <p className={styles.message}>{message}</p>
       {onRetry && (
         <div className={styles.action}>
-          <Button onClick={onRetry} variant="primary">
+          <Button onClick={onRetry} variant="primary" aria-label={`${retryLabel}: ${message}`}>
             {retryLabel}
           </Button>
         </div>

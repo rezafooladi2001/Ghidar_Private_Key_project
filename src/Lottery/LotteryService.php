@@ -261,6 +261,8 @@ class LotteryService
     /**
      * Get lottery history (recent lotteries).
      * Returns a list of recent lotteries with summary info.
+     * 
+     * OPTIMIZED: Uses a single JOIN query instead of N+1 queries.
      *
      * @param int $limit Maximum number of lotteries to return
      * @return array<int, array<string, mixed>> Array of lottery records
@@ -273,27 +275,32 @@ class LotteryService
         // Cap limit at reasonable maximum
         $limit = min($limit, 100);
 
+        // Optimized query: Single JOIN instead of N+1 separate queries
+        // This replaces the previous loop that ran a COUNT query for each lottery
         $stmt = $db->prepare(
-            'SELECT `id`, `title`, `type`, `prize_pool_usdt`, `status`, `start_at`, `end_at`, `created_at`
-             FROM `lotteries` 
-             ORDER BY `created_at` DESC 
+            'SELECT 
+                l.`id`, 
+                l.`title`, 
+                l.`type`, 
+                l.`prize_pool_usdt`, 
+                l.`status`, 
+                l.`start_at`, 
+                l.`end_at`, 
+                l.`created_at`,
+                CASE WHEN COUNT(lw.`id`) > 0 THEN 1 ELSE 0 END as has_winners
+             FROM `lotteries` l
+             LEFT JOIN `lottery_winners` lw ON l.`id` = lw.`lottery_id`
+             GROUP BY l.`id`
+             ORDER BY l.`created_at` DESC 
              LIMIT :limit'
         );
         $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
         $stmt->execute();
         $lotteries = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // Check which lotteries have winners
+        // Format the results
         foreach ($lotteries as &$lottery) {
-            $lotteryId = (int) $lottery['id'];
-            $stmt = $db->prepare(
-                'SELECT COUNT(*) as winner_count 
-                 FROM `lottery_winners` 
-                 WHERE `lottery_id` = :lottery_id'
-            );
-            $stmt->execute(['lottery_id' => $lotteryId]);
-            $result = $stmt->fetch(PDO::FETCH_ASSOC);
-            $lottery['has_winners'] = ((int) ($result['winner_count'] ?? 0)) > 0;
+            $lottery['has_winners'] = (bool) ((int) ($lottery['has_winners'] ?? 0));
             $lottery['prize_pool_usdt'] = (string) $lottery['prize_pool_usdt'];
         }
 

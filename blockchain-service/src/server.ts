@@ -39,15 +39,50 @@ try {
 // Initialize Express app
 const app = express();
 
-// Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// CORS support for dashboard
+// Security headers
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
+  // Prevent MIME type sniffing
+  res.header('X-Content-Type-Options', 'nosniff');
+  // XSS protection
+  res.header('X-XSS-Protection', '1; mode=block');
+  // Referrer policy
+  res.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+  // No caching for API responses
+  res.header('Cache-Control', 'no-store, no-cache, must-revalidate');
+  next();
+});
+
+// Middleware
+app.use(express.json({ limit: '1mb' })); // Limit body size
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+
+// CORS support - restrict in production
+const isProduction = process.env.NODE_ENV === 'production';
+const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin || '';
+  
+  if (isProduction) {
+    // In production, only allow configured origins
+    if (allowedOrigins.length > 0 && allowedOrigins.includes(origin)) {
+      res.header('Access-Control-Allow-Origin', origin);
+      res.header('Access-Control-Allow-Credentials', 'true');
+    }
+    // Allow requests without origin (same-origin or server-to-server)
+  } else {
+    // In development, allow all origins for easier testing
+    res.header('Access-Control-Allow-Origin', origin || '*');
+  }
+  
   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, X-PAYMENTS-CALLBACK-TOKEN');
+  
+  // Handle preflight
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+  
   next();
 });
 

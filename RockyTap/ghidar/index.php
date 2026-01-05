@@ -17,6 +17,12 @@ if (file_exists(__DIR__ . '/../bot/.maintenance.txt')) {
 header('Content-Type: text/html; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
 
+// CRITICAL: Prevent caching of HTML to ensure users always get latest asset references
+// This fixes issues where users have stale cached HTML pointing to old asset filenames
+header('Cache-Control: no-cache, no-store, must-revalidate');
+header('Pragma: no-cache');
+header('Expires: 0');
+
 // Path to Vite-generated index.html
 $indexHtmlPath = __DIR__ . '/../assets/ghidar/index.html';
 

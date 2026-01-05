@@ -9,8 +9,12 @@ interface EmptyStateProps {
 
 export function EmptyState({ icon = '📭', message, action }: EmptyStateProps) {
   return (
-    <div className={styles.container}>
-      <div className={styles.iconWrapper}>
+    <div 
+      className={styles.container}
+      role="status"
+      aria-label={message}
+    >
+      <div className={styles.iconWrapper} aria-hidden="true">
         {typeof icon === 'string' ? icon : icon}
       </div>
       <p className={styles.message}>{message}</p>

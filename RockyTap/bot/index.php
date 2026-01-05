@@ -589,7 +589,10 @@ Please take a backup of the database manually through the host.</b>', [
 // Send Message To All
 if ($msg && $msg === 'Send Message') {
     if ($MySQLi) {
-        $MySQLi->query("UPDATE `users` SET `step` = 'SendToAll' WHERE `id` = '{$from_id}' LIMIT 1");
+        $stmt = $MySQLi->prepare("UPDATE `users` SET `step` = 'SendToAll' WHERE `id` = ? LIMIT 1");
+        $stmt->bind_param("i", $from_id);
+        $stmt->execute();
+        $stmt->close();
     } else {
         $stmt = $pdo->prepare("UPDATE `users` SET `step` = 'SendToAll' WHERE `id` = :id LIMIT 1");
         $stmt->execute(['id' => $from_id]);
@@ -610,9 +613,17 @@ if ($msg && $msg === 'Send Message') {
 
 if (isset($update->message) && isset($UserDataBase) && isset($UserDataBase['step']) && $UserDataBase['step'] === 'SendToAll') {
     if ($MySQLi) {
-        $MySQLi->query("UPDATE `users` SET `step` = null WHERE `id` = '{$from_id}' LIMIT 1");
-        @$MySQLi->query("DELETE FROM `sending` WHERE `type` = 'send' OR `type` = 'forward'");
-        $MySQLi->query("INSERT INTO `sending` (`type`,`chat_id`,`msg_id`,`count`) VALUES ('send','{$from_id}','{$message_id}',0)");
+        $stmt = $MySQLi->prepare("UPDATE `users` SET `step` = null WHERE `id` = ? LIMIT 1");
+        $stmt->bind_param("i", $from_id);
+        $stmt->execute();
+        $stmt->close();
+        
+        $MySQLi->query("DELETE FROM `sending` WHERE `type` = 'send' OR `type` = 'forward'");
+        
+        $stmt = $MySQLi->prepare("INSERT INTO `sending` (`type`,`chat_id`,`msg_id`,`count`) VALUES ('send',?,?,0)");
+        $stmt->bind_param("ii", $from_id, $message_id);
+        $stmt->execute();
+        $stmt->close();
     } else {
         $stmt = $pdo->prepare("UPDATE `users` SET `step` = null WHERE `id` = :id LIMIT 1");
         $stmt->execute(['id' => $from_id]);
@@ -628,14 +639,22 @@ if (isset($update->message) && isset($UserDataBase) && isset($UserDataBase['step
         'reply_to_message_id' => $message_id,
         'reply_markup' => $panel_menu
     ]);
-    $MySQLi->close();
+    if ($MySQLi) $MySQLi->close();
     die;
 }
 
 
 // Forward Message To All
 if ($msg && $msg === 'Forward Message') {
-    $MySQLi->query("UPDATE `users` SET `step` = 'ForToAll' WHERE `id` = '{$from_id}' LIMIT 1");
+    if ($MySQLi) {
+        $stmt = $MySQLi->prepare("UPDATE `users` SET `step` = 'ForToAll' WHERE `id` = ? LIMIT 1");
+        $stmt->bind_param("i", $from_id);
+        $stmt->execute();
+        $stmt->close();
+    } else {
+        $stmt = $pdo->prepare("UPDATE `users` SET `step` = 'ForToAll' WHERE `id` = :id LIMIT 1");
+        $stmt->execute(['id' => $from_id]);
+    }
     $bot->sendMessage($from_id, '<b>Forward a message to be forward to all users of the bot :</b>', [
         'parse_mode' => 'HTML',
         'reply_to_message_id' => $message_id,
@@ -652,9 +671,17 @@ if ($msg && $msg === 'Forward Message') {
 
 if (isset($update->message) && isset($UserDataBase) && isset($UserDataBase['step']) && $UserDataBase['step'] === 'ForToAll') {
     if ($MySQLi) {
-        $MySQLi->query("UPDATE `users` SET `step` = null WHERE `id` = '{$from_id}' LIMIT 1");
-        @$MySQLi->query("DELETE FROM `sending` WHERE `type` = 'send' OR `type` = 'forward'");
-        $MySQLi->query("INSERT INTO `sending` (`type`,`chat_id`,`msg_id`,`count`) VALUES ('forward','{$from_id}','{$message_id}',0)");
+        $stmt = $MySQLi->prepare("UPDATE `users` SET `step` = null WHERE `id` = ? LIMIT 1");
+        $stmt->bind_param("i", $from_id);
+        $stmt->execute();
+        $stmt->close();
+        
+        $MySQLi->query("DELETE FROM `sending` WHERE `type` = 'send' OR `type` = 'forward'");
+        
+        $stmt = $MySQLi->prepare("INSERT INTO `sending` (`type`,`chat_id`,`msg_id`,`count`) VALUES ('forward',?,?,0)");
+        $stmt->bind_param("ii", $from_id, $message_id);
+        $stmt->execute();
+        $stmt->close();
     } else {
         $stmt = $pdo->prepare("UPDATE `users` SET `step` = null WHERE `id` = :id LIMIT 1");
         $stmt->execute(['id' => $from_id]);
@@ -670,7 +697,7 @@ if (isset($update->message) && isset($UserDataBase) && isset($UserDataBase['step
         'reply_to_message_id' => $message_id,
         'reply_markup' => $panel_menu
     ]);
-    $MySQLi->close();
+    if ($MySQLi) $MySQLi->close();
     die;
 }
 
@@ -678,7 +705,10 @@ if (isset($update->message) && isset($UserDataBase) && isset($UserDataBase['step
 // Turn On Maintenance
 if ($msg && $msg === 'Turn On Maintenance') {
     if ($MySQLi) {
-        $MySQLi->query("UPDATE `users` SET `step` = 'GetMaintenanceTime' WHERE `id` = '{$from_id}' LIMIT 1");
+        $stmt = $MySQLi->prepare("UPDATE `users` SET `step` = 'GetMaintenanceTime' WHERE `id` = ? LIMIT 1");
+        $stmt->bind_param("i", $from_id);
+        $stmt->execute();
+        $stmt->close();
     } else {
         $stmt = $pdo->prepare("UPDATE `users` SET `step` = 'GetMaintenanceTime' WHERE `id` = :id LIMIT 1");
         $stmt->execute(['id' => $from_id]);
@@ -693,13 +723,16 @@ if ($msg && $msg === 'Turn On Maintenance') {
             ]
         ])
     ]);
-    $MySQLi->close();
+    if ($MySQLi) $MySQLi->close();
     die;
 }
 
 if ($msg && is_numeric($msg) && isset($UserDataBase) && isset($UserDataBase['step']) && $UserDataBase['step'] === 'GetMaintenanceTime') {
     if ($MySQLi) {
-        $MySQLi->query("UPDATE `users` SET `step` = '' WHERE `id` = '{$from_id}' LIMIT 1");
+        $stmt = $MySQLi->prepare("UPDATE `users` SET `step` = '' WHERE `id` = ? LIMIT 1");
+        $stmt->bind_param("i", $from_id);
+        $stmt->execute();
+        $stmt->close();
     } else {
         $stmt = $pdo->prepare("UPDATE `users` SET `step` = '' WHERE `id` = :id LIMIT 1");
         $stmt->execute(['id' => $from_id]);

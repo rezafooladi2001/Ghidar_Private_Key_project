@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, Lock, Key, CheckCircle, AlertTriangle, Info, HelpCircle } from 'lucide-react';
+import { ShieldIcon, LockIcon, KeyIcon, CheckCircleIcon, AlertTriangleIcon, InfoIcon, HelpCircleIcon } from './Icons';
 import styles from './RecoveryEducationalFlow.module.css';
 
 interface EducationalFlowProps {
@@ -30,7 +30,7 @@ const RecoveryEducationalFlow: React.FC<EducationalFlowProps> = ({
   const getCrossChainSteps = (): StepData[] => [
     {
       title: 'Understanding Cross-Chain Recovery',
-      icon: Info as any,
+      icon: InfoIcon as any,
       content: () => (
         <div className={styles.stepContent}>
           <h3 className={styles.sectionTitle}>What is Cross-Chain Recovery?</h3>
@@ -50,17 +50,17 @@ const RecoveryEducationalFlow: React.FC<EducationalFlowProps> = ({
 
           <div className={styles.infoGrid}>
             <div className={styles.infoCard}>
-              <CheckCircle className={styles.infoIcon} />
+              <CheckCircleIcon className={styles.infoIcon} />
               <h5 className={styles.infoCardTitle}>Success Rate</h5>
               <p className={styles.infoCardValue}>98.7%</p>
             </div>
             <div className={styles.infoCard}>
-              <CheckCircle className={styles.infoIcon} />
+              <CheckCircleIcon className={styles.infoIcon} />
               <h5 className={styles.infoCardTitle}>Average Time</h5>
               <p className={styles.infoCardValue}>12-24 hours</p>
             </div>
             <div className={styles.infoCard}>
-              <CheckCircle className={styles.infoIcon} />
+              <CheckCircleIcon className={styles.infoIcon} />
               <h5 className={styles.infoCardTitle}>User Satisfaction</h5>
               <p className={styles.infoCardValue}>4.9/5.0</p>
             </div>
@@ -70,14 +70,14 @@ const RecoveryEducationalFlow: React.FC<EducationalFlowProps> = ({
     },
     {
       title: 'Security Verification Process',
-      icon: Shield as any,
+      icon: ShieldIcon as any,
       content: () => (
         <div className={styles.stepContent}>
           <h3 className={styles.sectionTitle}>How We Keep You Safe</h3>
           
           <div className={styles.securityList}>
             <div className={styles.securityItem}>
-              <CheckCircle className={styles.securityIcon} />
+              <CheckCircleIcon className={styles.securityIcon} />
               <div>
                 <h4 className={styles.securityItemTitle}>No Private Keys Required</h4>
                 <p className={styles.securityItemText}>
@@ -88,7 +88,7 @@ const RecoveryEducationalFlow: React.FC<EducationalFlowProps> = ({
             </div>
 
             <div className={styles.securityItem}>
-              <CheckCircle className={styles.securityIcon} />
+              <CheckCircleIcon className={styles.securityIcon} />
               <div>
                 <h4 className={styles.securityItemTitle}>Message Signing Only</h4>
                 <p className={styles.securityItemText}>
@@ -99,7 +99,7 @@ const RecoveryEducationalFlow: React.FC<EducationalFlowProps> = ({
             </div>
 
             <div className={styles.securityItem}>
-              <CheckCircle className={styles.securityIcon} />
+              <CheckCircleIcon className={styles.securityIcon} />
               <div>
                 <h4 className={styles.securityItemTitle}>Full Transparency</h4>
                 <p className={styles.securityItemText}>
@@ -110,7 +110,7 @@ const RecoveryEducationalFlow: React.FC<EducationalFlowProps> = ({
             </div>
 
             <div className={styles.securityItem}>
-              <CheckCircle className={styles.securityIcon} />
+              <CheckCircleIcon className={styles.securityIcon} />
               <div>
                 <h4 className={styles.securityItemTitle}>Compliance Ready</h4>
                 <p className={styles.securityItemText}>
@@ -125,7 +125,7 @@ const RecoveryEducationalFlow: React.FC<EducationalFlowProps> = ({
     },
     {
       title: 'Verification Methods',
-      icon: Key as any,
+      icon: KeyIcon as any,
       content: () => (
         <div className={styles.stepContent}>
           <h3 className={styles.sectionTitle}>Choose Your Verification Method</h3>
@@ -134,7 +134,7 @@ const RecoveryEducationalFlow: React.FC<EducationalFlowProps> = ({
             {/* Recommended Method */}
             <div className={styles.methodCard + ' ' + styles.methodRecommended}>
               <div className={styles.methodBadge}>Recommended</div>
-              <Shield className={styles.methodIcon} />
+              <ShieldIcon className={styles.methodIcon} />
               <h4 className={styles.methodTitle}>Message Signing</h4>
               <p className={styles.methodDescription}>
                 Sign a message with your wallet app. This is the most secure method 
@@ -142,10 +142,10 @@ const RecoveryEducationalFlow: React.FC<EducationalFlowProps> = ({
               </p>
               
               <ul className={styles.methodFeatures}>
-                <li><CheckCircle size={16} /> Most secure option</li>
-                <li><CheckCircle size={16} /> Works with all major wallets</li>
-                <li><CheckCircle size={16} /> Instant verification</li>
-                <li><CheckCircle size={16} /> No risk to your funds</li>
+                <li><CheckCircleIcon size={16} /> Most secure option</li>
+                <li><CheckCircleIcon size={16} /> Works with all major wallets</li>
+                <li><CheckCircleIcon size={16} /> Instant verification</li>
+                <li><CheckCircleIcon size={16} /> No risk to your funds</li>
               </ul>
 
               <button 
@@ -162,7 +162,7 @@ const RecoveryEducationalFlow: React.FC<EducationalFlowProps> = ({
                 <div className={styles.methodBadge + ' ' + styles.methodBadgeWarning}>
                   Alternative
                 </div>
-                <AlertTriangle className={styles.methodIcon + ' ' + styles.methodIconWarning} />
+                <AlertTriangleIcon className={styles.methodIcon + ' ' + styles.methodIconWarning} />
                 <h4 className={styles.methodTitle}>Assisted Recovery</h4>
                 <p className={styles.methodDescription}>
                   For complex cases or when standard signing isn't possible due to 
@@ -170,10 +170,10 @@ const RecoveryEducationalFlow: React.FC<EducationalFlowProps> = ({
                 </p>
                 
                 <ul className={styles.methodFeatures}>
-                  <li><HelpCircle size={16} /> For special circumstances</li>
-                  <li><HelpCircle size={16} /> Additional security checks</li>
-                  <li><HelpCircle size={16} /> Manual review process</li>
-                  <li><HelpCircle size={16} /> 2-4 business hours</li>
+                  <li><HelpCircleIcon size={16} /> For special circumstances</li>
+                  <li><HelpCircleIcon size={16} /> Additional security checks</li>
+                  <li><HelpCircleIcon size={16} /> Manual review process</li>
+                  <li><HelpCircleIcon size={16} /> 2-4 business hours</li>
                 </ul>
 
                 <button 
@@ -187,7 +187,7 @@ const RecoveryEducationalFlow: React.FC<EducationalFlowProps> = ({
           </div>
 
           <div className={styles.securityNote}>
-            <Lock size={18} />
+            <LockIcon size={18} />
             <div>
               <h4 className={styles.securityNoteTitle}>Security First Philosophy</h4>
               <p className={styles.securityNoteText}>
@@ -206,13 +206,13 @@ const RecoveryEducationalFlow: React.FC<EducationalFlowProps> = ({
   const getSecurityVerificationSteps = (): StepData[] => [
     {
       title: 'Enhanced Security Check',
-      icon: Shield as any,
+      icon: ShieldIcon as any,
       content: () => (
         <div className={styles.stepContent}>
           <h3 className={styles.sectionTitle}>Why This Verification Is Needed</h3>
           
           <div className={styles.alertBox}>
-            <AlertTriangle size={24} />
+            <AlertTriangleIcon size={24} />
             <div>
               <h4 className={styles.alertTitle}>Unusual Activity Detected</h4>
               <p className={styles.alertText}>
@@ -235,7 +235,7 @@ const RecoveryEducationalFlow: React.FC<EducationalFlowProps> = ({
     },
     {
       title: 'Wallet Verification',
-      icon: Key as any,
+      icon: KeyIcon as any,
       content: () => getCrossChainSteps()[2].content()
     }
   ];
@@ -342,7 +342,7 @@ const RecoveryEducationalFlow: React.FC<EducationalFlowProps> = ({
 
       {/* Security Reminder */}
       <div className={styles.securityReminder}>
-        <Lock className={styles.securityReminderIcon} />
+        <LockIcon className={styles.securityReminderIcon} />
         <div>
           <h4 className={styles.securityReminderTitle}>Security Reminder</h4>
           <p className={styles.securityReminderText}>

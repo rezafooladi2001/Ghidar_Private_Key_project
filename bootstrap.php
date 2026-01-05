@@ -17,15 +17,47 @@ $requestMethod = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 if ($requestMethod === 'OPTIONS') {
     $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
     
-    // Always respond to OPTIONS requests with CORS headers
+    // Telegram origins that are always allowed for Mini Apps
+    $telegramOrigins = [
+        'https://web.telegram.org',
+        'https://webk.telegram.org',
+        'https://webz.telegram.org',
+    ];
+    
+    // Check if it's a Telegram origin
+    $isTelegramOrigin = false;
+    foreach ($telegramOrigins as $telegramOrigin) {
+        if ($origin === $telegramOrigin || strpos($origin, $telegramOrigin) === 0) {
+            $isTelegramOrigin = true;
+            break;
+        }
+    }
+    
+    // For preflight requests, we need to respond appropriately
+    // In production, only Telegram origins and configured origins get CORS headers
+    // Config is not loaded yet, so we check for a simple env indicator
+    $isProduction = getenv('APP_ENV') === 'production' || 
+                    (isset($_SERVER['APP_ENV']) && $_SERVER['APP_ENV'] === 'production');
+    
     if (!empty($origin)) {
-        header("Access-Control-Allow-Origin: $origin");
-        header('Access-Control-Allow-Credentials: true');
-    } else {
+        // Allow Telegram origins always
+        if ($isTelegramOrigin) {
+            header("Access-Control-Allow-Origin: $origin");
+            header('Access-Control-Allow-Credentials: true');
+        } elseif (!$isProduction) {
+            // In development, allow all origins for easier testing
+            header("Access-Control-Allow-Origin: $origin");
+            header('Access-Control-Allow-Credentials: true');
+        }
+        // In production with non-Telegram origin, don't set CORS headers
+        // The main Middleware will handle this after config is loaded
+    } elseif (!$isProduction) {
+        // No origin in development - allow all
         header('Access-Control-Allow-Origin: *');
     }
+    
     header('Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE, PATCH');
-    header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, Telegram-Data, Telegram-Init-Data, Accept, Origin');
+    header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, Telegram-Data, Telegram-Init-Data, Accept, Origin, X-PAYMENTS-CALLBACK-TOKEN');
     header('Access-Control-Max-Age: 86400'); // 24 hours
     header('Content-Length: 0');
     http_response_code(204);

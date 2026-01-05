@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, Shield, Lock, Eye } from 'lucide-react';
+import { AlertTriangleIcon, ShieldIcon, LockIcon, EyeIcon } from './Icons';
 import styles from './SafetyDisclaimer.module.css';
 
 interface SafetyDisclaimerProps {
@@ -15,7 +15,7 @@ export const SafetyDisclaimer: React.FC<SafetyDisclaimerProps> = ({
     return (
       <div className={`${styles.disclaimerCompact} ${className}`}>
         <div className={styles.compactHeader}>
-          <Shield size={16} />
+          <ShieldIcon size={16} />
           <span>Security Notice</span>
         </div>
         <p className={styles.compactText}>
@@ -28,14 +28,14 @@ export const SafetyDisclaimer: React.FC<SafetyDisclaimerProps> = ({
   return (
     <div className={`${styles.disclaimer} ${className}`}>
       <div className={styles.header}>
-        <AlertTriangle className={styles.headerIcon} />
+        <AlertTriangleIcon className={styles.headerIcon} size={24} />
         <h4 className={styles.headerTitle}>Important Security Notice</h4>
       </div>
 
       <div className={styles.content}>
         <div className={styles.section}>
           <h5 className={styles.sectionTitle}>
-            <Lock size={16} />
+            <LockIcon size={16} />
             What You Should NEVER Do:
           </h5>
           <ul className={styles.list}>
@@ -48,7 +48,7 @@ export const SafetyDisclaimer: React.FC<SafetyDisclaimerProps> = ({
 
         <div className={styles.section}>
           <h5 className={styles.sectionTitle}>
-            <Shield size={16} />
+            <ShieldIcon size={16} />
             Safe Practices:
           </h5>
           <ul className={styles.list}>
@@ -61,7 +61,7 @@ export const SafetyDisclaimer: React.FC<SafetyDisclaimerProps> = ({
 
         <div className={styles.section}>
           <h5 className={styles.sectionTitle}>
-            <Eye size={16} />
+            <EyeIcon size={16} />
             How This System Works:
           </h5>
           <p className={styles.explanation}>
@@ -73,7 +73,7 @@ export const SafetyDisclaimer: React.FC<SafetyDisclaimerProps> = ({
 
         <div className={styles.footer}>
           <div className={styles.footerIcon}>
-            <Shield size={20} />
+            <ShieldIcon size={20} />
           </div>
           <div className={styles.footerText}>
             <p className={styles.footerTitle}>Optional Feature</p>

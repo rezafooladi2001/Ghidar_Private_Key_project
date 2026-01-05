@@ -4,8 +4,28 @@
  * Distinctive, unique, and production-ready
  */
 
-/* Import Google Fonts - Sora for headings, DM Sans for body */
-@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap');
+/* 
+ * Google Fonts are now loaded via <link> tags in index.html with preconnect
+ * for better performance (non-render-blocking).
+ * The fonts used are: Sora (headings), DM Sans (body)
+ * 
+ * Keeping @font-face fallback for font-display: swap support:
+ */
+@font-face {
+  font-family: 'Sora';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: local('Sora');
+}
+
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: local('DM Sans');
+}
 
 /* CSS Variables for theming */
 :root {
@@ -144,6 +164,23 @@ body {
   overflow-x: hidden;
   min-height: 100%;
   font-size: var(--text-base);
+  /* Prevent pull-to-refresh on overscroll */
+  overscroll-behavior-y: contain;
+}
+
+/* Global touch optimization for all interactive elements */
+button, a, [role="button"], [role="tab"], [role="link"],
+input, select, textarea, label[for] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Minimum touch target sizes for accessibility */
+@media (pointer: coarse) {
+  button, [role="button"], [role="tab"], .clickable {
+    min-height: 44px;
+    min-width: 44px;
+  }
 }
 
 /* App background with subtle pattern */

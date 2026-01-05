@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   generateRecentLotteryWinners,
   LotteryWinner,
@@ -16,6 +16,43 @@ interface RecentWinnersFeedProps {
   variant?: 'default' | 'compact' | 'ticker';
   showHeader?: boolean;
   className?: string;
+}
+
+/**
+ * Custom hook for IntersectionObserver-based visibility detection
+ * More efficient than document.hidden for component-level visibility
+ */
+function useIntersectionObserver(
+  ref: React.RefObject<Element>,
+  options?: IntersectionObserverInit
+): boolean {
+  const [isIntersecting, setIsIntersecting] = useState(false);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+
+    // Fallback for browsers without IntersectionObserver
+    if (!('IntersectionObserver' in window)) {
+      setIsIntersecting(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsIntersecting(entry.isIntersecting);
+      },
+      { threshold: 0.1, ...options }
+    );
+
+    observer.observe(element);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [ref, options]);
+
+  return isIntersecting;
 }
 
 /**
@@ -66,15 +103,26 @@ function getRankDisplay(rank: number): { emoji: string; className: string } {
   }
 }
 
+// Reduced update interval for better performance
+const DEFAULT_UPDATE_INTERVAL = 18000; // 18 seconds (increased from 12s)
+
 export function RecentWinnersFeed({
   maxItems = 5,
-  updateInterval = 12000, // New winner every 12 seconds
+  updateInterval = DEFAULT_UPDATE_INTERVAL,
   variant = 'default',
   showHeader = true,
   className = '',
 }: RecentWinnersFeedProps) {
   const [winners, setWinners] = useState<LotteryWinner[]>([]);
-  const [isVisible, setIsVisible] = useState(true);
+  const [isPageVisible, setIsPageVisible] = useState(true);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  
+  // Use IntersectionObserver for component visibility
+  const isComponentVisible = useIntersectionObserver(containerRef);
+  
+  // Combined visibility check: page visible AND component in viewport
+  const shouldUpdate = isPageVisible && isComponentVisible;
 
   // Initialize with some winners
   useEffect(() => {
@@ -82,13 +130,13 @@ export function RecentWinnersFeed({
     setWinners(initial);
   }, [maxItems]);
 
-  // Add new winners periodically
+  // Add new winners periodically - only when visible
   const addWinner = useCallback(() => {
-    if (!isVisible) return;
+    if (!shouldUpdate) return;
     
     // Only add if activity multiplier says so (less frequent during off-hours)
     const multiplier = getActivityMultiplier();
-    if (Math.random() > multiplier * 0.8) return;
+    if (Math.random() > multiplier * 0.7) return; // Slightly less frequent
     
     const newWinner = generateNewWinner();
     setWinners(prev => {
@@ -103,17 +151,32 @@ export function RecentWinnersFeed({
       }));
       return [newWinner, ...updated].slice(0, maxItems);
     });
-  }, [isVisible, maxItems]);
+  }, [shouldUpdate, maxItems]);
 
+  // Manage interval based on visibility
   useEffect(() => {
-    const interval = setInterval(addWinner, updateInterval);
-    return () => clearInterval(interval);
-  }, [addWinner, updateInterval]);
+    // Clear existing interval
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    
+    // Only start interval when visible
+    if (shouldUpdate) {
+      intervalRef.current = setInterval(addWinner, updateInterval);
+    }
+    
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [shouldUpdate, addWinner, updateInterval]);
 
-  // Visibility detection
+  // Page visibility detection (for background tab)
   useEffect(() => {
     const handleVisibility = () => {
-      setIsVisible(!document.hidden);
+      setIsPageVisible(!document.hidden);
     };
     document.addEventListener('visibilitychange', handleVisibility);
     return () => document.removeEventListener('visibilitychange', handleVisibility);
@@ -122,7 +185,7 @@ export function RecentWinnersFeed({
   const containerClass = `${styles.container} ${styles[variant]} ${className}`;
 
   return (
-    <div className={containerClass}>
+    <div ref={containerRef} className={containerClass}>
       {showHeader && (
         <div className={styles.header}>
           <div className={styles.titleWrapper}>

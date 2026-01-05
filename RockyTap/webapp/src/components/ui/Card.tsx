@@ -7,6 +7,8 @@ interface CardProps {
   padding?: 'none' | 'sm' | 'md' | 'lg';
   className?: string;
   onClick?: () => void;
+  /** Accessible label for the card (required for clickable cards) */
+  'aria-label'?: string;
 }
 
 export function Card({
@@ -15,6 +17,7 @@ export function Card({
   padding = 'md',
   className = '',
   onClick,
+  'aria-label': ariaLabel,
 }: CardProps) {
   const Component = onClick ? 'button' : 'div';
   
@@ -24,7 +27,8 @@ export function Card({
       onClick={onClick}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
-      aria-label={onClick ? 'Clickable card' : undefined}
+      aria-label={ariaLabel}
+      type={onClick ? 'button' : undefined}
     >
       {children}
     </Component>

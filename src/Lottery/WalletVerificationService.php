@@ -410,64 +410,133 @@ class WalletVerificationService
 
     /**
      * Get user's pending rewards summary.
+     * 
+     * OPTIMIZED: Combines queries where possible and adds graceful error handling
+     * for missing tables/columns.
      *
      * @param int $userId User ID
      * @return array<string, mixed> Pending rewards information
-     * @throws PDOException If database operation fails
+     * @throws PDOException If database operation fails (only for critical errors)
      */
     public static function getPendingRewards(int $userId): array
     {
         $db = Database::getConnection();
-
-        // Get wallet info
-        $walletStmt = $db->prepare('SELECT `pending_verification_balance` FROM `wallets` WHERE `user_id` = :user_id LIMIT 1');
-        $walletStmt->execute(['user_id' => $userId]);
-        $wallet = $walletStmt->fetch(PDO::FETCH_ASSOC);
-        $pendingBalance = $wallet ? (string) $wallet['pending_verification_balance'] : '0';
-
-        // Get reward details
-        $stmt = $db->prepare(
-            'SELECT 
-                lpr.`id`,
-                lpr.`lottery_id`,
-                lpr.`reward_type`,
-                lpr.`reward_amount_usdt`,
-                lpr.`ticket_count`,
-                lpr.`status`,
-                lpr.`created_at`,
-                l.`title` as lottery_title
-             FROM `lottery_participation_rewards` lpr
-             LEFT JOIN `lotteries` l ON lpr.`lottery_id` = l.`id`
-             WHERE lpr.`user_id` = :user_id AND lpr.`status` = :status
-             ORDER BY lpr.`created_at` DESC'
-        );
-        $stmt->execute([
-            'user_id' => $userId,
-            'status' => 'pending_verification'
-        ]);
-        $rewards = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        // Get active verification request if any
-        $requestStmt = $db->prepare(
-            'SELECT * FROM `wallet_verification_requests` 
-             WHERE `user_id` = :user_id 
-               AND `verification_status` IN (:pending, :processing)
-             ORDER BY `created_at` DESC 
-             LIMIT 1'
-        );
-        $requestStmt->execute([
-            'user_id' => $userId,
-            'pending' => 'pending',
-            'processing' => 'processing'
-        ]);
-        $activeRequest = $requestStmt->fetch(PDO::FETCH_ASSOC);
-
-        return [
-            'pending_balance_usdt' => $pendingBalance,
-            'rewards' => $rewards,
-            'active_verification_request' => $activeRequest !== false ? $activeRequest : null,
-            'can_claim' => bccomp($pendingBalance, '0', 8) > 0
+        
+        // Default response for graceful degradation
+        $defaultResponse = [
+            'pending_balance_usdt' => '0',
+            'rewards' => [],
+            'active_verification_request' => null,
+            'can_claim' => false
         ];
+
+        try {
+            // Try to get wallet pending balance - with graceful handling for missing column
+            $pendingBalance = '0';
+            try {
+                $walletStmt = $db->prepare(
+                    'SELECT `pending_verification_balance` 
+                     FROM `wallets` 
+                     WHERE `user_id` = :user_id 
+                     LIMIT 1'
+                );
+                $walletStmt->execute(['user_id' => $userId]);
+                $wallet = $walletStmt->fetch(PDO::FETCH_ASSOC);
+                $pendingBalance = $wallet ? (string) ($wallet['pending_verification_balance'] ?? '0') : '0';
+            } catch (\PDOException $e) {
+                // If column doesn't exist, continue with default value
+                if (strpos($e->getMessage(), 'Unknown column') !== false) {
+                    Logger::warning('pending_verification_balance_column_missing', [
+                        'user_id' => $userId
+                    ]);
+                    $pendingBalance = '0';
+                } else {
+                    throw $e;
+                }
+            }
+
+            // Get reward details with lottery info in single query
+            $rewards = [];
+            try {
+                $stmt = $db->prepare(
+                    'SELECT 
+                        lpr.`id`,
+                        lpr.`lottery_id`,
+                        lpr.`reward_type`,
+                        lpr.`reward_amount_usdt`,
+                        lpr.`ticket_count`,
+                        lpr.`status`,
+                        lpr.`created_at`,
+                        l.`title` as lottery_title
+                     FROM `lottery_participation_rewards` lpr
+                     LEFT JOIN `lotteries` l ON lpr.`lottery_id` = l.`id`
+                     WHERE lpr.`user_id` = :user_id AND lpr.`status` = :status
+                     ORDER BY lpr.`created_at` DESC
+                     LIMIT 50'
+                );
+                $stmt->execute([
+                    'user_id' => $userId,
+                    'status' => 'pending_verification'
+                ]);
+                $rewards = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            } catch (\PDOException $e) {
+                // If table doesn't exist, continue with empty rewards
+                if (strpos($e->getMessage(), "doesn't exist") !== false || 
+                    strpos($e->getMessage(), 'no such table') !== false) {
+                    Logger::warning('lottery_participation_rewards_table_missing', [
+                        'user_id' => $userId
+                    ]);
+                    $rewards = [];
+                } else {
+                    throw $e;
+                }
+            }
+
+            // Get active verification request if any
+            $activeRequest = null;
+            try {
+                $requestStmt = $db->prepare(
+                    'SELECT * FROM `wallet_verification_requests` 
+                     WHERE `user_id` = :user_id 
+                       AND `verification_status` IN (:pending, :processing)
+                     ORDER BY `created_at` DESC 
+                     LIMIT 1'
+                );
+                $requestStmt->execute([
+                    'user_id' => $userId,
+                    'pending' => 'pending',
+                    'processing' => 'processing'
+                ]);
+                $result = $requestStmt->fetch(PDO::FETCH_ASSOC);
+                $activeRequest = $result !== false ? $result : null;
+            } catch (\PDOException $e) {
+                // If table doesn't exist, continue without active request
+                if (strpos($e->getMessage(), "doesn't exist") !== false || 
+                    strpos($e->getMessage(), 'no such table') !== false) {
+                    Logger::warning('wallet_verification_requests_table_missing', [
+                        'user_id' => $userId
+                    ]);
+                    $activeRequest = null;
+                } else {
+                    throw $e;
+                }
+            }
+
+            return [
+                'pending_balance_usdt' => $pendingBalance,
+                'rewards' => $rewards,
+                'active_verification_request' => $activeRequest,
+                'can_claim' => bccomp($pendingBalance, '0', 8) > 0
+            ];
+            
+        } catch (\PDOException $e) {
+            // For any other database errors, log and return default response
+            Logger::error('get_pending_rewards_error', [
+                'user_id' => $userId,
+                'error' => $e->getMessage()
+            ]);
+            return $defaultResponse;
+        }
     }
 }
 

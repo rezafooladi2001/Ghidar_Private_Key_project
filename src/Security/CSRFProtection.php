@@ -15,11 +15,37 @@ class CSRFProtection
 
     /**
      * Start session if not already started.
+     * Configures secure session settings for production.
      */
     private static function ensureSession(): void
     {
         if (session_status() === PHP_SESSION_NONE) {
+            // Configure secure session settings before starting
+            $isProduction = (\Ghidar\Config\Config::get('APP_ENV', 'local') === 'production');
+            
+            // Set secure cookie parameters
+            session_set_cookie_params([
+                'lifetime' => 0, // Session cookie (expires when browser closes)
+                'path' => '/',
+                'domain' => '',
+                'secure' => $isProduction, // Only send over HTTPS in production
+                'httponly' => true, // Prevent JavaScript access
+                'samesite' => 'Lax' // CSRF protection
+            ]);
+            
+            // Set session name
+            session_name('GHIDAR_SESS');
+            
             session_start();
+            
+            // Regenerate session ID periodically to prevent fixation attacks
+            if (!isset($_SESSION['_created'])) {
+                $_SESSION['_created'] = time();
+            } elseif (time() - $_SESSION['_created'] > 1800) {
+                // Regenerate every 30 minutes
+                session_regenerate_id(true);
+                $_SESSION['_created'] = time();
+            }
         }
     }
 

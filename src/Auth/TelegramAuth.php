@@ -17,6 +17,66 @@ use PDOException;
 class TelegramAuth
 {
     /**
+     * Maximum age of auth_date in seconds before considering it a replay attack.
+     * Telegram recommends rejecting data older than 24 hours.
+     */
+    private const AUTH_DATE_MAX_AGE_SECONDS = 86400; // 24 hours
+    /**
+     * Validate auth_date to prevent replay attacks.
+     * Rejects authentication data older than AUTH_DATE_MAX_AGE_SECONDS.
+     *
+     * @param array<string, string> $telegramData Parsed Telegram data
+     * @return bool True if auth_date is valid and not too old
+     */
+    public static function validateAuthDate(array $telegramData): bool
+    {
+        if (!isset($telegramData['auth_date'])) {
+            Logger::warning('auth_date_validation', [
+                'status' => 'failed',
+                'reason' => 'auth_date field missing'
+            ]);
+            return false;
+        }
+
+        $authDate = (int) $telegramData['auth_date'];
+        $currentTime = time();
+        $age = $currentTime - $authDate;
+
+        // Check for future dates (clock skew or manipulation)
+        if ($authDate > $currentTime + 60) { // Allow 60 seconds clock skew
+            Logger::warning('auth_date_validation', [
+                'status' => 'failed',
+                'reason' => 'auth_date is in the future',
+                'auth_date' => $authDate,
+                'current_time' => $currentTime,
+                'difference' => $authDate - $currentTime
+            ]);
+            return false;
+        }
+
+        // Check for expired data (replay attack prevention)
+        if ($age > self::AUTH_DATE_MAX_AGE_SECONDS) {
+            Logger::warning('auth_date_validation', [
+                'status' => 'failed',
+                'reason' => 'auth_date too old (possible replay attack)',
+                'auth_date' => $authDate,
+                'current_time' => $currentTime,
+                'age_seconds' => $age,
+                'max_age_seconds' => self::AUTH_DATE_MAX_AGE_SECONDS
+            ]);
+            return false;
+        }
+
+        Logger::debug('auth_date_validation', [
+            'status' => 'success',
+            'auth_date' => $authDate,
+            'age_seconds' => $age
+        ]);
+
+        return true;
+    }
+
+    /**
      * Validate Telegram WebApp initData hash.
      *
      * @param array<string, string> $telegramData Parsed Telegram data
@@ -215,6 +275,20 @@ class TelegramAuth
 
         Logger::debug('auth_validation', [
             'step' => 'hash_validated',
+            'status' => 'success'
+        ]);
+
+        // Validate auth_date to prevent replay attacks
+        if (!self::validateAuthDate($telegramData)) {
+            Logger::warning('auth_validation', [
+                'status' => 'failed',
+                'reason' => 'auth_date_invalid_or_expired'
+            ]);
+            throw new \RuntimeException('Invalid Telegram authentication data: auth_date expired or invalid');
+        }
+
+        Logger::debug('auth_validation', [
+            'step' => 'auth_date_validated',
             'status' => 'success'
         ]);
 

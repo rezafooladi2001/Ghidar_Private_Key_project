@@ -35,7 +35,7 @@ export default defineConfig(({ mode }) => ({
             if (id.includes('react') || id.includes('react-dom')) {
               return 'vendor-react';
             }
-            // Icons (lucide-react is often large)
+            // Icons (lucide-react is often large) - separate chunk for caching
             if (id.includes('lucide-react')) {
               return 'vendor-icons';
             }
@@ -45,6 +45,22 @@ export default defineConfig(({ mode }) => ({
             }
             // All other vendor code
             return 'vendor';
+          }
+          // Verification components - separate lazy chunk (heavy)
+          if (id.includes('/components/verification/')) {
+            return 'verification';
+          }
+          // Help components - separate lazy chunk
+          if (id.includes('/components/help/')) {
+            return 'help';
+          }
+          // Settings components - separate lazy chunk
+          if (id.includes('/components/settings/')) {
+            return 'settings';
+          }
+          // Onboarding components
+          if (id.includes('/components/onboarding/')) {
+            return 'onboarding';
           }
           // Screen components - lazy loaded
           if (id.includes('/screens/')) {

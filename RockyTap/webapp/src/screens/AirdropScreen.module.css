@@ -603,16 +603,22 @@
 
 .quickAmountBtn {
   flex: 1;
-  padding: var(--space-xs) var(--space-sm);
+  /* Minimum touch target */
+  min-height: 44px;
+  padding: var(--space-sm) var(--space-sm);
   background: var(--bg-tertiary);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   font-family: var(--font-display);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text-secondary);
   cursor: pointer;
   transition: all var(--transition-fast);
+  /* Improve touch */
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .quickAmountBtn:hover:not(:disabled) {
@@ -634,13 +640,19 @@
   background: var(--gradient-brand);
   color: #fff;
   border: none;
-  padding: var(--space-xs) var(--space-md);
+  /* Minimum touch target */
+  min-height: 44px;
+  padding: var(--space-sm) var(--space-md);
   border-radius: var(--radius-sm);
   font-family: var(--font-display);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   font-weight: 600;
   cursor: pointer;
   transition: opacity var(--transition-fast), transform var(--transition-fast);
+  /* Improve touch */
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .maxButton:hover {

@@ -50,22 +50,33 @@ export function WalletSummary({
 
   return (
     <>
-      <Card variant="glow" className={className}>
+      <Card variant="glow" className={className} aria-label="Wallet balance summary">
         <div className={styles.walletContainer}>
-          <div className={styles.wallet}>
+          <div className={styles.wallet} role="region" aria-label="Account balances">
             <div className={styles.balance}>
-              <span className={styles.label}>USDT Balance</span>
-              <span className={styles.value}>
-                <span className={styles.currency}>$</span>
+              <span className={styles.label} id="usdt-label">USDT Balance</span>
+              <span 
+                className={styles.value} 
+                aria-labelledby="usdt-label"
+                aria-live="polite"
+              >
+                <span className={styles.currency} aria-hidden="true">$</span>
+                <span className="sr-only">$</span>
                 {formatBalance(usdtBalance)}
+                <span className="sr-only">USDT</span>
               </span>
             </div>
-            <div className={styles.divider} />
+            <div className={styles.divider} aria-hidden="true" />
             <div className={styles.balance}>
-              <span className={styles.label}>GHD Tokens</span>
-              <span className={styles.value}>
-                <span className={styles.token}>G</span>
+              <span className={styles.label} id="ghd-label">GHD Tokens</span>
+              <span 
+                className={styles.value}
+                aria-labelledby="ghd-label"
+                aria-live="polite"
+              >
+                <span className={styles.token} aria-hidden="true">G</span>
                 {formatGhd(ghdBalance)}
+                <span className="sr-only">GHD tokens</span>
               </span>
             </div>
           </div>

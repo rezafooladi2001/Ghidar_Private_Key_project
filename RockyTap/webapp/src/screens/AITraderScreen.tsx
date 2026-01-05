@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, Button, NumberInput, ErrorState, EmptyState, useToast, PullToRefresh, HelpTooltip } from '../components/ui';
 import { WalletSummary } from '../components/WalletSummary';
 import { TraderIcon, ArrowUpIcon, ArrowDownIcon } from '../components/Icons';
@@ -9,6 +9,7 @@ import { AITraderPerformanceChart } from '../components/AITraderPerformanceChart
 import { hapticFeedback } from '../lib/telegram';
 import { getAiTraderStatus, getAiTraderHistory, depositToAiTrader, withdrawFromAiTrader } from '../api/client';
 import { WithdrawalVerificationModal } from '../components/WithdrawalVerificationModal';
+import { getFriendlyErrorMessage } from '../lib/errorMessages';
 import styles from './AITraderScreen.module.css';
 
 // Types for AI Trader data
@@ -66,35 +67,50 @@ export function AITraderScreen() {
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const { showError: showToastError, showSuccess } = useToast();
+  
+  // Ref to track mounted state for cleanup
+  const isMountedRef = useRef(true);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     loadData();
   }, []);
 
-  const loadData = async () => {
-    console.log('[AITrader] Loading data...');
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
       // Use API client with fallback
       const statusData = await getAiTraderStatus();
-      console.log('[AITrader] Status loaded:', statusData);
+      
+      if (!isMountedRef.current) return;
       setStatus(statusData);
 
       // Fetch history using API client
       const historyData = await getAiTraderHistory(30);
+      
+      if (!isMountedRef.current) return;
       setHistory(historyData?.snapshots || []);
 
     } catch (err) {
-      console.error('[AITrader] Error:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load data';
+      if (!isMountedRef.current) return;
+      const errorMessage = getFriendlyErrorMessage(err as Error);
       setError(errorMessage);
       showToastError(errorMessage);
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
-  };
+  }, [showToastError]);
 
   const handleDeposit = async () => {
     setAmountError(null);

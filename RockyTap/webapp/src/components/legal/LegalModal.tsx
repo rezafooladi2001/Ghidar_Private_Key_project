@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { X } from 'lucide-react';
+import { CloseIcon } from '../Icons';
 import styles from './LegalModal.module.css';
 
 interface LegalModalProps {
@@ -51,7 +51,7 @@ export function LegalModal({ isOpen, onClose, title, children }: LegalModalProps
             onClick={onClose}
             aria-label="Close"
           >
-            <X size={20} />
+            <CloseIcon size={20} />
           </button>
         </header>
         <div className={styles.content}>

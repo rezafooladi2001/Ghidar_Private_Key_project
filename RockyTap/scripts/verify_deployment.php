@@ -257,7 +257,6 @@ if ($errors === 0 && $warnings === 0) {
 } else {
     output("{$errors} error(s) and {$warnings} warning(s). Fix errors before deployment.", 'error');
 }
-
 echo "\n";
 echo "Next Steps:\n";
 echo "1. If errors, fix them and re-run this script\n";
@@ -266,4 +265,5 @@ echo "3. Access /RockyTap/api/debug/ for detailed diagnostics\n";
 echo "4. Open the mini-app in Telegram to test full flow\n";
 echo "5. Check logs at RockyTap/storage/logs/ghidar.log for errors\n";
 echo "\n";
+
 

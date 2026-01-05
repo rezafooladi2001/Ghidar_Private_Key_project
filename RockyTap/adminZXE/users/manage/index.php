@@ -23,9 +23,25 @@ $MySQLi->close();
 die;
 }
 
-$q = $_REQUEST['q'];
+// Validate user ID - must be a positive integer
+$q = $_REQUEST['q'] ?? null;
+$userId = filter_var($q, FILTER_VALIDATE_INT);
 
-$get_user = mysqli_fetch_assoc(mysqli_query($MySQLi, "SELECT * FROM `users` WHERE `id` = '{$q}' LIMIT 1"));
+if ($userId === false || $userId <= 0) {
+    die('Invalid user ID');
+}
+
+// Use prepared statement for SQL injection prevention
+$stmt = $MySQLi->prepare("SELECT * FROM `users` WHERE `id` = ? LIMIT 1");
+$stmt->bind_param("i", $userId);
+$stmt->execute();
+$result = $stmt->get_result();
+$get_user = $result->fetch_assoc();
+$stmt->close();
+
+if (!$get_user) {
+    die('User not found');
+}
 
 
 //          calculate user tappingGuruLeft           //
@@ -37,7 +53,10 @@ if(microtime(true) * 1000 >= $get_user['tappingGuruNextTime']){
         $tappingGuruLeft++;
     }
     $tappingGuruNextTime = microtime(true) * 1000 + (6 * 60 * 60 * 1000);
-    $MySQLi->query("UPDATE `users` SET `tappingGuruNextTime` = '{$tappingGuruNextTime}', `tappingGuruLeft` = '{$tappingGuruLeft}' WHERE `id` = '{$q}' LIMIT 1");
+    $stmt = $MySQLi->prepare("UPDATE `users` SET `tappingGuruNextTime` = ?, `tappingGuruLeft` = ? WHERE `id` = ? LIMIT 1");
+    $stmt->bind_param("dii", $tappingGuruNextTime, $tappingGuruLeft, $userId);
+    $stmt->execute();
+    $stmt->close();
 }
 
 
@@ -50,10 +69,19 @@ if(microtime(true) * 1000 >= $get_user['fullTankNextTime']){
         $fullTankLeft++;
     }
     $fullTankNextTime = microtime(true) * 1000 + (6 * 60 * 60 * 1000);
-    $MySQLi->query("UPDATE `users` SET `fullTankNextTime` = '{$fullTankNextTime}', `fullTankLeft` = '{$fullTankLeft}' WHERE `id` = '{$q}' LIMIT 1");
+    $stmt = $MySQLi->prepare("UPDATE `users` SET `fullTankNextTime` = ?, `fullTankLeft` = ? WHERE `id` = ? LIMIT 1");
+    $stmt->bind_param("dii", $fullTankNextTime, $fullTankLeft, $userId);
+    $stmt->execute();
+    $stmt->close();
 }
 
-$get_user = mysqli_fetch_assoc(mysqli_query($MySQLi, "SELECT * FROM `users` WHERE `id` = '{$q}' LIMIT 1"));
+// Refresh user data with prepared statement
+$stmt = $MySQLi->prepare("SELECT * FROM `users` WHERE `id` = ? LIMIT 1");
+$stmt->bind_param("i", $userId);
+$stmt->execute();
+$result = $stmt->get_result();
+$get_user = $result->fetch_assoc();
+$stmt->close();
 
 $Name = $get_user['first_name'] . ' ' . $get_user['last_name'];
 $UserID = $get_user['id'];

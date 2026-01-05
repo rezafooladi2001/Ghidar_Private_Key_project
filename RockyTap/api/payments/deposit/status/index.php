@@ -17,12 +17,20 @@ use Ghidar\Core\UserContext;
 use Ghidar\Core\Database;
 use Ghidar\Core\Response;
 use Ghidar\Payments\PaymentsConfig;
+use Ghidar\Security\RateLimiter;
 
 try {
     // Authenticate user
     $context = UserContext::requireCurrentUserWithWallet();
     $user = $context['user'];
     $userId = (int) $user['id'];
+
+    // Rate limit: 60 requests per minute for status checks
+    $rateLimitCheck = RateLimiter::check((string) $userId, 'deposit_status', 60, 60);
+    if (!$rateLimitCheck['allowed']) {
+        Response::jsonError('RATE_LIMITED', 'Too many requests. Please wait before checking again.', 429);
+        exit;
+    }
 
     // Get deposit_id from query string
     if (!isset($_GET['deposit_id']) || !is_numeric($_GET['deposit_id'])) {

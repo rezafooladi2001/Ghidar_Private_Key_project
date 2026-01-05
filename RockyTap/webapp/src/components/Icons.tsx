@@ -385,3 +385,182 @@ export function FireIcon({ size = 24, color = 'currentColor', className = '' }: 
   );
 }
 
+// Additional icons for verification and security flows
+export function ShieldIcon({ size = 24, color = 'currentColor', className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M12 22C12 22 20 18 20 12V5L12 2L4 5V12C4 18 12 22 12 22Z" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function ShieldCheckIcon({ size = 24, color = 'currentColor', className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M12 22C12 22 20 18 20 12V5L12 2L4 5V12C4 18 12 22 12 22Z" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M9 12L11 14L15 10" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function KeyIcon({ size = 24, color = 'currentColor', className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M21 2L19 4M19 4L22 7L18.5 10.5L15.5 7.5M19 4L15.5 7.5M11.4 11.4C12.2 12.1 12.8 13 13.1 14C13.4 15 13.4 16.1 13.1 17.1C12.8 18.1 12.2 19 11.4 19.8C10.6 20.6 9.7 21.2 8.6 21.5C7.6 21.8 6.5 21.8 5.5 21.5C4.5 21.2 3.6 20.6 2.8 19.8C2 19 1.4 18.1 1.1 17.1C0.800003 16.1 0.800003 15 1.1 14C1.4 13 2 12.1 2.8 11.4C3.6 10.6 4.5 10 5.5 9.7C6.5 9.4 7.6 9.4 8.6 9.7C9.7 10 10.6 10.6 11.4 11.4ZM11.4 11.4L15.5 7.5" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function LockIcon({ size = 24, color = 'currentColor', className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <rect x="3" y="11" width="18" height="11" rx="2" stroke={color} strokeWidth="2" />
+      <path d="M7 11V7C7 4.23858 9.23858 2 12 2C14.7614 2 17 4.23858 17 7V11" stroke={color} strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function AlertTriangleIcon({ size = 24, color = 'currentColor', className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M10.29 3.86L1.82 18C1.64 18.3 1.55 18.64 1.55 19C1.55 19.36 1.64 19.7 1.82 20C2 20.3 2.26 20.56 2.56 20.74C2.87 20.92 3.21 21.01 3.56 21.01H20.43C20.78 21.01 21.12 20.92 21.42 20.74C21.73 20.56 21.99 20.3 22.17 20C22.35 19.7 22.44 19.36 22.44 19C22.44 18.64 22.35 18.3 22.17 18L13.7 3.86C13.52 3.56 13.27 3.31 12.96 3.13C12.66 2.95 12.32 2.86 11.97 2.86C11.62 2.86 11.28 2.95 10.98 3.13C10.67 3.31 10.42 3.56 10.24 3.86H10.29Z" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M12 9V13" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      <circle cx="12" cy="17" r="1" fill={color} />
+    </svg>
+  );
+}
+
+export function CheckCircleIcon({ size = 24, color = 'currentColor', className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <circle cx="12" cy="12" r="10" stroke={color} strokeWidth="2" />
+      <path d="M9 12L11 14L15 10" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function HelpCircleIcon({ size = 24, color = 'currentColor', className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <circle cx="12" cy="12" r="10" stroke={color} strokeWidth="2" />
+      <path d="M9.09 9C9.3 8.33 9.79 7.79 10.42 7.47C11.05 7.14 11.77 7.05 12.46 7.21C13.14 7.37 13.74 7.77 14.15 8.32C14.56 8.88 14.74 9.56 14.67 10.25C14.67 12 11.92 12.75 11.92 12.75" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="12" cy="17" r="1" fill={color} />
+    </svg>
+  );
+}
+
+export function LoaderIcon({ size = 24, color = 'currentColor', className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M12 2V6" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      <path d="M12 18V22" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      <path d="M4.93 4.93L7.76 7.76" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      <path d="M16.24 16.24L19.07 19.07" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      <path d="M2 12H6" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      <path d="M18 12H22" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      <path d="M4.93 19.07L7.76 16.24" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      <path d="M16.24 7.76L19.07 4.93" stroke={color} strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function SmartphoneIcon({ size = 24, color = 'currentColor', className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <rect x="5" y="2" width="14" height="20" rx="2" stroke={color} strokeWidth="2" />
+      <path d="M12 18H12.01" stroke={color} strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function MonitorIcon({ size = 24, color = 'currentColor', className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <rect x="2" y="3" width="20" height="14" rx="2" stroke={color} strokeWidth="2" />
+      <path d="M8 21H16" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      <path d="M12 17V21" stroke={color} strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function ExternalLinkIcon({ size = 24, color = 'currentColor', className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M18 13V19C18 19.5304 17.7893 20.0391 17.4142 20.4142C17.0391 20.7893 16.5304 21 16 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V8C3 7.46957 3.21071 6.96086 3.58579 6.58579C3.96086 6.21071 4.46957 6 5 6H11" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M15 3H21V9" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M10 14L21 3" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function ChevronDownIcon({ size = 24, color = 'currentColor', className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M6 9L12 15L18 9" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function ChevronUpIcon({ size = 24, color = 'currentColor', className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M18 15L12 9L6 15" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function MessageCircleIcon({ size = 24, color = 'currentColor', className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M21 11.5C21.0034 12.8199 20.6951 14.1219 20.1 15.3C19.3944 16.7118 18.3098 17.8992 16.9674 18.7293C15.6251 19.5594 14.0782 19.9994 12.5 20C11.1801 20.0035 9.87812 19.6951 8.7 19.1L3 21L4.9 15.3C4.30493 14.1219 3.99656 12.8199 4 11.5C4.00061 9.92179 4.44061 8.37488 5.27072 7.03258C6.10083 5.69028 7.28825 4.6056 8.7 3.90003C9.87812 3.30496 11.1801 2.99659 12.5 3.00003H13C15.0843 3.11502 17.053 3.99479 18.5291 5.47089C20.0052 6.94699 20.885 8.91568 21 11V11.5Z" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function UserIcon({ size = 24, color = 'currentColor', className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <circle cx="12" cy="8" r="4" stroke={color} strokeWidth="2" />
+      <path d="M4 21V19C4 16.7909 5.79086 15 8 15H16C18.2091 15 20 16.7909 20 19V21" stroke={color} strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function EyeIcon({ size = 24, color = 'currentColor', className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M1 12C1 12 5 4 12 4C19 4 23 12 23 12C23 12 19 20 12 20C5 20 1 12 1 12Z" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="12" cy="12" r="3" stroke={color} strokeWidth="2" />
+    </svg>
+  );
+}
+
+export function CreditCardIcon({ size = 24, color = 'currentColor', className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <rect x="1" y="4" width="22" height="16" rx="2" stroke={color} strokeWidth="2" />
+      <path d="M1 10H23" stroke={color} strokeWidth="2" />
+    </svg>
+  );
+}
+
+export function XCircleIcon({ size = 24, color = 'currentColor', className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <circle cx="12" cy="12" r="10" stroke={color} strokeWidth="2" />
+      <path d="M15 9L9 15M9 9L15 15" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function ArrowRightLeftIcon({ size = 24, color = 'currentColor', className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M17 4L21 8L17 12" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M21 8H9" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M7 20L3 16L7 12" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M3 16H15" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+

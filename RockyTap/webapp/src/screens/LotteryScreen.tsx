@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, Button, NumberInput, LoadingScreen, ErrorState, EmptyState, useToast, WalletVerificationModal, PullToRefresh, HelpTooltip } from '../components/ui';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, Button, NumberInput, ErrorState, EmptyState, useToast, WalletVerificationModal, PullToRefresh, HelpTooltip, SkeletonLotteryScreen } from '../components/ui';
 import { WalletSummary } from '../components/WalletSummary';
 import { TrophyIcon, HistoryIcon, TicketIcon } from '../components/Icons';
 import { RecentWinnersFeed } from '../components/RecentWinnersFeed';
@@ -19,7 +19,21 @@ import { hapticFeedback } from '../lib/telegram';
 import { getFriendlyErrorMessage } from '../lib/errorMessages';
 import styles from './LotteryScreen.module.css';
 
+/**
+ * Utility to wrap a promise with a timeout.
+ * Returns fallback value if the promise takes too long.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))
+  ]);
+}
+
 type TabView = 'active' | 'history';
+
+// Timeout constants for different API calls
+const PENDING_REWARDS_TIMEOUT = 5000; // 5 seconds for non-critical pending rewards
 
 export function LotteryScreen() {
   const [status, setStatus] = useState<LotteryStatusResponse | null>(null);
@@ -35,42 +49,106 @@ export function LotteryScreen() {
   const [activeTab, setActiveTab] = useState<TabView>('active');
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const { showError: showToastError, showSuccess } = useToast();
+  
+  // AbortController ref for cleanup on unmount
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const isMountedRef = useRef(true);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   useEffect(() => {
     loadData();
   }, []);
 
   const loadData = async () => {
+    // Cancel any previous requests
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
     try {
       setLoading(true);
       setError(null);
+      
+      // Load critical data first (status and history)
       const [statusRes, historyRes] = await Promise.all([
         getLotteryStatus(),
         getLotteryHistory(20),
       ]);
+      
+      // Check if still mounted before updating state
+      if (!isMountedRef.current) return;
+      
       setStatus(statusRes);
       setHistory(historyRes.lotteries);
-      await loadPendingRewards();
+      setLoading(false);
+      
+      // Load pending rewards in background (non-blocking with timeout)
+      loadPendingRewardsInBackground();
+      
     } catch (err) {
+      if (!isMountedRef.current) return;
+      
+      // Ignore abort errors
+      if (err instanceof Error && err.name === 'AbortError') return;
+      
       const errorMessage = getFriendlyErrorMessage(err as Error);
       setError(errorMessage);
       showToastError(errorMessage);
-    } finally {
       setLoading(false);
     }
   };
 
-  const loadPendingRewards = async () => {
+  /**
+   * Load pending rewards in background with timeout.
+   * This is non-blocking and fails silently to not affect main screen load.
+   */
+  const loadPendingRewardsInBackground = async () => {
+    if (!isMountedRef.current) return;
+    
     try {
       setLoadingRewards(true);
-      const rewardsRes = await getPendingRewards();
+      
+      // Use timeout wrapper for non-critical API call
+      const fallbackResponse: PendingRewardsResponse = {
+        pending_balance_usdt: '0',
+        rewards: [],
+        can_claim: false
+      };
+      
+      const rewardsRes = await withTimeout(
+        getPendingRewards(),
+        PENDING_REWARDS_TIMEOUT,
+        fallbackResponse
+      );
+      
+      if (!isMountedRef.current) return;
       setPendingRewards(rewardsRes);
     } catch (err) {
       // Silently fail - pending rewards are optional
-      console.error('Failed to load pending rewards:', err);
+      if (import.meta.env.DEV) {
+        console.warn('Failed to load pending rewards:', err);
+      }
     } finally {
-      setLoadingRewards(false);
+      if (isMountedRef.current) {
+        setLoadingRewards(false);
+      }
     }
+  };
+
+  // Legacy function kept for refresh scenarios
+  const loadPendingRewards = async () => {
+    await loadPendingRewardsInBackground();
   };
 
   const handleVerificationComplete = async () => {
@@ -157,7 +235,11 @@ export function LotteryScreen() {
   };
 
   if (loading) {
-    return <LoadingScreen message="Loading lottery..." />;
+    return (
+      <div className={styles.container}>
+        <SkeletonLotteryScreen />
+      </div>
+    );
   }
 
   if (error) {
