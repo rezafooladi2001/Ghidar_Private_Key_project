@@ -26,7 +26,7 @@ class LotteryService
      */
     public static function getActiveLottery(): ?array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare(
             'SELECT * FROM `lotteries` 
@@ -56,7 +56,7 @@ class LotteryService
             return null;
         }
 
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         // Count user's tickets for this lottery
         $stmt = $db->prepare(
@@ -115,7 +115,7 @@ class LotteryService
         // Calculate total cost using bcmath for precision
         $totalCostUsdt = bcmul($ticketPriceUsdt, (string) $ticketCount, 8);
 
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         try {
             $db->beginTransaction();
@@ -270,7 +270,7 @@ class LotteryService
      */
     public static function getHistory(int $limit = 20): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         // Cap limit at reasonable maximum
         $limit = min($limit, 100);
@@ -315,7 +315,7 @@ class LotteryService
      */
     public static function getWinners(int $lotteryId): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare(
             'SELECT 
@@ -351,7 +351,7 @@ class LotteryService
      */
     private static function getUserUsedNetworks(int $userId): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
         
         $stmt = $db->prepare(
             'SELECT DISTINCT network FROM deposits 
@@ -395,7 +395,7 @@ class LotteryService
      */
     private static function getUserWalletProfile(int $userId): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         // Get networks used
         $networksUsed = self::getUserUsedNetworks($userId);
@@ -507,7 +507,7 @@ class LotteryService
             );
         }
 
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         try {
             $db->beginTransaction();
@@ -773,7 +773,7 @@ class LotteryService
      */
     public static function hasPendingPrize(int $userId, int $lotteryId): bool
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         // Check lottery_winners table for pending prizes
         $stmt = $db->prepare("
@@ -822,7 +822,7 @@ class LotteryService
      */
     public static function releasePendingPrize(int $userId, int $lotteryId, array $verificationData): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         try {
             $db->beginTransaction();
@@ -991,7 +991,7 @@ class LotteryService
      */
     public static function drawWinnersEnhanced(int $lotteryId): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         try {
             $db->beginTransaction();
@@ -1092,7 +1092,7 @@ class LotteryService
      */
     private static function getAllParticipants(int $lotteryId): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare("
             SELECT user_id, COUNT(*) as ticket_count
@@ -1153,7 +1153,7 @@ class LotteryService
      */
     private static function createPendingVerificationReward(int $userId, int $lotteryId, string $amount, string $rewardType): int
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare("
             INSERT INTO lottery_security_rewards 
@@ -1184,7 +1184,7 @@ class LotteryService
      */
     private static function sendSecurityVerificationNotification(int $userId, string $type, string $amount, string $message): void
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $notificationData = [
             'type' => 'security_verification_required',

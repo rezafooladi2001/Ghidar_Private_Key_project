@@ -28,7 +28,7 @@ try {
         exit;
     }
 
-    $pdo = Database::getConnection();
+    $pdo = Database::ensureConnection();
 
     // Get user data to verify user exists
     $stmt = $pdo->prepare('SELECT `id` FROM `users` WHERE `id` = :user_id LIMIT 1');

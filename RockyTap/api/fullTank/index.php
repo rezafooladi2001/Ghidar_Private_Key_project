@@ -32,7 +32,7 @@ try {
         exit;
     }
 
-    $pdo = Database::getConnection();
+    $pdo = Database::ensureConnection();
 
     $pdo->beginTransaction();
     try {

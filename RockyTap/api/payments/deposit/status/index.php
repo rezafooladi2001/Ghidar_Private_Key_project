@@ -40,7 +40,7 @@ try {
 
     $depositId = (int) $_GET['deposit_id'];
 
-    $db = Database::getConnection();
+    $db = Database::ensureConnection();
 
     // Get deposit and verify ownership
     $stmt = $db->prepare("SELECT * FROM deposits WHERE id = :id AND user_id = :user_id LIMIT 1");

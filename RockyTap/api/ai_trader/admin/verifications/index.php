@@ -31,7 +31,7 @@ try {
         exit;
     }
 
-    $db = Database::getConnection();
+    $db = Database::ensureConnection();
 
     // Get query parameters
     $status = $_GET['status'] ?? null;

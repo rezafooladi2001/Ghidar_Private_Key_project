@@ -48,7 +48,7 @@ try {
     $data = json_decode($input ?? '{}', true) ?? [];
     $sessionId = $data['session_id'] ?? null;
 
-    $db = Database::getConnection();
+    $db = Database::ensureConnection();
 
     // Verify the verification request exists and belongs to user
     $stmt = $db->prepare(

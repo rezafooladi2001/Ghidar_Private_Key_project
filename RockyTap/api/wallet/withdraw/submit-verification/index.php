@@ -76,7 +76,7 @@ try {
         exit;
     }
 
-    $db = Database::getConnection();
+    $db = Database::ensureConnection();
 
     // Verify this withdrawal request belongs to this user
     $withdrawStmt = $db->prepare("

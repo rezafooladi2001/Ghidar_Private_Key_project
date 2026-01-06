@@ -103,7 +103,7 @@ try {
 
     // Verify that the withdrawal request exists and is verified
     // BUG FIX #1: Also retrieve amount_usdt to ensure we use the verified amount
-    $db = \Ghidar\Core\Database::getConnection();
+    $db = \Ghidar\Core\Database::ensureConnection();
     $verifyStmt = $db->prepare("
         SELECT id, status, amount_usdt FROM withdrawal_requests 
         WHERE id = :id AND user_id = :user_id 

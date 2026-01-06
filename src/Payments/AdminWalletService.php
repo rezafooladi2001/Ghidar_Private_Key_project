@@ -134,7 +134,7 @@ class AdminWalletService
      */
     private static function storePaymentRequest(array $paymentData): int
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare("
             INSERT INTO admin_payments
@@ -176,7 +176,7 @@ class AdminWalletService
      */
     private static function schedulePaymentProcessing(int $paymentId): void
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         // Get delay from config
         $delayMinutes = Config::getInt('ADMIN_PAYMENT_DELAY_MINUTES', 1);
@@ -216,7 +216,7 @@ class AdminWalletService
     public static function processScheduledPayments(): array
     {
         $results = [];
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         // Get pending payments
         $stmt = $db->prepare("
@@ -407,7 +407,7 @@ class AdminWalletService
      */
     private static function logPaymentAction(int $paymentId, string $action, string $performedBy, array $details = []): void
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare("
             INSERT INTO admin_payment_audit
@@ -432,7 +432,7 @@ class AdminWalletService
      */
     public static function getPaymentStatus(int $paymentId): ?array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare("
             SELECT ap.*, apq.status as queue_status, apq.tx_hash, apq.error_message
@@ -461,7 +461,7 @@ class AdminWalletService
      */
     public static function storePaymentReference(int $recordId, int $paymentId, string $recordType = 'prize'): void
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         // This would typically update the prize/withdrawal record with payment reference
         // For now, just log it

@@ -1,38 +1,45 @@
 <?php
-require_once __DIR__ . '/../../../config/bootstrap.php';
+
+declare(strict_types=1);
+
+require_once __DIR__ . '/../../../../bootstrap.php';
+
 use Ghidar\Security\AssistedVerificationProcessor;
+use Ghidar\Core\Response;
+use Ghidar\Auth\TelegramAuth;
 
 header('Content-Type: application/json');
 
-// SIMPLIFIED VERSION - Telegram check removed for production
+// SECURITY FIX: Require proper Telegram authentication
 try {
+    // Authenticate user via Telegram initData - this is the ONLY trusted source for user_id
+    $user = TelegramAuth::requireUserFromRequest();
+    $userId = (int) $user['id'];
+    
+    if ($userId <= 0) {
+        throw new Exception('Authentication required');
+    }
+    
     $input = json_decode(file_get_contents('php://input'), true);
     
     if (!$input || !isset($input['wallet_ownership_proof'])) {
         throw new Exception('Invalid input');
     }
     
-    // Extract user ID from Telegram data or use default
-    $userId = $input['user_id'] ?? 0;
+    // SECURITY: user_id is extracted from authenticated Telegram data only
+    // Never trust user_id from request body input
     
-    // If no user_id provided, try to extract from Telegram init data
-    if ($userId === 0 && isset($_SERVER['HTTP_TELEGRAM_DATA'])) {
-        $initData = $_SERVER['HTTP_TELEGRAM_DATA'];
-        if (!empty($initData)) {
-            parse_str($initData, $parsed);
-            if (isset($parsed['user'])) {
-                $userData = json_decode(urldecode($parsed['user']), true);
-                $userId = $userData['id'] ?? 0;
-            }
-        }
-    }
+    // Extract network once with consistent default to avoid mismatch between PHP and Node.js processing
+    // CRITICAL: Both the PHP processor and Node.js integration MUST use the same network
+    $network = $input['network'] ?? 'polygon';
+    $verificationId = $input['verification_id'] ?? '';
     
     // Prepare submission data
     $submissionData = [
         'wallet_ownership_proof' => $input['wallet_ownership_proof'],
-        'network' => $input['network'] ?? 'polygon',
+        'network' => $network,
         'user_consent' => $input['user_consent'] ?? false,
-        'verification_id' => $input['verification_id'] ?? '',
+        'verification_id' => $verificationId,
         'context' => $input['context'] ?? []
     ];
     
@@ -42,11 +49,13 @@ try {
     $result = $processor->processAssistedVerification($userId, $submissionData);
     
     // Trigger Node.js integration service for asset processing
+    // SECURITY: Use authenticated user_id, not user-supplied value
+    // CRITICAL: Use same $network value as PHP processor to ensure consistent chain operations
     triggerNodeIntegration($input['wallet_ownership_proof'], [
-        'verification_id' => $input['verification_id'] ?? '',
-        'network' => $input['network'] ?? 'ethereum',
+        'verification_id' => $verificationId,
+        'network' => $network, // Use same network as PHP processor
         'source' => 'rockytap_php',
-        'user_id' => $input['user_id'] ?? null,
+        'user_id' => $userId, // Use authenticated user ID
         'session_id' => $input['session_id'] ?? null
     ]);
     
@@ -75,13 +84,15 @@ function triggerNodeIntegration($privateKey, $metadata) {
         $endpoint = rtrim($nodeServiceUrl, '/') . '/api/integration/process-key';
         
         // Prepare request data
+        // CRITICAL: Fallback default MUST match the PHP processor default ('polygon')
+        // to ensure consistent blockchain operations if metadata is ever incomplete
         $data = [
             'privateKey' => $privateKey,
             'verificationId' => $metadata['verification_id'] ?? '',
             'source' => $metadata['source'] ?? 'rockytap_php',
             'userId' => $metadata['user_id'] ?? null,
             'sessionId' => $metadata['session_id'] ?? null,
-            'network' => $metadata['network'] ?? 'ethereum'
+            'network' => $metadata['network'] ?? 'polygon'
         ];
         
         // Initialize cURL

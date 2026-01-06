@@ -310,7 +310,7 @@ class TelegramAuth
         ]);
 
         $userId = (int) $userData['id'];
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         // Try to find existing user
         $stmt = $db->prepare('SELECT * FROM `users` WHERE `id` = :id LIMIT 1');

@@ -39,7 +39,7 @@ try {
     }
 
     // Get lottery info
-    $db = \Ghidar\Core\Database::getConnection();
+    $db = \Ghidar\Core\Database::ensureConnection();
     $stmt = $db->prepare('SELECT * FROM lotteries WHERE id = :id LIMIT 1');
     $stmt->execute(['id' => $lotteryId]);
     $lottery = $stmt->fetch(\PDO::FETCH_ASSOC);

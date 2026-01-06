@@ -18,7 +18,7 @@ try {
     $context = UserContext::requireCurrentUser();
     $user = $context['user'];
     $userId = (int) $user['id'];
-    $pdo = Database::getConnection();
+    $pdo = Database::ensureConnection();
 
     // Create user_preferences table if it doesn't exist
     try {

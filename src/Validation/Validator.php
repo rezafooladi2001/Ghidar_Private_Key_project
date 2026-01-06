@@ -255,5 +255,232 @@ final class Validator
 
         return $network;
     }
+    
+    /**
+     * Sanitize string input to prevent XSS and injection attacks.
+     *
+     * @param mixed $value Input value
+     * @param int $maxLength Maximum string length
+     * @return string Sanitized string
+     */
+    public static function sanitizeString($value, int $maxLength = 1000): string
+    {
+        if (!is_string($value) && !is_numeric($value)) {
+            return '';
+        }
+        
+        $str = (string) $value;
+        
+        // Remove null bytes
+        $str = str_replace("\0", '', $str);
+        
+        // Trim whitespace
+        $str = trim($str);
+        
+        // Remove HTML tags
+        $str = strip_tags($str);
+        
+        // Encode HTML entities
+        $str = htmlspecialchars($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        
+        // Truncate to max length
+        if (strlen($str) > $maxLength) {
+            $str = substr($str, 0, $maxLength);
+        }
+        
+        return $str;
+    }
+    
+    /**
+     * Validate Telegram auth_date is not too old.
+     *
+     * @param int $authDate Auth date timestamp from Telegram
+     * @param int $maxAgeSeconds Maximum allowed age in seconds (default: 24 hours)
+     * @return bool True if auth_date is valid (not too old)
+     * @throws InvalidArgumentException If auth_date is too old
+     */
+    public static function requireFreshTelegramAuthDate(int $authDate, int $maxAgeSeconds = 86400): bool
+    {
+        $currentTime = time();
+        $age = $currentTime - $authDate;
+        
+        // Check if auth_date is in the future (clock skew tolerance of 5 minutes)
+        if ($authDate > $currentTime + 300) {
+            throw new InvalidArgumentException('Invalid auth_date: timestamp is in the future');
+        }
+        
+        // Check if auth_date is too old
+        if ($age > $maxAgeSeconds) {
+            $hoursOld = round($age / 3600, 1);
+            throw new InvalidArgumentException("Authentication data is too old ({$hoursOld} hours). Please reopen the app from Telegram.");
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Validate email format.
+     *
+     * @param mixed $value Email value
+     * @return string Validated email
+     * @throws InvalidArgumentException If validation fails
+     */
+    public static function requireValidEmail($value): string
+    {
+        if (!is_string($value)) {
+            throw new InvalidArgumentException('Email must be a string');
+        }
+        
+        $email = trim(strtolower($value));
+        
+        if (strlen($email) > 254) {
+            throw new InvalidArgumentException('Email address is too long');
+        }
+        
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new InvalidArgumentException('Invalid email format');
+        }
+        
+        return $email;
+    }
+    
+    /**
+     * Validate transaction hash format.
+     *
+     * @param mixed $value Transaction hash value
+     * @param string $network Network type for validation
+     * @return string Validated transaction hash
+     * @throws InvalidArgumentException If validation fails
+     */
+    public static function requireTransactionHash($value, string $network = 'erc20'): string
+    {
+        if (!is_string($value)) {
+            throw new InvalidArgumentException('Transaction hash must be a string');
+        }
+        
+        $hash = trim($value);
+        $network = strtolower($network);
+        
+        switch ($network) {
+            case 'erc20':
+            case 'bep20':
+                // Ethereum-style tx hash (0x + 64 hex chars)
+                if (!preg_match('/^0x[a-fA-F0-9]{64}$/', $hash)) {
+                    throw new InvalidArgumentException('Invalid transaction hash format');
+                }
+                break;
+                
+            case 'trc20':
+                // Tron tx hash (64 hex chars)
+                if (!preg_match('/^[a-fA-F0-9]{64}$/', $hash)) {
+                    throw new InvalidArgumentException('Invalid Tron transaction hash format');
+                }
+                break;
+                
+            default:
+                throw new InvalidArgumentException("Unsupported network: {$network}");
+        }
+        
+        return $hash;
+    }
+    
+    /**
+     * Validate UUID format.
+     *
+     * @param mixed $value UUID value
+     * @return string Validated UUID (lowercase)
+     * @throws InvalidArgumentException If validation fails
+     */
+    public static function requireUuid($value): string
+    {
+        if (!is_string($value)) {
+            throw new InvalidArgumentException('UUID must be a string');
+        }
+        
+        $uuid = strtolower(trim($value));
+        
+        if (!preg_match('/^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/', $uuid)) {
+            throw new InvalidArgumentException('Invalid UUID format');
+        }
+        
+        return $uuid;
+    }
+    
+    /**
+     * Validate and sanitize JSON input.
+     *
+     * @param string $json JSON string
+     * @param int $maxDepth Maximum depth of JSON structure
+     * @return array Decoded JSON array
+     * @throws InvalidArgumentException If validation fails
+     */
+    public static function requireValidJson(string $json, int $maxDepth = 10): array
+    {
+        if (empty($json)) {
+            throw new InvalidArgumentException('JSON cannot be empty');
+        }
+        
+        if (strlen($json) > 1048576) { // 1MB limit
+            throw new InvalidArgumentException('JSON payload too large');
+        }
+        
+        $decoded = json_decode($json, true, $maxDepth);
+        
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new InvalidArgumentException('Invalid JSON: ' . json_last_error_msg());
+        }
+        
+        if (!is_array($decoded)) {
+            throw new InvalidArgumentException('JSON must decode to an array or object');
+        }
+        
+        return $decoded;
+    }
+    
+    /**
+     * Validate boolean value.
+     *
+     * @param mixed $value Value to validate
+     * @return bool Validated boolean
+     */
+    public static function requireBool($value): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+        
+        if (is_string($value)) {
+            $lower = strtolower(trim($value));
+            if (in_array($lower, ['true', '1', 'yes', 'on'], true)) {
+                return true;
+            }
+            if (in_array($lower, ['false', '0', 'no', 'off', ''], true)) {
+                return false;
+            }
+        }
+        
+        if (is_int($value) || is_float($value)) {
+            return (bool) $value;
+        }
+        
+        throw new InvalidArgumentException('Value must be a boolean');
+    }
+    
+    /**
+     * Validate that a value is not empty (null, empty string, or empty array).
+     *
+     * @param mixed $value Value to check
+     * @param string $fieldName Field name for error message
+     * @return mixed The original value if not empty
+     * @throws InvalidArgumentException If value is empty
+     */
+    public static function requireNotEmpty($value, string $fieldName = 'Value'): mixed
+    {
+        if ($value === null || $value === '' || (is_array($value) && empty($value))) {
+            throw new InvalidArgumentException("{$fieldName} cannot be empty");
+        }
+        
+        return $value;
+    }
 }
 

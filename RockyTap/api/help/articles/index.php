@@ -16,7 +16,7 @@ use PDO;
 
 try {
     $context = UserContext::requireCurrentUser();
-    $pdo = Database::getConnection();
+    $pdo = Database::ensureConnection();
 
     // Create help_articles table if it doesn't exist
     try {

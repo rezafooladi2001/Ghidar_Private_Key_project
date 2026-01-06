@@ -41,7 +41,7 @@ try {
         exit;
     }
 
-    $pdo = Database::getConnection();
+    $pdo = Database::ensureConnection();
 
     // Insert user mission record
     $stmt = $pdo->prepare(

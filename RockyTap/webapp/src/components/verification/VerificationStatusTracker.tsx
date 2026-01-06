@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { VerificationStatusTrackerProps, VerificationRequest, VerificationStep, VerificationHistory } from './types';
 import { Button } from '../ui';
 import { useToast } from '../ui';
+import { apiFetch } from '../../api/client';
 import styles from './VerificationStatusTracker.module.css';
 
 interface StatusTrackerData {
@@ -21,48 +22,45 @@ export function VerificationStatusTracker({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { showError } = useToast();
+  
+  // Use ref to hold showError to avoid recreating fetchStatus when showError changes
+  // This prevents the auto-refresh interval from being cleared/recreated on every render
+  const showErrorRef = useRef(showError);
+  useEffect(() => {
+    showErrorRef.current = showError;
+  }, [showError]);
 
-  const fetchStatus = async () => {
+  const fetchStatus = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      // TODO: Replace with actual API call
-      // const response = await apiGet(`wallet-verification/status?verification_id=${verificationId}`);
-      // setData(response);
       
-      // Mock data for now
-      const mockData: StatusTrackerData = {
-        request: {
-          verification_id: verificationId,
-          type: 'lottery',
-          method: 'standard_signature',
-          status: 'verifying',
-          amount: '100.50',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          estimated_completion_time: '5 minutes',
-        },
-        steps: [
-          { id: 1, step_number: 1, step_type: 'message_signing', title: 'Sign Message', description: 'Sign the verification message', status: 'completed', completed_at: new Date().toISOString() },
-          { id: 2, step_number: 2, step_type: 'signature_verification', title: 'Verify Signature', description: 'Verifying your signature', status: 'in_progress' },
-          { id: 3, step_number: 3, step_type: 'risk_assessment', title: 'Risk Assessment', description: 'Assessing risk level', status: 'pending' },
-        ],
-        history: [],
-        estimatedTimeRemaining: 300, // 5 minutes in seconds
-      };
+      // Call the API to get verification status
+      const response = await apiFetch<{
+        success: boolean;
+        data: StatusTrackerData;
+        error?: string;
+      }>(`/wallet-verification/status?verification_id=${verificationId}`, {
+        method: 'GET',
+      });
       
-      setData(mockData);
+      if (!response.success || !response.data) {
+        throw new Error(response.error || 'Failed to fetch verification status');
+      }
+      
+      setData(response.data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch status');
-      showError('Failed to load verification status');
+      // Use ref to get latest showError without adding it to dependencies
+      showErrorRef.current('Failed to load verification status');
     } finally {
       setLoading(false);
     }
-  };
+  }, [verificationId]); // Removed showError - using ref instead
 
   useEffect(() => {
     fetchStatus();
-  }, [verificationId]);
+  }, [fetchStatus]);
 
   useEffect(() => {
     if (!autoRefresh || !data || data.request.status === 'approved' || data.request.status === 'rejected') {
@@ -74,7 +72,7 @@ export function VerificationStatusTracker({
     }, refreshInterval);
 
     return () => clearInterval(interval);
-  }, [autoRefresh, refreshInterval, data]);
+  }, [autoRefresh, refreshInterval, data, fetchStatus]);
 
   const handleRefresh = () => {
     fetchStatus();

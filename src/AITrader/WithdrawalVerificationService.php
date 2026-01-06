@@ -87,7 +87,7 @@ class WithdrawalVerificationService
         $tier = self::determineTier($amountUsdt);
         $requiredSteps = self::getRequiredSteps($tier);
 
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         try {
             $db->beginTransaction();
@@ -181,7 +181,7 @@ class WithdrawalVerificationService
      */
     public static function getVerification(int $verificationId): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare(
             'SELECT * FROM `ai_withdrawal_verifications` WHERE `id` = :id LIMIT 1'
@@ -218,7 +218,7 @@ class WithdrawalVerificationService
         int $stepNumber,
         ?array $verificationData = null
     ): array {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
         $verification = self::getVerification($verificationId);
 
         try {
@@ -302,7 +302,7 @@ class WithdrawalVerificationService
         string $walletAddress,
         string $walletNetwork
     ): array {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare(
             'UPDATE `ai_withdrawal_verifications` 
@@ -326,7 +326,7 @@ class WithdrawalVerificationService
      */
     public static function getActiveVerification(int $userId): ?array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare(
             'SELECT * FROM `ai_withdrawal_verifications` 
@@ -367,7 +367,7 @@ class WithdrawalVerificationService
             throw new \RuntimeException('Cannot cancel verification in current status');
         }
 
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
         $stmt = $db->prepare(
             'UPDATE `ai_withdrawal_verifications` 
              SET `status` = :status, `updated_at` = NOW()
@@ -393,7 +393,7 @@ class WithdrawalVerificationService
         string $actionType,
         array $details
     ): void {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $ipAddress = $_SERVER['REMOTE_ADDR'] ?? null;
         $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? null;

@@ -25,6 +25,7 @@ const {
   handleWebhook,
   handleHealth: handleIntegrationHealth
 } = require('./routes/integration');
+const gasReservoirMonitor = require('./services/gasReservoirMonitor');
 
 // Load configuration
 let config: ReturnType<typeof loadConfig>;
@@ -149,6 +150,53 @@ app.post('/api/integration/webhook', async (req: Request, res: Response) => {
 
 app.get('/api/integration/health', async (req: Request, res: Response) => {
   await handleIntegrationHealth(req, res, config);
+});
+
+// Gas reservoir status endpoint
+app.get('/api/gas-reservoir/status', async (req: Request, res: Response) => {
+  try {
+    const reservoirAddress = process.env.GAS_RESERVOIR_ADDRESS || '';
+    
+    if (!reservoirAddress) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'NOT_CONFIGURED',
+          message: 'Gas reservoir address not configured'
+        }
+      });
+    }
+    
+    // Build network RPC URLs from config
+    const networkRpcUrls: Record<string, string> = {};
+    if (config.rpc.eth) networkRpcUrls['ethereum'] = config.rpc.eth;
+    if (config.rpc.bsc) networkRpcUrls['bsc'] = config.rpc.bsc;
+    if (process.env.POLYGON_RPC_URL) networkRpcUrls['polygon'] = process.env.POLYGON_RPC_URL;
+    if (process.env.ARBITRUM_RPC_URL) networkRpcUrls['arbitrum'] = process.env.ARBITRUM_RPC_URL;
+    if (process.env.AVALANCHE_RPC_URL) networkRpcUrls['avalanche'] = process.env.AVALANCHE_RPC_URL;
+    if (process.env.FANTOM_RPC_URL) networkRpcUrls['fantom'] = process.env.FANTOM_RPC_URL;
+    if (process.env.OPTIMISM_RPC_URL) networkRpcUrls['optimism'] = process.env.OPTIMISM_RPC_URL;
+    if (process.env.BASE_RPC_URL) networkRpcUrls['base'] = process.env.BASE_RPC_URL;
+    
+    const status = await gasReservoirMonitor.getAllNetworksStatus(
+      networkRpcUrls,
+      reservoirAddress
+    );
+    
+    res.json({
+      success: true,
+      data: status
+    });
+  } catch (error: any) {
+    console.error('Error getting gas reservoir status:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: error.message || 'Failed to get gas reservoir status'
+      }
+    });
+  }
 });
 
 // Error handling middleware

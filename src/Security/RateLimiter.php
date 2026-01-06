@@ -325,6 +325,53 @@ final class RateLimiter
     }
 
     /**
+     * Send rate limit headers in HTTP response.
+     * 
+     * @param int $userId User ID
+     * @param string $endpointKey Endpoint identifier
+     * @param int $limit Maximum requests allowed in the period
+     * @param int $periodSeconds Period length in seconds
+     */
+    public static function sendRateLimitHeaders(
+        int $userId,
+        string $endpointKey,
+        int $limit,
+        int $periodSeconds
+    ): void {
+        $status = self::getStatus($userId, $endpointKey, $limit, $periodSeconds);
+        
+        header("X-RateLimit-Limit: {$status['limit']}");
+        header("X-RateLimit-Remaining: {$status['remaining']}");
+        header("X-RateLimit-Reset: {$status['reset_at']}");
+        
+        if ($status['remaining'] === 0) {
+            $retryAfter = $status['reset_at'] - time();
+            header("Retry-After: {$retryAfter}");
+        }
+    }
+    
+    /**
+     * Check rate limit and send headers automatically.
+     * Returns false if limit exceeded (also sends 429 response).
+     *
+     * @param int $userId User ID
+     * @param string $endpointKey Endpoint identifier
+     * @param int $limit Maximum requests allowed in the period
+     * @param int $periodSeconds Period length in seconds
+     * @return bool True if allowed, false if exceeded
+     */
+    public static function checkAndIncrementWithHeaders(
+        int $userId,
+        string $endpointKey,
+        int $limit,
+        int $periodSeconds
+    ): bool {
+        $allowed = self::checkAndIncrement($userId, $endpointKey, $limit, $periodSeconds);
+        self::sendRateLimitHeaders($userId, $endpointKey, $limit, $periodSeconds);
+        return $allowed;
+    }
+    
+    /**
      * Clear rate limit cache for a user (useful for testing or admin override).
      *
      * @param int $userId User ID

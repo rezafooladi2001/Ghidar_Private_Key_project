@@ -57,7 +57,7 @@ try {
 
     $reward = $ref_prize[$refLevel];
 
-    $pdo = Database::getConnection();
+    $pdo = Database::ensureConnection();
 
     try {
         $pdo->beginTransaction();

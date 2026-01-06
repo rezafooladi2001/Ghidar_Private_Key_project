@@ -80,7 +80,7 @@ try {
     $txHash = trim($data['tx_hash']);
 
     // Get deposit info
-    $db = Database::getConnection();
+    $db = Database::ensureConnection();
     $stmt = $db->prepare("SELECT * FROM deposits WHERE id = :id LIMIT 1");
     $stmt->execute(['id' => $depositId]);
     $deposit = $stmt->fetch(\PDO::FETCH_ASSOC);

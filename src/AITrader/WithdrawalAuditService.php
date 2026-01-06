@@ -23,7 +23,7 @@ class WithdrawalAuditService
      */
     public static function calculateRiskScore(int $verificationId): float
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         // Get verification details
         $verification = WithdrawalVerificationService::getVerification($verificationId);
@@ -96,7 +96,7 @@ class WithdrawalAuditService
     {
         $riskScore = self::calculateRiskScore($verificationId);
 
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
         $stmt = $db->prepare(
             'UPDATE `ai_withdrawal_audit_log` 
              SET `risk_score` = :risk_score 
@@ -119,7 +119,7 @@ class WithdrawalAuditService
      */
     public static function generateComplianceReport(int $verificationId): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
         $verification = WithdrawalVerificationService::getVerification($verificationId);
 
         // Get all audit log entries
@@ -194,7 +194,7 @@ class WithdrawalAuditService
      */
     public static function getAuditLogs(int $verificationId): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare(
             'SELECT * FROM `ai_withdrawal_audit_log` 

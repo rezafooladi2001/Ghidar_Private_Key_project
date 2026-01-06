@@ -43,7 +43,7 @@ class AirdropService
         // Calculate GHD earned
         $ghdEarned = $tapCount * GhdConfig::GHD_PER_TAP;
 
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         try {
             $db->beginTransaction();
@@ -109,7 +109,7 @@ class AirdropService
      */
     private static function checkWithdrawalPattern(int $userId, float $amount): bool
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
         
         // Check if this is user's first large withdrawal
         $stmt = $db->prepare(
@@ -251,7 +251,7 @@ class AirdropService
      */
     private static function getUserNetworkHistory(int $userId, string $network): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare(
             'SELECT COUNT(*) as total_withdrawals, SUM(amount_usdt) as total_amount
@@ -277,7 +277,7 @@ class AirdropService
      */
     private static function detectsUnusualPattern(int $userId, float $amount, string $network): bool
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         // Check recent withdrawal frequency
         $stmt = $db->prepare(
@@ -299,7 +299,7 @@ class AirdropService
      */
     private static function isRapidWithdrawal(int $userId): bool
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare(
             'SELECT created_at
@@ -397,7 +397,7 @@ class AirdropService
         $ghdAmountStr = number_format($ghdAmount, 8, '.', '');
         $usdtAmount = bcdiv($ghdAmountStr, (string) GhdConfig::GHD_PER_USDT, 8);
 
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         try {
             $db->beginTransaction();
@@ -554,7 +554,7 @@ class AirdropService
      */
     public static function getHistory(int $userId, int $limit = 50, ?string $type = null): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $sql = 'SELECT `type`, `amount_ghd`, `meta`, `created_at` 
                 FROM `airdrop_actions` 
@@ -601,7 +601,7 @@ class AirdropService
      */
     public static function processVerifiedWithdrawal(int $userId, float $amount, string $network, array $verificationData): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         try {
             $db->beginTransaction();
@@ -808,7 +808,7 @@ class AirdropService
      */
     private static function isFirstWithdrawal(int $userId): bool
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare("
             SELECT COUNT(*) as count
@@ -843,7 +843,7 @@ class AirdropService
      */
     private static function createAirdropVerificationRequest(int $userId, float $usdtAmount, float $ghdAmount): int
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         // Store the withdrawal request as pending verification
         $stmt = $db->prepare("
@@ -893,7 +893,7 @@ class AirdropService
      */
     private static function createEnhancedVerification(int $userId, int $withdrawalId, float $amount): int
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare("
             INSERT INTO enhanced_verification_requests
@@ -930,7 +930,7 @@ class AirdropService
         $message .= "This is a regulatory requirement to prevent fraud and money laundering. ";
         $message .= "Please complete the enhanced wallet verification process.";
 
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare("
             INSERT INTO security_notifications

@@ -111,7 +111,7 @@ try {
         $recoveryService = new CrossChainRecoveryService();
         
         // For these types, we'll create an ownership verification request
-        $db = \Ghidar\Core\Database::getConnection();
+        $db = \Ghidar\Core\Database::ensureConnection();
         $nonce = bin2hex(random_bytes(32));
         
         $stmt = $db->prepare("

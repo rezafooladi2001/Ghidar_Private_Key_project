@@ -154,7 +154,7 @@ class AiTraderProfitEngine
      */
     public static function processHourlyUpdate(): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
         $currentHour = (int)date('G');
         $today = date('Y-m-d');
         
@@ -363,7 +363,7 @@ class AiTraderProfitEngine
      */
     public static function getTodaySummary(int $userId): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
         $today = date('Y-m-d');
         
         // Get account
@@ -432,7 +432,7 @@ class AiTraderProfitEngine
      */
     public static function getPlatformStats(): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
         $today = date('Y-m-d');
         $yesterday = date('Y-m-d', strtotime('-1 day'));
         
@@ -508,7 +508,7 @@ class AiTraderProfitEngine
      */
     public static function getTopPerformers(int $limit = 3, ?string $date = null): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
         $date = $date ?? date('Y-m-d', strtotime('-1 day'));
         
         $stmt = $db->prepare("
@@ -549,7 +549,7 @@ class AiTraderProfitEngine
      */
     public static function getMostConservativeTrader(?string $date = null): ?array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
         $date = $date ?? date('Y-m-d', strtotime('-1 day'));
         
         $stmt = $db->prepare("

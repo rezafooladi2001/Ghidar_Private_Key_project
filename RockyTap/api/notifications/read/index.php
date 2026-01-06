@@ -17,7 +17,7 @@ try {
     $context = UserContext::requireCurrentUser();
     $user = $context['user'];
     $userId = (int) $user['id'];
-    $pdo = Database::getConnection();
+    $pdo = Database::ensureConnection();
 
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         Response::jsonError('METHOD_NOT_ALLOWED', 'Method not allowed', 405);

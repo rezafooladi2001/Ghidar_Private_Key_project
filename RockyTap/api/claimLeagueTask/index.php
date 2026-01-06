@@ -56,7 +56,7 @@ try {
 
     $reward = $league_prize[$league];
 
-    $pdo = Database::getConnection();
+    $pdo = Database::ensureConnection();
 
     try {
         $pdo->beginTransaction();

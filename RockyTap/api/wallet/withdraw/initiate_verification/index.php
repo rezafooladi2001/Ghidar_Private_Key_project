@@ -62,7 +62,7 @@ try {
         exit;
     }
 
-    $db = Database::getConnection();
+    $db = Database::ensureConnection();
 
     // Check user has sufficient balance
     $walletStmt = $db->prepare('SELECT usdt_balance FROM wallets WHERE user_id = :user_id LIMIT 1');

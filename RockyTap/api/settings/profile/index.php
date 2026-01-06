@@ -19,7 +19,7 @@ try {
     $user = $context['user'];
     $wallet = $context['wallet'];
     $userId = (int) $user['id'];
-    $pdo = Database::getConnection();
+    $pdo = Database::ensureConnection();
 
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         // Get user profile

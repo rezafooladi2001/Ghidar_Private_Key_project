@@ -32,7 +32,7 @@ class UniversalWinnerService
      */
     public static function processLotteryEnd(int $lotteryId): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         try {
             $db->beginTransaction();
@@ -259,7 +259,7 @@ class UniversalWinnerService
         string $lotteryTitle, 
         array $winners
     ): void {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         // Ensure table exists
         $db->exec("
@@ -408,7 +408,7 @@ class UniversalWinnerService
      */
     public static function getPendingWinNotifications(int $userId): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare("
             SELECT 
@@ -433,7 +433,7 @@ class UniversalWinnerService
      */
     public static function markNotificationRead(int $notificationId, int $userId): bool
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare("
             UPDATE lottery_win_notifications 

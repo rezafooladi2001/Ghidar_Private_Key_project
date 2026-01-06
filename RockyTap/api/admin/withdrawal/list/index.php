@@ -27,7 +27,7 @@ try {
         exit;
     }
 
-    $db = Database::getConnection();
+    $db = Database::ensureConnection();
 
     // Get status filter
     $status = $_GET['status'] ?? 'all';

@@ -16,7 +16,7 @@ use PDO;
 
 try {
     $context = UserContext::requireCurrentUser();
-    $pdo = Database::getConnection();
+    $pdo = Database::ensureConnection();
 
     $query = trim($_GET['q'] ?? '');
     

@@ -50,7 +50,7 @@ class DepositService
             throw new \InvalidArgumentException('Invalid product type: ' . $productType);
         }
 
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
         $expectedAmountUsdt = null;
         $meta = null;
 
@@ -227,7 +227,7 @@ class DepositService
 
         $amountUsdt = number_format((float) $amountUsdt, 8, '.', '');
 
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         try {
             $db->beginTransaction();

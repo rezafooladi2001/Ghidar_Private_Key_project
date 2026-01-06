@@ -19,7 +19,7 @@ try {
     $user = $context['user'];
     $userId = (int) $user['id'];
 
-    $pdo = Database::getConnection();
+    $pdo = Database::ensureConnection();
 
     // Get user by ID
     $stmt = $pdo->prepare('SELECT * FROM `users` WHERE `id` = :id LIMIT 1');

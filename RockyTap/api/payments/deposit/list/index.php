@@ -58,7 +58,7 @@ try {
     $limit = isset($_GET['limit']) ? min(100, max(1, (int) $_GET['limit'])) : 50;
     $offset = isset($_GET['offset']) ? max(0, (int) $_GET['offset']) : 0;
 
-    $db = Database::getConnection();
+    $db = Database::ensureConnection();
 
     // Build query
     $where = [];

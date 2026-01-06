@@ -54,7 +54,7 @@ try {
         exit;
     }
 
-    $pdo = Database::getConnection();
+    $pdo = Database::ensureConnection();
 
     // Verify user exists
     $stmt = $pdo->prepare('SELECT `id` FROM `users` WHERE `id` = :user_id LIMIT 1');

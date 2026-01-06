@@ -18,7 +18,7 @@ try {
     $context = UserContext::requireCurrentUser();
     $user = $context['user'];
     $userId = (int) $user['id'];
-    $pdo = Database::getConnection();
+    $pdo = Database::ensureConnection();
 
     // Get total GHD earned from airdrop actions
     $stmt = $pdo->prepare("

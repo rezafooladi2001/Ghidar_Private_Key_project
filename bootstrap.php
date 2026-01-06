@@ -111,3 +111,26 @@ if (is_dir($logDir) && is_writable($logDir)) {
 // Register global exception handler
 use Ghidar\Http\ExceptionHandler;
 ExceptionHandler::register();
+
+// Validate configuration in production (fail fast on critical issues)
+if ($env === 'production') {
+    try {
+        \Ghidar\Config\ConfigValidator::validateOnStartup();
+    } catch (\RuntimeException $e) {
+        // In production, log the error but don't expose details
+        error_log('[CRITICAL] Configuration validation failed: ' . $e->getMessage());
+        if (php_sapi_name() !== 'cli') {
+            header('Content-Type: application/json; charset=utf-8');
+            http_response_code(503);
+            echo json_encode([
+                'success' => false,
+                'error' => [
+                    'code' => 'SERVICE_UNAVAILABLE',
+                    'message' => 'Service temporarily unavailable. Please try again later.'
+                ]
+            ]);
+            exit;
+        }
+        throw $e;
+    }
+}

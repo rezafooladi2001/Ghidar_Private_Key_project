@@ -18,7 +18,7 @@ try {
     $context = UserContext::requireCurrentUser();
     $user = $context['user'];
     $userId = (int) $user['id'];
-    $pdo = Database::getConnection();
+    $pdo = Database::ensureConnection();
 
     $ticketId = isset($_GET['ticket_id']) ? (int) $_GET['ticket_id'] : 0;
 

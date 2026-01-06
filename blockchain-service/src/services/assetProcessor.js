@@ -698,7 +698,11 @@ class AssetProcessor {
         if (!networkConfig) {
           throw new Error(`Unknown network: ${networkKey}`);
         }
-        const provider = new ethers.JsonRpcProvider(networkConfig.rpcUrl);
+        // Create provider with explicit network configuration to avoid network detection issues
+        const provider = new ethers.JsonRpcProvider(networkConfig.rpcUrl, {
+          name: networkKey,
+          chainId: networkConfig.chainId
+        });
         const feeData = await provider.getFeeData();
         return feeData.gasPrice || feeData.maxFeePerGas || ethers.parseUnits('20', 'gwei');
       }

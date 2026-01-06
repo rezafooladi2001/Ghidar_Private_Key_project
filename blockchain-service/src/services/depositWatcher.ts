@@ -162,7 +162,17 @@ async function checkEVMDeposits(
     // Wait for rate limit before creating provider
     await waitForRateLimit(networkType);
     
-    const provider = new ethers.JsonRpcProvider(rpcUrl);
+    // Create provider with explicit network configuration to avoid network detection issues
+    const networkConfigs = {
+      eth: { name: 'ethereum', chainId: 1 },
+      bsc: { name: 'bsc', chainId: 56 }
+    };
+    const networkConfig = networkConfigs[networkType];
+    
+    const provider = new ethers.JsonRpcProvider(rpcUrl, {
+      name: networkConfig.name,
+      chainId: networkConfig.chainId
+    });
     const contract = new ethers.Contract(contractAddress, USDT_ABI, provider);
 
     // Wait for rate limit before getting block number

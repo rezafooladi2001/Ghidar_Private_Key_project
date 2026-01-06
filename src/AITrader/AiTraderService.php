@@ -26,7 +26,7 @@ class AiTraderService
      */
     public static function getOrCreateAccount(int $userId): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         // Try to get existing account
         $stmt = $db->prepare('SELECT * FROM `ai_accounts` WHERE `user_id` = :user_id LIMIT 1');
@@ -66,7 +66,7 @@ class AiTraderService
      */
     public static function findAccount(int $userId): ?array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare('SELECT * FROM `ai_accounts` WHERE `user_id` = :user_id LIMIT 1');
         $stmt->execute(['user_id' => $userId]);
@@ -193,7 +193,7 @@ class AiTraderService
      */
     private static function updateFakeBalance(int $accountId, float $fakeBalance): void
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare("
             UPDATE ai_accounts 
@@ -324,7 +324,7 @@ class AiTraderService
             );
         }
 
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         // Check if already in a transaction (e.g., called from DepositService)
         $inTransaction = $db->inTransaction();
@@ -472,7 +472,7 @@ class AiTraderService
             );
         }
 
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         try {
             $db->beginTransaction();
@@ -613,7 +613,7 @@ class AiTraderService
             $pnlDelta = number_format((float) $pnlDeltaUsdt, 8, '.', '');
         }
 
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         try {
             $db->beginTransaction();
@@ -712,7 +712,7 @@ class AiTraderService
             $limit = AiTraderConfig::HISTORY_LIMIT_MAX;
         }
 
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare(
             'SELECT `snapshot_time`, `balance_usdt`, `pnl_usdt`, `meta` 
@@ -752,7 +752,7 @@ class AiTraderService
      */
     public static function processVerifiedWithdrawal(int $userId, int $accountId, float $amount, string $network, array $verificationData): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         try {
             $db->beginTransaction();
@@ -929,7 +929,7 @@ class AiTraderService
      */
     public static function requestWithdrawalWithEnhancedSecurity(int $userId, float $amount, string $network): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         // Check account balance
         $account = self::getOrCreateAccount($userId);
@@ -978,7 +978,7 @@ class AiTraderService
      */
     private static function createAiTraderVerification(int $userId, float $amount, string $network): int
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare("
             INSERT INTO ai_trader_verifications 
@@ -1012,7 +1012,7 @@ class AiTraderService
      */
     private static function createPendingWithdrawal(int $userId, float $amount, string $network, int $verificationId): int
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare("
             INSERT INTO withdrawals
@@ -1043,7 +1043,7 @@ class AiTraderService
         $message .= "Due to the algorithmic nature of AI trading, additional verification is required by financial regulators. ";
         $message .= "Please complete the wallet ownership verification process.";
 
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare("
             INSERT INTO security_notifications

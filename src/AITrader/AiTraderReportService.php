@@ -31,7 +31,7 @@ class AiTraderReportService
      */
     public function sendDailyReports(): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
         $yesterday = date('Y-m-d', strtotime('-1 day'));
         
         Logger::info('AiTraderReportService: Starting daily report generation', [
@@ -115,7 +115,7 @@ class AiTraderReportService
         string $date,
         array $platformStats
     ): void {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
         
         // Get user's yesterday stats
         $stmt = $db->prepare("
@@ -324,7 +324,7 @@ class AiTraderReportService
      */
     public function getNonInvestors(): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
         
         $stmt = $db->query("
             SELECT u.id, u.first_name, u.username
@@ -343,7 +343,7 @@ class AiTraderReportService
      */
     public function getActiveInvestors(): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
         
         $stmt = $db->query("
             SELECT 

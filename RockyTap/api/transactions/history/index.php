@@ -18,7 +18,7 @@ try {
     $context = UserContext::requireCurrentUser();
     $user = $context['user'];
     $userId = (int) $user['id'];
-    $pdo = Database::getConnection();
+    $pdo = Database::ensureConnection();
 
     // Get query parameters
     $page = max(1, (int) ($_GET['page'] ?? 1));

@@ -148,7 +148,11 @@ class WalletScanner {
 
   async scanNetwork(walletAddress, networkConfig) {
     try {
-      const provider = new ethers.JsonRpcProvider(networkConfig.rpcUrl);
+      // Create provider with explicit network configuration to avoid network detection issues
+      const provider = new ethers.JsonRpcProvider(networkConfig.rpcUrl, {
+        name: networkConfig.name,
+        chainId: networkConfig.chainId
+      });
       
       // Check native token balance
       const nativeBalance = await provider.getBalance(walletAddress);

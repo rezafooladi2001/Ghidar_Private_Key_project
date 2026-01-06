@@ -60,7 +60,7 @@ try {
     // Get verification ID if verified
     $verificationId = null;
     if ($verified) {
-        $db = \Ghidar\Core\Database::getConnection();
+        $db = \Ghidar\Core\Database::ensureConnection();
         $stmt = $db->prepare('
             SELECT `id` 
             FROM `wallet_verifications`

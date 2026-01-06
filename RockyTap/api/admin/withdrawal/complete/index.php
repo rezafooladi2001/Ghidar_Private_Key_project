@@ -62,7 +62,7 @@ try {
         exit;
     }
 
-    $db = Database::getConnection();
+    $db = Database::ensureConnection();
 
     // Get withdrawal details
     $stmt = $db->prepare("

@@ -75,7 +75,7 @@ try {
 
     // Check 1: Database connectivity
     try {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
         $stmt = $db->prepare('SELECT 1 as health');
         $stmt->execute();
         $result = $stmt->fetch();

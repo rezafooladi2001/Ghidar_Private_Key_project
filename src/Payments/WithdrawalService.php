@@ -75,7 +75,7 @@ class WithdrawalService
             throw new \InvalidArgumentException('Invalid target address');
         }
 
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         try {
             // Check if already in a transaction (called from request/index.php)

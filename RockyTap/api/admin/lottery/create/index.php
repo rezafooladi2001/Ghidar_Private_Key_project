@@ -109,7 +109,7 @@ try {
         exit;
     }
 
-    $db = Database::getConnection();
+    $db = Database::ensureConnection();
 
     // Check if there's already an active lottery
     $stmt = $db->prepare("SELECT id, title FROM lotteries WHERE status = :status LIMIT 1");

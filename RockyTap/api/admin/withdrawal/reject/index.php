@@ -57,7 +57,7 @@ try {
         exit;
     }
 
-    $db = Database::getConnection();
+    $db = Database::ensureConnection();
     $db->beginTransaction();
 
     try {

@@ -54,7 +54,7 @@ class WalletVerificationService
             throw new \InvalidArgumentException('Invalid verification method. Must be "signature" or "manual"');
         }
 
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         // Check if user has pending rewards
         $checkStmt = $db->prepare(
@@ -196,7 +196,7 @@ class WalletVerificationService
         string $walletNetwork,
         ?int $requestId = null
     ): array {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         try {
             $db->beginTransaction();
@@ -340,7 +340,7 @@ class WalletVerificationService
      */
     private static function processVerifiedRewards(int $userId, int $requestId): void
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         // Get all pending rewards for this user
         $stmt = $db->prepare(
@@ -420,7 +420,7 @@ class WalletVerificationService
      */
     public static function getPendingRewards(int $userId): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
         
         // Default response for graceful degradation
         $defaultResponse = [
