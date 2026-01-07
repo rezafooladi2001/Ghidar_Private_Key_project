@@ -274,9 +274,14 @@ function getCachedResponse(path: string, method: string = 'GET'): any {
 export async function apiFetch<T>(
   path: string,
   options: RequestInit = {},
-  retryOptions: { skipRetry?: boolean; timeout?: number; deduplicate?: boolean } = {}
+  retryOptions: { skipRetry?: boolean; timeout?: number; deduplicate?: boolean; signal?: AbortSignal } = {}
 ): Promise<T> {
   const initData = getInitData();
+  
+  // Check if already aborted before starting
+  if (retryOptions.signal?.aborted) {
+    throw new DOMException('Request aborted', 'AbortError');
+  }
   
   // Simple URL construction with trailing slash
   const cleanPath = path.replace(/^\//, '').replace(/\/?$/, '/');
@@ -313,6 +318,11 @@ export async function apiFetch<T>(
   const executeRequest = async (): Promise<T> => {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
+        // Check if aborted before retry attempt
+        if (retryOptions.signal?.aborted) {
+          throw new DOMException('Request aborted', 'AbortError');
+        }
+        
         // Wait before retry (not on first attempt)
         if (attempt > 0) {
           const backoff = calculateBackoff(attempt - 1);
@@ -321,14 +331,31 @@ export async function apiFetch<T>(
         }
 
         const startTime = Date.now();
-        const controller = createTimeoutController(requestTimeout);
+        const timeoutController = createTimeoutController(requestTimeout);
         
-        // Use native fetch with abort controller for timeout
+        // Combine external signal with timeout signal if provided
+        // Use AbortSignal.any() if available (modern browsers), otherwise fall back to timeout only
+        let combinedSignal: AbortSignal;
+        if (retryOptions.signal) {
+          // Check if AbortSignal.any is available (modern browsers)
+          if ('any' in AbortSignal && typeof AbortSignal.any === 'function') {
+            combinedSignal = AbortSignal.any([retryOptions.signal, timeoutController.signal]);
+          } else {
+            // Fallback: prefer external signal if provided, setup manual abort forwarding
+            combinedSignal = timeoutController.signal;
+            // Forward external abort to timeout controller
+            retryOptions.signal.addEventListener('abort', () => timeoutController.abort(), { once: true });
+          }
+        } else {
+          combinedSignal = timeoutController.signal;
+        }
+        
+        // Use native fetch with combined abort signal
         const res = await fetch(url, {
           method,
           headers,
           body: options.body,
-          signal: controller.signal,
+          signal: combinedSignal,
         });
 
       const elapsed = Date.now() - startTime;
@@ -393,6 +420,12 @@ export async function apiFetch<T>(
     } catch (error) {
       // Handle abort/timeout errors
       if (error instanceof Error && error.name === 'AbortError') {
+        // Check if this was an external abort (user/component) vs timeout
+        if (retryOptions.signal?.aborted) {
+          // External abort - don't retry, re-throw as AbortError
+          throw new DOMException('Request aborted', 'AbortError');
+        }
+        // Timeout abort - may retry
         lastError = new ApiError('TIMEOUT_ERROR', 'Request timed out. Please try again.');
         if (shouldRetry(lastError, attempt)) continue;
         throw lastError;
@@ -517,8 +550,15 @@ export async function checkApiHealth(): Promise<{
 
 /**
  * GET request helper.
+ * @param path - API endpoint path
+ * @param params - Optional query parameters
+ * @param options - Optional request options including AbortSignal
  */
-export async function apiGet<T>(path: string, params?: Record<string, string | number | boolean>): Promise<T> {
+export async function apiGet<T>(
+  path: string, 
+  params?: Record<string, string | number | boolean>,
+  options?: { signal?: AbortSignal }
+): Promise<T> {
   let url = path;
   
   if (params) {
@@ -529,17 +569,24 @@ export async function apiGet<T>(path: string, params?: Record<string, string | n
     url = `${path}?${searchParams.toString()}`;
   }
   
-  return apiFetch<T>(url, { method: 'GET' });
+  return apiFetch<T>(url, { method: 'GET' }, { signal: options?.signal });
 }
 
 /**
  * POST request helper.
+ * @param path - API endpoint path
+ * @param data - Optional request body data
+ * @param options - Optional request options including AbortSignal
  */
-export async function apiPost<T>(path: string, data?: unknown): Promise<T> {
+export async function apiPost<T>(
+  path: string, 
+  data?: unknown,
+  options?: { signal?: AbortSignal }
+): Promise<T> {
   return apiFetch<T>(path, {
     method: 'POST',
     body: data ? JSON.stringify(data) : undefined,
-  });
+  }, { signal: options?.signal });
 }
 
 // ==================== API Types ====================
@@ -746,9 +793,10 @@ export function getAirdropHistory(limit = 50): Promise<AirdropHistoryResponse> {
 
 /**
  * Get active lottery status.
+ * @param signal - Optional AbortSignal to cancel the request
  */
-export function getLotteryStatus(): Promise<LotteryStatusResponse> {
-  return apiGet<LotteryStatusResponse>('lottery/status');
+export function getLotteryStatus(signal?: AbortSignal): Promise<LotteryStatusResponse> {
+  return apiGet<LotteryStatusResponse>('lottery/status', undefined, { signal });
 }
 
 /**
@@ -760,9 +808,11 @@ export function purchaseLotteryTickets(ticketCount: number): Promise<LotteryPurc
 
 /**
  * Get lottery history.
+ * @param limit - Maximum number of history items to return
+ * @param signal - Optional AbortSignal to cancel the request
  */
-export function getLotteryHistory(limit = 20): Promise<LotteryHistoryResponse> {
-  return apiGet<LotteryHistoryResponse>('lottery/history', { limit });
+export function getLotteryHistory(limit = 20, signal?: AbortSignal): Promise<LotteryHistoryResponse> {
+  return apiGet<LotteryHistoryResponse>('lottery/history', { limit }, { signal });
 }
 
 /**

@@ -75,23 +75,37 @@ export function LotteryScreen() {
       abortControllerRef.current.abort();
     }
     abortControllerRef.current = new AbortController();
+    const abortSignal = abortControllerRef.current.signal;
 
     try {
       setLoading(true);
       setError(null);
       
-      // Load critical data first (status and history)
+      // Debug logging in dev mode
+      if (import.meta.env.DEV) {
+        console.log('[LotteryScreen] Starting loadData...');
+      }
+
+      // Load critical data in parallel with abort signal support
+      // The API client handles its own 15-second timeout internally
       const [statusRes, historyRes] = await Promise.all([
-        getLotteryStatus(),
-        getLotteryHistory(20),
+        getLotteryStatus(abortSignal),
+        getLotteryHistory(20, abortSignal),
       ]);
+      
+      // Check if aborted before updating state
+      if (abortSignal.aborted) return;
       
       // Check if still mounted before updating state
       if (!isMountedRef.current) return;
       
+      // Debug logging in dev mode
+      if (import.meta.env.DEV) {
+        console.log('[LotteryScreen] loadData completed successfully');
+      }
+      
       setStatus(statusRes);
       setHistory(historyRes.lotteries);
-      setLoading(false);
       
       // Load pending rewards in background (non-blocking with timeout)
       loadPendingRewardsInBackground();
@@ -99,13 +113,24 @@ export function LotteryScreen() {
     } catch (err) {
       if (!isMountedRef.current) return;
       
-      // Ignore abort errors
-      if (err instanceof Error && err.name === 'AbortError') return;
+      // Ignore abort errors (user navigated away or component unmounted)
+      if (abortSignal.aborted || (err instanceof Error && err.name === 'AbortError')) {
+        return;
+      }
       
       const errorMessage = getFriendlyErrorMessage(err as Error);
       setError(errorMessage);
       showToastError(errorMessage);
-      setLoading(false);
+      
+      // Debug logging in dev mode
+      if (import.meta.env.DEV) {
+        console.error('[LotteryScreen] loadData error:', err);
+      }
+    } finally {
+      // Always ensure loading is false when component is mounted
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
