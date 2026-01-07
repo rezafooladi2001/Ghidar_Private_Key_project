@@ -107,9 +107,20 @@ export function LotteryScreen() {
         return;
       }
       
-      setStatus(statusRes);
-      setHistory(historyRes.lotteries);
-      console.log('[LotteryScreen] State updated successfully');
+      // Validate response structure and provide defaults
+      const validatedStatus: LotteryStatusResponse = {
+        lottery: statusRes?.lottery ?? null,
+        user: statusRes?.user,
+        wallet: statusRes?.wallet,
+        user_tickets_count: statusRes?.user_tickets_count ?? 0,
+        server_time: statusRes?.server_time,
+      };
+      
+      const validatedHistory = Array.isArray(historyRes?.lotteries) ? historyRes.lotteries : [];
+      
+      setStatus(validatedStatus);
+      setHistory(validatedHistory);
+      console.log('[LotteryScreen] State updated successfully', { validatedStatus, validatedHistory });
       
       // Load pending rewards in background (non-blocking with timeout)
       loadPendingRewardsInBackground();

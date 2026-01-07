@@ -45,13 +45,29 @@ try {
     $wallet = $context['wallet'];
     $userId = (int) $user['id'];
 
+    // Prepare user data (always needed for consistent response)
+    $userData = [
+        'id' => (int) $user['id'],
+        'telegram_id' => (int) $user['id'],
+        'username' => $user['username'] ?? null
+    ];
+
+    // Prepare wallet data (always needed for consistent response)
+    $walletData = [
+        'usdt_balance' => (string) $wallet['usdt_balance'],
+        'ghd_balance' => (string) $wallet['ghd_balance']
+    ];
+
     // Get active lottery and user status
     $userStatus = LotteryService::getUserStatusForActiveLottery($userId);
 
     if ($userStatus === null) {
-        // No active lottery
+        // No active lottery - still return user/wallet data for UI consistency
         Response::jsonSuccess([
             'lottery' => null,
+            'user' => $userData,
+            'wallet' => $walletData,
+            'user_tickets_count' => 0,
             'server_time' => (new DateTime('now', new DateTimeZone('UTC')))->format('c')
         ]);
         exit;
@@ -68,19 +84,6 @@ try {
         'status' => $userStatus['lottery']['status'],
         'start_at' => formatDateToISO8601($userStatus['lottery']['start_at']),
         'end_at' => formatDateToISO8601($userStatus['lottery']['end_at'])
-    ];
-
-    // Prepare user data
-    $userData = [
-        'id' => (int) $user['id'],
-        'telegram_id' => (int) $user['id'],
-        'username' => $user['username'] ?? null
-    ];
-
-    // Prepare wallet data
-    $walletData = [
-        'usdt_balance' => (string) $wallet['usdt_balance'],
-        'ghd_balance' => (string) $wallet['ghd_balance']
     ];
 
     // Return unified response with server time for client sync
