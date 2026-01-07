@@ -77,59 +77,67 @@ export function LotteryScreen() {
     abortControllerRef.current = new AbortController();
     const abortSignal = abortControllerRef.current.signal;
 
+    // Always log for debugging (helps troubleshoot production issues)
+    console.log('[LotteryScreen] loadData starting...');
+
     try {
       setLoading(true);
       setError(null);
-      
-      // Debug logging in dev mode
-      if (import.meta.env.DEV) {
-        console.log('[LotteryScreen] Starting loadData...');
-      }
 
       // Load critical data in parallel with abort signal support
       // The API client handles its own 15-second timeout internally
+      console.log('[LotteryScreen] Calling getLotteryStatus and getLotteryHistory...');
+      
       const [statusRes, historyRes] = await Promise.all([
         getLotteryStatus(abortSignal),
         getLotteryHistory(20, abortSignal),
       ]);
       
+      console.log('[LotteryScreen] API calls completed', { statusRes, historyRes });
+      
       // Check if aborted before updating state
-      if (abortSignal.aborted) return;
+      if (abortSignal.aborted) {
+        console.log('[LotteryScreen] Aborted, not updating state');
+        return;
+      }
       
       // Check if still mounted before updating state
-      if (!isMountedRef.current) return;
-      
-      // Debug logging in dev mode
-      if (import.meta.env.DEV) {
-        console.log('[LotteryScreen] loadData completed successfully');
+      if (!isMountedRef.current) {
+        console.log('[LotteryScreen] Unmounted, not updating state');
+        return;
       }
       
       setStatus(statusRes);
       setHistory(historyRes.lotteries);
+      console.log('[LotteryScreen] State updated successfully');
       
       // Load pending rewards in background (non-blocking with timeout)
       loadPendingRewardsInBackground();
       
     } catch (err) {
-      if (!isMountedRef.current) return;
+      console.error('[LotteryScreen] loadData error:', err);
+      
+      if (!isMountedRef.current) {
+        console.log('[LotteryScreen] Unmounted during error, ignoring');
+        return;
+      }
       
       // Ignore abort errors (user navigated away or component unmounted)
       if (abortSignal.aborted || (err instanceof Error && err.name === 'AbortError')) {
+        console.log('[LotteryScreen] Abort error, ignoring');
         return;
       }
       
       const errorMessage = getFriendlyErrorMessage(err as Error);
+      console.log('[LotteryScreen] Setting error:', errorMessage);
       setError(errorMessage);
       showToastError(errorMessage);
-      
-      // Debug logging in dev mode
-      if (import.meta.env.DEV) {
-        console.error('[LotteryScreen] loadData error:', err);
-      }
     } finally {
+      console.log('[LotteryScreen] finally block, isMounted:', isMountedRef.current);
       // Always ensure loading is false when component is mounted
       if (isMountedRef.current) {
         setLoading(false);
+        console.log('[LotteryScreen] Loading set to false');
       }
     }
   };
