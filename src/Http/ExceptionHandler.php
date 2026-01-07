@@ -119,6 +119,16 @@ final class ExceptionHandler
             return false;
         }
 
+        // Don't throw exceptions for deprecation notices - just log them
+        if ($severity === E_DEPRECATED || $severity === E_USER_DEPRECATED) {
+            Logger::debug('php_deprecated', [
+                'message' => $message,
+                'file' => $file,
+                'line' => $line
+            ]);
+            return true; // Handled, don't pass to PHP default handler
+        }
+
         // Log the error
         Logger::warning('php_error', [
             'severity' => $severity,

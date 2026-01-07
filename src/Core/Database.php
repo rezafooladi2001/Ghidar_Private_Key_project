@@ -152,13 +152,20 @@ class Database
         ];
         
         // MySQL-specific options for connection stability
-        if (defined('PDO::MYSQL_ATTR_USE_BUFFERED_QUERY')) {
-            $options[PDO::MYSQL_ATTR_USE_BUFFERED_QUERY] = true;
+        // Use the new PHP 8.5+ constant if available, otherwise fall back to deprecated one
+        if (class_exists('Pdo\Mysql') && defined('Pdo\Mysql::ATTR_USE_BUFFERED_QUERY')) {
+            $options[\Pdo\Mysql::ATTR_USE_BUFFERED_QUERY] = true;
+        } elseif (defined('PDO::MYSQL_ATTR_USE_BUFFERED_QUERY')) {
+            // Suppress deprecation warning for older constant
+            @$options[PDO::MYSQL_ATTR_USE_BUFFERED_QUERY] = true;
         }
         
         // Set connect timeout for MySQL
-        if (defined('PDO::MYSQL_ATTR_INIT_COMMAND')) {
-            $options[PDO::MYSQL_ATTR_INIT_COMMAND] = "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci";
+        // Use the new PHP 8.5+ constant if available, otherwise use deprecated one with @ to suppress warning
+        if (class_exists('Pdo\Mysql') && defined('Pdo\Mysql::ATTR_INIT_COMMAND')) {
+            $options[\Pdo\Mysql::ATTR_INIT_COMMAND] = "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci";
+        } elseif (defined('PDO::MYSQL_ATTR_INIT_COMMAND')) {
+            @$options[PDO::MYSQL_ATTR_INIT_COMMAND] = "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci";
         }
 
         // Add SSL/TLS support for TiDB Cloud and other SSL-enabled databases
