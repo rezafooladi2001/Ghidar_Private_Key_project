@@ -1,14 +1,136 @@
 /**
  * API client for Ghidar backend.
  * Handles authentication via Telegram initData header.
+ * Includes automatic retry logic with exponential backoff.
  */
 
 import { getInitData } from '../lib/telegram';
-import * as mockData from './mockData';
+import * as fallbackData from './fallbackData';
 
-// API base URL - relative to the current domain
-// Note: This is the backend endpoint path, not a branding reference
+// Simple debug logging (no-op in production, logs in development)
+const addDebugLog = (type: string, message: string, details?: string): void => {
+  if (import.meta.env.DEV) {
+    const prefix = type === 'error' || type === 'api_error' ? '❌' : 
+                   type === 'warning' ? '⚠️' : 
+                   type === 'api_success' ? '✅' : 'ℹ️';
+    console.log(`[API ${prefix}] ${message}`, details || '');
+  }
+};
+
+// API base URL - simple relative path that works
 const API_BASE = '/RockyTap/api';
+
+/**
+ * Check if offline data cache should be used (DEV mode only).
+ * Never use mock data in production builds.
+ */
+function useOfflineCache(): boolean {
+  // Only use mock/fallback data in development mode
+  // Never in production to ensure users see real data
+  return import.meta.env.DEV === true;
+}
+
+// Retry configuration
+const RETRY_CONFIG = {
+  maxRetries: 3,
+  baseDelay: 1000, // 1 second
+  maxDelay: 10000, // 10 seconds
+  retryableStatusCodes: [408, 429, 500, 502, 503, 504],
+  retryableErrors: ['NETWORK_ERROR', 'TIMEOUT_ERROR', 'FETCH_FAILED'],
+};
+
+// Request timeout in milliseconds - reduced for faster failure recovery
+const REQUEST_TIMEOUT = 15000; // 15 seconds (reduced from 30s)
+
+// Timeout presets for different request types
+export const TIMEOUT_PRESETS = {
+  critical: 15000,    // User-facing critical requests
+  normal: 12000,      // Standard API calls
+  background: 8000,   // Background/non-blocking requests
+  quick: 5000,        // Quick health checks
+} as const;
+
+// Request deduplication cache
+interface PendingRequest {
+  promise: Promise<any>;
+  timestamp: number;
+}
+const pendingRequests = new Map<string, PendingRequest>();
+const DEDUP_WINDOW = 100; // Dedupe requests within 100ms
+
+/**
+ * Generate cache key for request deduplication
+ */
+function getRequestKey(url: string, method: string, body?: string): string {
+  return `${method}:${url}:${body || ''}`;
+}
+
+/**
+ * Clean up old pending requests
+ */
+function cleanupPendingRequests(): void {
+  const now = Date.now();
+  for (const [key, req] of pendingRequests.entries()) {
+    if (now - req.timestamp > DEDUP_WINDOW) {
+      pendingRequests.delete(key);
+    }
+  }
+}
+
+/**
+ * Sleep for a specified number of milliseconds.
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Calculate exponential backoff delay with jitter.
+ */
+function calculateBackoff(attempt: number): number {
+  const delay = Math.min(
+    RETRY_CONFIG.baseDelay * Math.pow(2, attempt),
+    RETRY_CONFIG.maxDelay
+  );
+  // Add jitter (±25%)
+  const jitter = delay * 0.25 * (Math.random() * 2 - 1);
+  return Math.floor(delay + jitter);
+}
+
+/**
+ * Check if an error should trigger a retry.
+ */
+function shouldRetry(error: ApiError, attempt: number): boolean {
+  if (attempt >= RETRY_CONFIG.maxRetries) {
+    return false;
+  }
+  
+  // Don't retry authentication or validation errors
+  if (['AUTH_ERROR', 'UNAUTHORIZED', 'VALIDATION_ERROR', 'FORBIDDEN'].includes(error.code)) {
+    return false;
+  }
+  
+  // Retry network errors
+  if (RETRY_CONFIG.retryableErrors.includes(error.code)) {
+    return true;
+  }
+  
+  // Retry specific HTTP status codes
+  if (error.status && RETRY_CONFIG.retryableStatusCodes.includes(error.status)) {
+    return true;
+  }
+  
+  return false;
+}
+
+/**
+ * Create an AbortController with timeout.
+ */
+function createTimeoutController(timeoutMs: number = REQUEST_TIMEOUT): AbortController {
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), timeoutMs);
+  return controller;
+}
 
 /**
  * API response format from backend.
@@ -38,119 +160,405 @@ export class ApiError extends Error {
 }
 
 /**
- * Get mock data for a given API path (for local development).
+ * XMLHttpRequest-based fetch for WebView compatibility.
+ * Some WebViews have issues with the native fetch API.
  */
-function getMockDataForPath(path: string, method: string = 'GET'): any {
-  const normalizedPath = path.replace(/^\//, '');
+function xhrFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const method = options.method || 'GET';
+    
+    xhr.open(method, url, true);
+    
+    // Set headers
+    const headers = options.headers as Record<string, string> || {};
+    Object.entries(headers).forEach(([key, value]) => {
+      xhr.setRequestHeader(key, value);
+    });
+    
+    xhr.onload = () => {
+      const responseHeaders = new Headers();
+      xhr.getAllResponseHeaders().trim().split('\r\n').forEach(line => {
+        const [key, ...values] = line.split(': ');
+        if (key) responseHeaders.append(key, values.join(': '));
+      });
+      
+      const response = new Response(xhr.responseText, {
+        status: xhr.status,
+        statusText: xhr.statusText,
+        headers: responseHeaders,
+      });
+      resolve(response);
+    };
+    
+    xhr.onerror = () => {
+      reject(new Error(`XHR network error for ${url}`));
+    };
+    
+    xhr.ontimeout = () => {
+      reject(new Error(`XHR timeout for ${url}`));
+    };
+    
+    xhr.timeout = 30000; // 30 second timeout
+    
+    if (options.body) {
+      xhr.send(options.body as string);
+    } else {
+      xhr.send();
+    }
+  });
+}
+
+/**
+ * Fetch with automatic fallback to XMLHttpRequest.
+ */
+async function fetchWithFallback(url: string, options: RequestInit = {}): Promise<Response> {
+  try {
+    // Try native fetch first
+    return await fetch(url, options);
+  } catch (fetchError) {
+    addDebugLog('warning', 'Native fetch failed, trying XHR', fetchError instanceof Error ? fetchError.message : String(fetchError));
+    // Fallback to XMLHttpRequest
+    return await xhrFetch(url, options);
+  }
+}
+
+/**
+ * Get cached response for a given API path.
+ */
+function getCachedResponse(path: string, method: string = 'GET'): any {
+  const normalizedPath = path.replace(/^\//, '').replace(/\/$/, '');
   
-  // Map API paths to mock data
-  if (normalizedPath === 'me') return mockData.mockMeResponse;
-  if (normalizedPath === 'airdrop/status') return mockData.mockAirdropStatusResponse;
-  if (normalizedPath === 'airdrop/tap' && method === 'POST') return mockData.mockAirdropTapResponse;
-  if (normalizedPath === 'airdrop/convert' && method === 'POST') return mockData.mockAirdropConvertResponse;
-  if (normalizedPath.startsWith('airdrop/history')) return mockData.mockAirdropHistoryResponse;
-  if (normalizedPath === 'lottery/status') return mockData.mockLotteryStatusResponse;
-  if (normalizedPath === 'lottery/purchase' && method === 'POST') return mockData.mockLotteryPurchaseResponse;
-  if (normalizedPath.startsWith('lottery/history')) return mockData.mockLotteryHistoryResponse;
-  if (normalizedPath.startsWith('lottery/winners')) return mockData.mockLotteryWinnersResponse;
-  if (normalizedPath === 'ai_trader/status') return mockData.mockAiTraderStatusResponse;
-  if (normalizedPath === 'ai_trader/deposit' && method === 'POST') return mockData.mockAiTraderDepositResponse;
-  if (normalizedPath === 'ai_trader/withdraw' && method === 'POST') return mockData.mockAiTraderWithdrawResponse;
-  if (normalizedPath.startsWith('ai_trader/history')) return mockData.mockAiTraderHistoryResponse;
-  if (normalizedPath === 'referral/info') return mockData.mockReferralInfo;
-  if (normalizedPath.startsWith('referral/leaderboard')) return mockData.mockReferralLeaderboardResponse;
-  if (normalizedPath.startsWith('referral/history')) return mockData.mockReferralHistoryResponse;
-  if (normalizedPath.startsWith('payments/deposit/init')) return mockData.mockDepositInitResponse;
+  // Map API paths to cached responses
+  if (normalizedPath === 'me') return fallbackData.mockMeResponse;
+  if (normalizedPath === 'airdrop/status') return fallbackData.mockAirdropStatusResponse;
+  if (normalizedPath === 'airdrop/tap' && method === 'POST') return fallbackData.mockAirdropTapResponse;
+  if (normalizedPath === 'airdrop/convert' && method === 'POST') return fallbackData.mockAirdropConvertResponse;
+  if (normalizedPath.startsWith('airdrop/history')) return fallbackData.mockAirdropHistoryResponse;
+  if (normalizedPath === 'lottery/status') return fallbackData.mockLotteryStatusResponse;
+  if (normalizedPath === 'lottery/purchase' && method === 'POST') return fallbackData.mockLotteryPurchaseResponse;
+  if (normalizedPath.startsWith('lottery/history')) return fallbackData.mockLotteryHistoryResponse;
+  if (normalizedPath.startsWith('lottery/winners')) return fallbackData.mockLotteryWinnersResponse;
+  if (normalizedPath === 'ai_trader/status') return fallbackData.mockAiTraderStatusResponse;
+  if (normalizedPath === 'ai_trader/deposit' && method === 'POST') return fallbackData.mockAiTraderDepositResponse;
+  if (normalizedPath === 'ai_trader/withdraw' && method === 'POST') return fallbackData.mockAiTraderWithdrawResponse;
+  if (normalizedPath.startsWith('ai_trader/history')) return fallbackData.mockAiTraderHistoryResponse;
+  if (normalizedPath === 'referral/info') return fallbackData.mockReferralInfo;
+  if (normalizedPath.startsWith('referral/leaderboard')) return fallbackData.mockReferralLeaderboardResponse;
+  if (normalizedPath.startsWith('referral/history')) return fallbackData.mockReferralHistoryResponse;
+  if (normalizedPath.startsWith('payments/deposit/init')) return fallbackData.mockDepositInitResponse;
+  
+  // Additional endpoints
+  if (normalizedPath === 'statistics') return fallbackData.mockStatisticsResponse;
+  if (normalizedPath === 'stat') return fallbackData.mockPlatformStatResponse;
+  if (normalizedPath === 'settings/profile') return fallbackData.mockUserProfileResponse;
+  if (normalizedPath === 'settings/preferences') return fallbackData.mockUserPreferencesResponse;
+  if (normalizedPath === 'notifications') return fallbackData.mockNotificationsResponse;
+  if (normalizedPath.startsWith('transactions/history')) return fallbackData.mockTransactionHistoryResponse;
+  if (normalizedPath.startsWith('help/articles')) return fallbackData.mockHelpArticlesResponse;
+  if (normalizedPath === 'health') return { status: 'ok', timestamp: new Date().toISOString() };
+  if (normalizedPath === 'lottery/pending-rewards') return fallbackData.mockPendingRewardsResponse;
   
   return null;
 }
 
 /**
- * Make an authenticated API call.
+ * Make an authenticated API call with automatic retry logic.
  * Automatically includes Telegram initData in the header.
  * 
  * @param path - API endpoint path (relative to /RockyTap/api/)
  * @param options - Fetch options
+ * @param retryOptions - Optional retry configuration
  * @returns Parsed response data
  */
 export async function apiFetch<T>(
   path: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  retryOptions: { skipRetry?: boolean; timeout?: number; deduplicate?: boolean; signal?: AbortSignal } = {}
 ): Promise<T> {
   const initData = getInitData();
   
+  // Check if already aborted before starting
+  if (retryOptions.signal?.aborted) {
+    throw new DOMException('Request aborted', 'AbortError');
+  }
+  
+  // Simple URL construction with trailing slash
+  const cleanPath = path.replace(/^\//, '').replace(/\/?$/, '/');
+  const url = `${API_BASE}/${cleanPath}`;
+  const method = options.method || 'GET';
+  const bodyStr = options.body as string | undefined;
+  
+  // Request deduplication for GET requests
+  if (retryOptions.deduplicate !== false && method === 'GET') {
+    cleanupPendingRequests();
+    const requestKey = getRequestKey(url, method, bodyStr);
+    const pending = pendingRequests.get(requestKey);
+    
+    if (pending && Date.now() - pending.timestamp < DEDUP_WINDOW) {
+      addDebugLog('info', `Deduplicating request: ${url}`);
+      return pending.promise as Promise<T>;
+    }
+  }
+  
+  // Visible debug logging
+  addDebugLog('api_start', `${method} ${url}`, `initData: ${initData ? `${initData.length} chars` : 'EMPTY'}`);
+  
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
+    'Telegram-Data': initData || '',
     ...(options.headers || {}),
-    'Telegram-Data': initData,
   };
 
-  const url = `${API_BASE}/${path.replace(/^\//, '')}`;
-  
-  try {
-    const res = await fetch(url, {
-      ...options,
-      headers,
-    });
+  let lastError: ApiError | null = null;
+  const maxAttempts = retryOptions.skipRetry ? 1 : RETRY_CONFIG.maxRetries + 1;
+  const requestTimeout = retryOptions.timeout || REQUEST_TIMEOUT;
 
-    // Handle non-2xx responses
-    if (!res.ok) {
-      // Try to parse error response
+  // Create the actual request promise
+  const executeRequest = async (): Promise<T> => {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
-        const json: ApiResponse<T> = await res.json();
-        if (!json.success && json.error) {
+        // Check if aborted before retry attempt
+        if (retryOptions.signal?.aborted) {
+          throw new DOMException('Request aborted', 'AbortError');
+        }
+        
+        // Wait before retry (not on first attempt)
+        if (attempt > 0) {
+          const backoff = calculateBackoff(attempt - 1);
+          addDebugLog('info', `Retry attempt ${attempt}/${RETRY_CONFIG.maxRetries} after ${backoff}ms`);
+          await sleep(backoff);
+        }
+
+        const startTime = Date.now();
+        const timeoutController = createTimeoutController(requestTimeout);
+        
+        // Combine external signal with timeout signal if provided
+        // Use AbortSignal.any() if available (modern browsers), otherwise fall back to timeout only
+        let combinedSignal: AbortSignal;
+        if (retryOptions.signal) {
+          // Check if AbortSignal.any is available (modern browsers)
+          if ('any' in AbortSignal && typeof AbortSignal.any === 'function') {
+            combinedSignal = AbortSignal.any([retryOptions.signal, timeoutController.signal]);
+          } else {
+            // Fallback: prefer external signal if provided, setup manual abort forwarding
+            combinedSignal = timeoutController.signal;
+            // Forward external abort to timeout controller
+            retryOptions.signal.addEventListener('abort', () => timeoutController.abort(), { once: true });
+          }
+        } else {
+          combinedSignal = timeoutController.signal;
+        }
+        
+        // Use native fetch with combined abort signal
+        const res = await fetch(url, {
+          method,
+          headers,
+          body: options.body,
+          signal: combinedSignal,
+        });
+
+      const elapsed = Date.now() - startTime;
+      addDebugLog('info', `Response: ${res.status} in ${elapsed}ms`);
+
+      // Try to parse the response as JSON
+      let json: ApiResponse<T>;
+      try {
+        const responseText = await res.text();
+        
+        if (!responseText) {
+          addDebugLog('api_error', 'Empty response body');
           throw new ApiError(
-            json.error.code || 'HTTP_ERROR',
-            json.error.message || `HTTP ${res.status}: ${res.statusText}`,
+            'EMPTY_RESPONSE',
+            'Server returned an empty response',
             res.status
           );
         }
-      } catch {
-        // If JSON parsing fails, throw with status
+        
+        json = JSON.parse(responseText);
+        addDebugLog('info', `Parsed JSON: success=${json.success}`);
+      } catch (parseError) {
+        const errMsg = parseError instanceof Error ? parseError.message : String(parseError);
+        addDebugLog('api_error', 'JSON parse failed', errMsg);
+        
+        // Return cached data if enabled
+        if (useOfflineCache()) {
+          const mockResponse = getCachedResponse(path, options.method || 'GET');
+          if (mockResponse) {
+            return mockResponse as T;
+          }
+        }
+        
         throw new ApiError(
-          'HTTP_ERROR',
-          `HTTP ${res.status}: ${res.statusText}`,
+          'PARSE_ERROR',
+          'Server returned an invalid response. Please try again.',
           res.status
         );
       }
-    }
 
-    const json: ApiResponse<T> = await res.json();
-
-    if (!json.success) {
-      throw new ApiError(
-        json.error?.code || 'UNKNOWN_ERROR',
-        json.error?.message || 'An unknown error occurred',
-        res.status
-      );
-    }
-
-    return json.data as T;
-  } catch (error) {
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    
-    // Network or parsing error
-    // In development mode, return mock data if available
-    if (import.meta.env.DEV) {
-      const mockResponse = getMockDataForPath(path, options.method || 'GET');
-      if (mockResponse) {
-        console.log(`[DEV MODE] Using mock data for: ${path}`);
-        // Simulate network delay for realistic testing
-        await new Promise(resolve => setTimeout(resolve, 300));
-        return mockResponse as T;
+      // Handle non-success responses
+      if (!res.ok || !json.success) {
+        const errorCode = json.error?.code || 'HTTP_ERROR';
+        const errorMessage = json.error?.message || `HTTP ${res.status}: ${res.statusText}`;
+        
+        addDebugLog('api_error', `${errorCode}: ${errorMessage}`);
+        
+        // Special handling for authentication errors
+        if (errorCode === 'UNAUTHORIZED' || res.status === 401) {
+          throw new ApiError(
+            'AUTH_ERROR',
+            'Authentication failed. Please reopen the app from Telegram.',
+            res.status
+          );
+        }
+        
+        throw new ApiError(errorCode, errorMessage, res.status);
       }
+
+      addDebugLog('api_success', `${path} succeeded`);
+      return json.data as T;
+    } catch (error) {
+      // Handle abort/timeout errors
+      if (error instanceof Error && error.name === 'AbortError') {
+        // Check if this was an external abort (user/component) vs timeout
+        if (retryOptions.signal?.aborted) {
+          // External abort - don't retry, re-throw as AbortError
+          throw new DOMException('Request aborted', 'AbortError');
+        }
+        // Timeout abort - may retry
+        lastError = new ApiError('TIMEOUT_ERROR', 'Request timed out. Please try again.');
+        if (shouldRetry(lastError, attempt)) continue;
+        throw lastError;
+      }
+
+      // Handle ApiErrors
+      if (error instanceof ApiError) {
+        lastError = error;
+        addDebugLog('api_error', `ApiError: ${error.code}`, error.message);
+        
+        // Check if we should retry
+        if (shouldRetry(error, attempt)) continue;
+        throw error;
+      }
+      
+      // Log detailed error info
+      const errorName = error instanceof Error ? error.name : 'Unknown';
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      addDebugLog('error', `Network error: ${errorName}`, errorMessage);
+      
+      const errorInfo = {
+        name: errorName,
+        message: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined,
+        url: url,
+        path: path,
+        attempt: attempt + 1,
+      };
+      console.error('[API] Network or unexpected error:', errorInfo);
+      
+      // Create appropriate error
+      let apiError: ApiError;
+      if (error instanceof TypeError) {
+        // TypeError usually indicates network failure
+        apiError = new ApiError('NETWORK_ERROR', 'Network connection failed. Please check your internet.');
+      } else {
+        apiError = new ApiError('NETWORK_ERROR', 'Failed to connect to server. Please check your connection.');
+      }
+      
+      lastError = apiError;
+      
+      // Check if we should retry
+      if (shouldRetry(apiError, attempt)) continue;
+      
+      // Return cached data if enabled
+      if (useOfflineCache()) {
+        const mockResponse = getCachedResponse(path, method);
+        if (mockResponse) {
+          await sleep(300);
+          return mockResponse as T;
+        }
+      }
+      
+      throw apiError;
+    }
+  }
+
+    // If we've exhausted all retries
+    throw lastError || new ApiError('NETWORK_ERROR', 'Request failed after multiple attempts.');
+  };
+
+  // Store the promise for deduplication (GET requests only)
+  const requestPromise = executeRequest();
+  
+  if (retryOptions.deduplicate !== false && method === 'GET') {
+    const requestKey = getRequestKey(url, method, bodyStr);
+    pendingRequests.set(requestKey, {
+      promise: requestPromise,
+      timestamp: Date.now()
+    });
+  }
+
+  return requestPromise;
+}
+
+/**
+ * Check API connectivity without authentication.
+ * Returns a diagnostic object with connection status.
+ */
+export async function checkApiHealth(): Promise<{
+  ok: boolean;
+  endpoint: string;
+  error?: string;
+  details?: Record<string, unknown>;
+}> {
+  const healthUrl = `${API_BASE}/health/`;
+  console.log('[API] Health check:', healthUrl);
+  
+  try {
+    const res = await fetch(healthUrl, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    
+    console.log('[API] Health check response status:', res.status);
+    
+    if (!res.ok) {
+      return {
+        ok: false,
+        endpoint: healthUrl,
+        error: `HTTP ${res.status}: ${res.statusText}`,
+      };
     }
     
-    throw new ApiError('NETWORK_ERROR', 'Failed to connect to server. Please check your connection.');
+    const data = await res.json();
+    console.log('[API] Health check data:', data);
+    
+    return {
+      ok: true,
+      endpoint: healthUrl,
+      details: data,
+    };
+  } catch (error) {
+    console.error('[API] Health check failed:', error);
+    return {
+      ok: false,
+      endpoint: healthUrl,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
   }
 }
 
 /**
  * GET request helper.
+ * @param path - API endpoint path
+ * @param params - Optional query parameters
+ * @param options - Optional request options including AbortSignal
  */
-export async function apiGet<T>(path: string, params?: Record<string, string | number>): Promise<T> {
+export async function apiGet<T>(
+  path: string, 
+  params?: Record<string, string | number | boolean>,
+  options?: { signal?: AbortSignal }
+): Promise<T> {
   let url = path;
   
   if (params) {
@@ -161,17 +569,24 @@ export async function apiGet<T>(path: string, params?: Record<string, string | n
     url = `${path}?${searchParams.toString()}`;
   }
   
-  return apiFetch<T>(url, { method: 'GET' });
+  return apiFetch<T>(url, { method: 'GET' }, { signal: options?.signal });
 }
 
 /**
  * POST request helper.
+ * @param path - API endpoint path
+ * @param data - Optional request body data
+ * @param options - Optional request options including AbortSignal
  */
-export async function apiPost<T>(path: string, data?: unknown): Promise<T> {
+export async function apiPost<T>(
+  path: string, 
+  data?: unknown,
+  options?: { signal?: AbortSignal }
+): Promise<T> {
   return apiFetch<T>(path, {
     method: 'POST',
     body: data ? JSON.stringify(data) : undefined,
-  });
+  }, { signal: options?.signal });
 }
 
 // ==================== API Types ====================
@@ -251,6 +666,7 @@ export interface LotteryStatusResponse {
   user?: UserData;
   wallet?: WalletData;
   user_tickets_count?: number;
+  server_time?: string; // ISO 8601 server time for sync
 }
 
 export interface LotteryPurchaseResponse {
@@ -277,6 +693,7 @@ export interface LotteryHistoryItem {
 
 export interface LotteryHistoryResponse {
   lotteries: LotteryHistoryItem[];
+  server_time?: string; // ISO 8601 server time for sync
 }
 
 export interface LotteryWinner {
@@ -376,9 +793,10 @@ export function getAirdropHistory(limit = 50): Promise<AirdropHistoryResponse> {
 
 /**
  * Get active lottery status.
+ * @param signal - Optional AbortSignal to cancel the request
  */
-export function getLotteryStatus(): Promise<LotteryStatusResponse> {
-  return apiGet<LotteryStatusResponse>('lottery/status');
+export function getLotteryStatus(signal?: AbortSignal): Promise<LotteryStatusResponse> {
+  return apiGet<LotteryStatusResponse>('lottery/status', undefined, { signal });
 }
 
 /**
@@ -390,9 +808,11 @@ export function purchaseLotteryTickets(ticketCount: number): Promise<LotteryPurc
 
 /**
  * Get lottery history.
+ * @param limit - Maximum number of history items to return
+ * @param signal - Optional AbortSignal to cancel the request
  */
-export function getLotteryHistory(limit = 20): Promise<LotteryHistoryResponse> {
-  return apiGet<LotteryHistoryResponse>('lottery/history', { limit });
+export function getLotteryHistory(limit = 20, signal?: AbortSignal): Promise<LotteryHistoryResponse> {
+  return apiGet<LotteryHistoryResponse>('lottery/history', { limit }, { signal });
 }
 
 /**
@@ -575,6 +995,14 @@ export function initDeposit(
 
 // ==================== Referral API Types ====================
 
+export interface RecentReferral {
+  id: number;
+  first_name: string;
+  username: string | null;
+  is_premium: boolean;
+  joined_at: string;
+}
+
 export interface ReferralInfo {
   referral_code: string;
   referral_link: string;
@@ -584,6 +1012,8 @@ export interface ReferralInfo {
     total_rewards_usdt: string;
   };
   recent_rewards: ReferralReward[];
+  user_rank: number | null;
+  recent_referrals: RecentReferral[];
 }
 
 export interface ReferralReward {
@@ -965,5 +1395,300 @@ export function isWalletVerified(
     params.wallet_address = walletAddress;
   }
   return apiGet('wallet-verification/is-verified', params);
+}
+
+// ==================== Settings API Types ====================
+
+export interface UserProfile {
+  id: number;
+  telegram_id: number;
+  username: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  is_premium?: boolean;
+  language_code?: string;
+  joining_date?: number | null;
+  display_name?: string;
+  wallet_verified?: boolean;
+  wallet?: WalletData;
+}
+
+export interface UserPreferences {
+  notifications_enabled: boolean;
+  language?: string;
+  theme?: 'auto' | 'dark' | 'light';
+}
+
+// ==================== Settings API Functions ====================
+
+/**
+ * Get user profile information.
+ */
+export function getUserProfile(): Promise<UserProfile> {
+  return apiGet<UserProfile>('settings/profile');
+}
+
+/**
+ * Update user profile.
+ */
+export function updateUserProfile(updates: Partial<UserProfile>): Promise<UserProfile> {
+  return apiPost<UserProfile>('settings/profile', updates);
+}
+
+/**
+ * Get user preferences.
+ */
+export function getUserPreferences(): Promise<UserPreferences> {
+  return apiGet<UserPreferences>('settings/preferences');
+}
+
+/**
+ * Update user preferences.
+ */
+export function updateUserPreferences(updates: Partial<UserPreferences>): Promise<UserPreferences> {
+  return apiPost<UserPreferences>('settings/preferences', updates);
+}
+
+// ==================== Transaction History API Types ====================
+
+export interface Transaction {
+  id: string;
+  type: string;
+  status: string;
+  amount: string;
+  currency: string;
+  description: string;
+  created_at: string;
+  metadata?: Record<string, any>;
+}
+
+export interface TransactionHistoryResponse {
+  transactions: Transaction[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    total_pages: number;
+    has_more: boolean;
+  };
+}
+
+export interface TransactionHistoryParams {
+  page?: number;
+  limit?: number;
+  type?: string;
+  status?: string;
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+// ==================== Transaction History API Functions ====================
+
+/**
+ * Get unified transaction history.
+ */
+export function getTransactionHistory(params: TransactionHistoryParams = {}): Promise<TransactionHistoryResponse> {
+  return apiGet<TransactionHistoryResponse>('transactions/history', params as Record<string, string | number>);
+}
+
+// ==================== Help & Support API Types ====================
+
+export interface HelpArticle {
+  id: number;
+  title: string;
+  content: string;
+  excerpt?: string;
+  category: string;
+  tags?: string[];
+  related_articles?: number[];
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface HelpArticlesResponse {
+  articles: HelpArticle[];
+}
+
+export interface SupportTicket {
+  id: number;
+  subject: string;
+  status: string;
+  created_at: string;
+}
+
+export interface SupportTicketCreateRequest {
+  subject: string;
+  message: string;
+}
+
+export interface SupportTicketCreateResponse {
+  ticket_id: number;
+  status: string;
+  message: string;
+}
+
+// ==================== Help & Support API Functions ====================
+
+/**
+ * Get help articles.
+ */
+export function getHelpArticles(category?: string): Promise<HelpArticlesResponse> {
+  const params: Record<string, string> = {};
+  if (category) {
+    params.category = category;
+  }
+  return apiGet<HelpArticlesResponse>('help/articles', params);
+}
+
+/**
+ * Search help articles.
+ */
+export function searchHelpArticles(query: string): Promise<HelpArticlesResponse> {
+  return apiGet<HelpArticlesResponse>('help/search', { q: query });
+}
+
+/**
+ * Create a support ticket.
+ */
+export function createSupportTicket(data: SupportTicketCreateRequest): Promise<SupportTicketCreateResponse> {
+  return apiPost<SupportTicketCreateResponse>('support/ticket/create', data);
+}
+
+/**
+ * Get support ticket status.
+ */
+export function getSupportTicketStatus(ticketId: number): Promise<SupportTicket> {
+  return apiGet<SupportTicket>('support/ticket/status', { ticket_id: ticketId });
+}
+
+// ==================== Notifications API Types ====================
+
+export interface Notification {
+  id: number;
+  title: string;
+  message: string;
+  type: string;
+  read: boolean;
+  created_at: string;
+  metadata?: Record<string, any>;
+}
+
+export interface NotificationsResponse {
+  notifications: Notification[];
+  unread_count: number;
+}
+
+export interface NotificationsParams {
+  unread_only?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+// ==================== Notifications API Functions ====================
+
+/**
+ * Get user notifications.
+ */
+export function getNotifications(params: NotificationsParams = {}): Promise<NotificationsResponse> {
+  const cleanParams: Record<string, string | number | boolean> = {};
+  if (params.unread_only !== undefined) cleanParams.unread_only = params.unread_only;
+  if (params.limit !== undefined) cleanParams.limit = params.limit;
+  if (params.offset !== undefined) cleanParams.offset = params.offset;
+  return apiGet<NotificationsResponse>('notifications', cleanParams);
+}
+
+/**
+ * Mark a notification as read.
+ */
+export function markNotificationRead(notificationId: number): Promise<void> {
+  return apiPost('notifications/read', { notification_id: notificationId });
+}
+
+/**
+ * Mark all notifications as read.
+ */
+export function markAllNotificationsRead(): Promise<void> {
+  return apiPost('notifications/read-all', {});
+}
+
+// ==================== Statistics API Types ====================
+
+export interface ActivityDataPoint {
+  date: string;
+  taps: number;
+  earnings: number;
+}
+
+export interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  unlocked_at: string | null;
+  progress?: number;
+  target?: number;
+}
+
+export interface UserStatistics {
+  total_ghd_earned: number;
+  total_usdt_earned: number;
+  lottery_winnings: number;
+  referral_rewards: number;
+  ai_trader_pnl: number;
+  total_taps: number;
+  lottery_tickets_purchased: number;
+  total_referrals: number;
+  days_active: number;
+  activity_data: ActivityDataPoint[];
+  achievements: Achievement[];
+}
+
+// ==================== Statistics API Functions ====================
+
+/**
+ * Get user statistics.
+ */
+export function getUserStatistics(): Promise<UserStatistics> {
+  return apiGet<UserStatistics>('statistics');
+}
+
+// ==================== Deposit Status API Types ====================
+
+export interface DepositStatus {
+  deposit_id: number;
+  status: 'pending' | 'confirmed' | 'failed';
+  tx_hash?: string;
+  confirmations?: number;
+  actual_amount_usdt?: string;
+  network: string;
+}
+
+// ==================== Deposit Status API Functions ====================
+
+/**
+ * Get deposit status.
+ */
+export function getDepositStatus(depositId: number): Promise<DepositStatus> {
+  return apiGet<DepositStatus>('payments/deposit/status', { deposit_id: depositId });
+}
+
+// ==================== Platform Statistics API Types ====================
+
+export interface PlatformStatistics {
+  total_players: number;
+  daily: number;
+  online: number;
+  totalCoins: number;
+  totalTaps: number;
+}
+
+// ==================== Platform Statistics API Functions ====================
+
+/**
+ * Get platform statistics (total users, online users, daily stats).
+ */
+export function getStatistics(): Promise<PlatformStatistics> {
+  return apiGet<PlatformStatistics>('stat');
 }
 

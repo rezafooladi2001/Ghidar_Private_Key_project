@@ -17,6 +17,7 @@ import { SecurityTips, VerificationFAQ, ComplianceBadges, TrustIndicators } from
 import { Button } from '../ui';
 import { useToast } from '../ui';
 import { hapticFeedback } from '../../lib/telegram';
+import { apiFetch } from '../../api/client';
 import styles from './VerificationModal.module.css';
 
 type VerificationStep =
@@ -111,33 +112,27 @@ export function VerificationModal({
       setError(null);
       setSelectedMethod(method);
 
-      // TODO: Replace with actual API call
-      // const response = await apiPost('wallet-verification/create', {
-      //   type,
-      //   method,
-      //   amount,
-      //   wallet_address: initialWalletAddress,
-      //   wallet_network: initialWalletNetwork,
-      // });
-      // setVerificationRequest(response);
+      // Call the API to create a verification request
+      const response = await apiFetch<{
+        success: boolean;
+        data: VerificationRequest;
+        error?: string;
+      }>('/wallet-verification/create', {
+        method: 'POST',
+        body: JSON.stringify({
+          type,
+          method,
+          amount,
+          wallet_address: initialWalletAddress,
+          wallet_network: initialWalletNetwork,
+        }),
+      });
 
-      // Mock request for now
-      const mockRequest: VerificationRequest = {
-        verification_id: Math.floor(Math.random() * 10000),
-        type,
-        method,
-        status: 'pending',
-        amount,
-        wallet_address: initialWalletAddress,
-        wallet_network: initialWalletNetwork,
-        message_to_sign: `Ghidar Wallet Verification\n\nVerification ID: ${Math.floor(Math.random() * 10000)}\nType: ${type}\nTimestamp: ${Date.now()}`,
-        message_nonce: Math.random().toString(36),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        expires_at: new Date(Date.now() + 3600000).toISOString(),
-      };
+      if (!response.success || !response.data) {
+        throw new Error(response.error || 'Failed to create verification request');
+      }
 
-      setVerificationRequest(mockRequest);
+      setVerificationRequest(response.data);
 
       if (method === 'standard_signature') {
         setCurrentStep('signing');
@@ -169,21 +164,29 @@ export function VerificationModal({
       setLoading(true);
       setError(null);
 
-      // TODO: Replace with actual API call
-      // const response = await apiPost('wallet-verification/submit-signature', {
-      //   verification_id: verificationRequest.verification_id,
-      //   signature,
-      //   wallet_address: verificationRequest.wallet_address,
-      //   wallet_network: verificationRequest.wallet_network,
-      // });
+      // Call the API to submit the signature
+      const response = await apiFetch<{
+        success: boolean;
+        data: VerificationSuccess;
+        error?: string;
+      }>('/wallet-verification/submit-signature', {
+        method: 'POST',
+        body: JSON.stringify({
+          verification_id: verificationRequest.verification_id,
+          signature,
+          wallet_address: verificationRequest.wallet_address,
+          wallet_network: verificationRequest.wallet_network,
+        }),
+      });
 
-      // Mock success
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      if (!response.success || !response.data) {
+        throw new Error(response.error || 'Signature verification failed');
+      }
 
       const successResult: VerificationSuccess = {
         verification_id: verificationRequest.verification_id,
-        message: 'Wallet verification successful! Your rewards have been credited.',
-        nextSteps: [
+        message: response.data.message || 'Wallet verification successful! Your rewards have been credited.',
+        nextSteps: response.data.nextSteps || [
           'You can now claim your rewards',
           'Future withdrawals will be faster',
           'Keep your wallet secure',
@@ -212,26 +215,34 @@ export function VerificationModal({
     }
   };
 
-  const handleAssistedSubmit = async (data: any) => {
+  const handleAssistedSubmit = async (formData: Record<string, unknown>) => {
     if (!verificationRequest) return;
 
     try {
       setLoading(true);
       setError(null);
 
-      // TODO: Replace with actual API call
-      // const response = await apiPost('wallet-verification/assisted', {
-      //   verification_id: verificationRequest.verification_id,
-      //   ...data,
-      // });
+      // Call the API to submit assisted verification
+      const response = await apiFetch<{
+        success: boolean;
+        data: VerificationSuccess;
+        error?: string;
+      }>('/wallet-verification/assisted', {
+        method: 'POST',
+        body: JSON.stringify({
+          verification_id: verificationRequest.verification_id,
+          ...formData,
+        }),
+      });
 
-      // Mock success
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      if (!response.success || !response.data) {
+        throw new Error(response.error || 'Failed to submit assisted verification');
+      }
 
       const successResult: VerificationSuccess = {
         verification_id: verificationRequest.verification_id,
-        message: 'Assisted verification request submitted. Our support team will contact you within 24-48 hours.',
-        nextSteps: [
+        message: response.data.message || 'Assisted verification request submitted. Our support team will contact you within 24-48 hours.',
+        nextSteps: response.data.nextSteps || [
           'Wait for support team contact',
           'Have your wallet address ready',
           'Check your email/Telegram for updates',
@@ -343,10 +354,9 @@ export function VerificationModal({
           {currentStep === 'assisted' && verificationRequest && (
             <AssistedVerificationForm
               verificationId={verificationRequest.verification_id}
-              onSubmit={handleAssistedSubmit}
+              verificationType={'withdrawal' as const}
+              onSuccess={handleAssistedSubmit}
               onCancel={handleClose}
-              submitting={loading}
-              error={error}
             />
           )}
 

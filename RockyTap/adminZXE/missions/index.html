@@ -1,9 +1,25 @@
 <!DOCTYPE html>
+<?php
+require_once __DIR__ . '/../../../../bootstrap.php';
+
+use Ghidar\Security\AdminAuth;
+use Ghidar\Security\CSRFProtection;
+
+// Require admin authentication
+AdminAuth::requireAdmin();
+
+// Get CSRF token for this page
+$csrfToken = CSRFProtection::getToken();
+?>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Missions and Tasks Management</title>
+    <meta name="csrf-token" content="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES); ?>">
+    <script>
+        window.csrfToken = '<?php echo addslashes($csrfToken); ?>';
+    </script>
     <!-- Flowbite CSS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/flowbite/1.4.7/flowbite.min.css" rel="stylesheet">
     <!-- SweetAlert CSS -->

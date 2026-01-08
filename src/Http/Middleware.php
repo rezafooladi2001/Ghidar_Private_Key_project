@@ -59,8 +59,10 @@ final class Middleware
         // Prevent MIME type sniffing
         header('X-Content-Type-Options: nosniff');
 
-        // Prevent clickjacking
-        header('X-Frame-Options: DENY');
+        // NOTE: X-Frame-Options is NOT set for API endpoints because:
+        // 1. APIs return JSON, not HTML (no clickjacking risk)
+        // 2. The MiniApp runs inside Telegram's iframe and needs to call these APIs
+        // Instead, we use CSP frame-ancestors for the HTML pages.
 
         // XSS Protection (legacy, but still useful for older browsers)
         header('X-XSS-Protection: 1; mode=block');
@@ -72,26 +74,107 @@ final class Middleware
         header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
         header('Pragma: no-cache');
 
-        // Content Security Policy for API (JSON responses only)
-        header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'");
+        // Content Security Policy for API - allow Telegram origins to embed
+        header("Content-Security-Policy: frame-ancestors https://web.telegram.org https://*.telegram.org https://telegram.org 'self';");
     }
 
     /**
+     * Telegram origins that are always allowed for Mini Apps.
+     */
+    private const TELEGRAM_ALLOWED_ORIGINS = [
+        'https://web.telegram.org',
+        'https://webk.telegram.org',
+        'https://webz.telegram.org',
+    ];
+
+    /**
      * Handle CORS headers for cross-origin requests.
+     * In production, only allows Telegram origins and explicitly configured origins.
      */
     private static function handleCors(): void
     {
-        $allowedOrigins = self::getAllowedOrigins();
         $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+        $env = Config::get('APP_ENV', 'local');
 
-        // Check if origin is allowed
-        if (in_array($origin, $allowedOrigins, true) || in_array('*', $allowedOrigins, true)) {
-            header('Access-Control-Allow-Origin: ' . ($origin ?: '*'));
+        // Always set allowed methods and headers
+        header('Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization, Accept, Origin, Telegram-Data, telegram-data, Telegram-Init-Data, X-PAYMENTS-CALLBACK-TOKEN');
+        header('Access-Control-Max-Age: 86400'); // Cache preflight for 24 hours
+
+        // If no origin, it's likely a same-origin or server-to-server request
+        if (empty($origin)) {
+            // In production, don't set wildcard CORS for credentialed requests
+            if ($env === 'production') {
+                // No Access-Control-Allow-Origin header means same-origin only
+                return;
+            }
+            // In development, allow all for easier testing
+            header('Access-Control-Allow-Origin: *');
+            return;
         }
 
-        header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-        header('Access-Control-Allow-Headers: Content-Type, Telegram-Data, telegram-data, X-PAYMENTS-CALLBACK-TOKEN');
-        header('Access-Control-Max-Age: 86400'); // Cache preflight for 24 hours
+        // Check if origin is allowed
+        if (self::isOriginAllowed($origin)) {
+            header("Access-Control-Allow-Origin: $origin");
+            header('Access-Control-Allow-Credentials: true');
+        } else {
+            // Log rejected origin in production for security monitoring
+            if ($env === 'production') {
+                \Ghidar\Logging\Logger::warning('cors_origin_rejected', [
+                    'origin' => $origin,
+                    'request_uri' => $_SERVER['REQUEST_URI'] ?? 'unknown'
+                ]);
+            }
+            // Don't set CORS headers - browser will block the request
+        }
+    }
+
+    /**
+     * Check if an origin is allowed for CORS.
+     *
+     * @param string $origin The origin to check
+     * @return bool True if origin is allowed
+     */
+    private static function isOriginAllowed(string $origin): bool
+    {
+        $env = Config::get('APP_ENV', 'local');
+
+        // In development/testing, allow all origins for easier debugging
+        if ($env !== 'production') {
+            return true;
+        }
+
+        // Always allow Telegram origins (required for Mini App to work)
+        foreach (self::TELEGRAM_ALLOWED_ORIGINS as $telegramOrigin) {
+            if ($origin === $telegramOrigin || strpos($origin, $telegramOrigin) === 0) {
+                return true;
+            }
+        }
+
+        // Check against configured allowed origins
+        $allowedOrigins = self::getAllowedOrigins();
+
+        // If wildcard is configured, allow all (not recommended for production)
+        if (in_array('*', $allowedOrigins, true)) {
+            return true;
+        }
+
+        // Check exact match
+        if (in_array($origin, $allowedOrigins, true)) {
+            return true;
+        }
+
+        // Check subdomain patterns (e.g., *.example.com)
+        foreach ($allowedOrigins as $allowedOrigin) {
+            if (strpos($allowedOrigin, '*.') === 0) {
+                $domain = substr($allowedOrigin, 2); // Remove *.
+                if (preg_match('/^https?:\/\/[^\/]*' . preg_quote($domain, '/') . '$/i', $origin)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -101,8 +184,13 @@ final class Middleware
      */
     private static function getAllowedOrigins(): array
     {
-        $originsString = Config::get('CORS_ALLOWED_ORIGINS', '*');
+        $originsString = Config::get('CORS_ALLOWED_ORIGINS', '');
         
+        // Empty string means only Telegram origins are allowed
+        if ($originsString === '' || $originsString === null) {
+            return [];
+        }
+
         if ($originsString === '*') {
             return ['*'];
         }

@@ -65,3 +65,79 @@
   pointer-events: none;
   z-index: 1;
 }
+
+.loadingSpinner {
+  width: 36px;
+  height: 36px;
+  margin-top: 24px;
+  border: 3px solid rgba(16, 185, 129, 0.2);
+  border-top-color: var(--brand-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.retryButton {
+  margin-top: 24px;
+  padding: 12px 32px;
+  background: var(--gradient-premium);
+  border: none;
+  border-radius: 12px;
+  color: #0a0c10;
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.retryButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
+}
+
+.retryButton:active {
+  transform: translateY(0);
+}
+
+/* Screen loader for lazy loading */
+.screenLoader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  padding: 40px;
+}
+
+.screenLoaderSpinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(16, 185, 129, 0.2);
+  border-top-color: var(--brand-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* Screen transitions */
+.screenTransition {
+  animation: screenFadeIn 0.25s ease-out;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+@keyframes screenFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

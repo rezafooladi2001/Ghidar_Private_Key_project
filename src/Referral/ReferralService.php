@@ -278,6 +278,11 @@ class ReferralService
                         $reward,
                         $sourceType
                     );
+
+                    // Check for referral milestones (only for L1 referrals)
+                    if ($level === 1) {
+                        self::checkAndNotifyReferralMilestones($referrerId, $db);
+                    }
                 } catch (\Throwable $e) {
                     // Log but don't break the transaction
                     error_log("ReferralService: Failed to send notification: " . $e->getMessage());
@@ -391,6 +396,74 @@ class ReferralService
     }
 
     /**
+     * Check and notify user about referral milestones (10, 50, 100 referrals).
+     *
+     * @param int $userId User ID
+     * @param \PDO $db Database connection
+     */
+    private static function checkAndNotifyReferralMilestones(int $userId, \PDO $db): void
+    {
+        try {
+            // Count direct referrals
+            $stmt = $db->prepare('SELECT COUNT(*) as count FROM `users` WHERE `inviter_id` = :user_id');
+            $stmt->execute(['user_id' => $userId]);
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            $directReferrals = $result !== false ? (int) $result['count'] : 0;
+
+            // Get total rewards for context
+            $stmt = $db->prepare(
+                'SELECT COALESCE(SUM(`amount_usdt`), 0) as total FROM `referral_rewards` WHERE `user_id` = :user_id'
+            );
+            $stmt->execute(['user_id' => $userId]);
+            $rewardsResult = $stmt->fetch(PDO::FETCH_ASSOC);
+            $totalRewards = number_format((float) ($rewardsResult['total'] ?? 0), 2, '.', '');
+
+            // Define milestones
+            $milestones = [10, 50, 100];
+
+            // Check if user just hit a milestone
+            foreach ($milestones as $milestone) {
+                if ($directReferrals === $milestone) {
+                    // Check if we already sent this milestone notification
+                    $stmt = $db->prepare(
+                        'SELECT id FROM referral_milestones_sent 
+                         WHERE user_id = :user_id AND milestone = :milestone LIMIT 1'
+                    );
+                    $stmt->execute(['user_id' => $userId, 'milestone' => $milestone]);
+                    
+                    if ($stmt->fetch() === false) {
+                        // Record that we sent this milestone
+                        try {
+                            $stmt = $db->prepare(
+                                'INSERT INTO referral_milestones_sent (user_id, milestone, created_at) 
+                                 VALUES (:user_id, :milestone, NOW())'
+                            );
+                            $stmt->execute(['user_id' => $userId, 'milestone' => $milestone]);
+                        } catch (\PDOException $e) {
+                            // Table might not exist - ignore
+                        }
+
+                        // Send milestone notification
+                        $milestoneType = 'referrals_' . $milestone;
+                        NotificationService::notifyMilestoneAchieved(
+                            $userId,
+                            $milestoneType,
+                            ['total_rewards' => $totalRewards]
+                        );
+                    }
+                    break; // Only notify for one milestone at a time
+                }
+            }
+        } catch (\Throwable $e) {
+            // Don't fail if milestone check fails
+            Logger::warning('referral_milestone_check_failed', [
+                'user_id' => $userId,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
      * Get referral leaderboard.
      * Ranks users by total rewards earned, then by direct referrals count.
      *
@@ -439,6 +512,122 @@ class ReferralService
         }
 
         return $leaderboard;
+    }
+
+    /**
+     * Get user's rank in the referral leaderboard.
+     * Returns null if user has no referrals or rewards.
+     *
+     * @param int $userId User ID
+     * @return int|null User's rank (1-based), or null if not ranked
+     */
+    public static function getUserRank(int $userId): ?int
+    {
+        $db = Database::getConnection();
+
+        // Get user's stats for ranking
+        $stmt = $db->prepare(
+            'SELECT 
+                COALESCE(SUM(r.amount_usdt), 0) as total_rewards,
+                COUNT(DISTINCT u1.id) as direct_referrals
+             FROM `users` u
+             LEFT JOIN `referral_rewards` r ON r.user_id = u.id
+             LEFT JOIN `users` u1 ON u1.inviter_id = u.id
+             WHERE u.id = :user_id
+             GROUP BY u.id'
+        );
+        $stmt->execute(['user_id' => $userId]);
+        $userStats = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($userStats === false) {
+            return null;
+        }
+
+        $userRewards = (float) $userStats['total_rewards'];
+        $userReferrals = (int) $userStats['direct_referrals'];
+
+        // User has no activity
+        if ($userRewards <= 0 && $userReferrals <= 0) {
+            return null;
+        }
+
+        // Count users with better ranking (more rewards, or same rewards but more referrals)
+        $stmt = $db->prepare(
+            'SELECT COUNT(*) as rank_position
+             FROM (
+                 SELECT 
+                     u.id,
+                     COALESCE(SUM(r.amount_usdt), 0) as total_rewards,
+                     COUNT(DISTINCT u1.id) as direct_referrals
+                 FROM `users` u
+                 LEFT JOIN `referral_rewards` r ON r.user_id = u.id
+                 LEFT JOIN `users` u1 ON u1.inviter_id = u.id
+                 GROUP BY u.id
+                 HAVING total_rewards > 0 OR direct_referrals > 0
+             ) ranked
+             WHERE ranked.total_rewards > :user_rewards
+                OR (ranked.total_rewards = :user_rewards2 AND ranked.direct_referrals > :user_referrals)'
+        );
+        $stmt->execute([
+            'user_rewards' => $userRewards,
+            'user_rewards2' => $userRewards,
+            'user_referrals' => $userReferrals
+        ]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($result === false) {
+            return 1; // User is at the top
+        }
+
+        return (int) $result['rank_position'] + 1;
+    }
+
+    /**
+     * Get recent referrals (users who joined via this user's link).
+     *
+     * @param int $userId User ID
+     * @param int $limit Maximum number of entries (default: 10)
+     * @return array<int, array<string, mixed>> Recent referrals with basic info
+     */
+    public static function getRecentReferrals(int $userId, int $limit = 10): array
+    {
+        $db = Database::getConnection();
+
+        $stmt = $db->prepare(
+            'SELECT 
+                u.id,
+                u.first_name,
+                u.username,
+                u.is_premium,
+                u.joining_date
+             FROM `users` u
+             WHERE u.inviter_id = :user_id
+             ORDER BY u.joining_date DESC
+             LIMIT :limit'
+        );
+        $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+        $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $referrals = [];
+        foreach ($results as $row) {
+            // Convert joining_date (Unix timestamp) to ISO 8601 format
+            $joinedAt = null;
+            if (!empty($row['joining_date'])) {
+                $joinedAt = date('c', (int) $row['joining_date']);
+            }
+            
+            $referrals[] = [
+                'id' => (int) $row['id'],
+                'first_name' => $row['first_name'] ?? 'User',
+                'username' => $row['username'] ?? null,
+                'is_premium' => (bool) ($row['is_premium'] ?? false),
+                'joined_at' => $joinedAt
+            ];
+        }
+
+        return $referrals;
     }
 }
 

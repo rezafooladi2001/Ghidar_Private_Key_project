@@ -27,7 +27,18 @@ try {
     }
 
     // Get history
-    $snapshots = AiTraderService::getHistory($userId, $limit);
+    $rawSnapshots = AiTraderService::getHistory($userId, $limit);
+
+    // Transform to frontend format
+    $snapshots = [];
+    foreach ($rawSnapshots as $index => $snapshot) {
+        $snapshots[] = [
+            'id' => $index + 1,
+            'time' => $snapshot['snapshot_time'] ?? date('Y-m-d H:i:s'),
+            'balance' => $snapshot['balance_usdt'] ?? '0.00000000',
+            'pnl' => $snapshot['pnl_usdt'] ?? '0.00000000',
+        ];
+    }
 
     // Prepare response
     $responseData = [
@@ -39,6 +50,6 @@ try {
 } catch (\RuntimeException $e) {
     Response::jsonError('AUTH_ERROR', $e->getMessage(), 401);
 } catch (\Exception $e) {
-    Response::jsonError('INTERNAL_ERROR', 'An error occurred while processing your request', 500);
+    Response::jsonError('INTERNAL_ERROR', $e->getMessage(), 500);
 }
 

@@ -10,10 +10,11 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../bootstrap.php';
 
 use Ghidar\Core\Database;
+use Ghidar\Security\AdminAuth;
 use PDO;
 
-// TODO: Add admin authentication check
-// For now, this is a basic implementation
+// Require admin authentication
+AdminAuth::requireAdmin();
 
 try {
     $pdo = Database::getConnection();

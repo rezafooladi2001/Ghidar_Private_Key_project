@@ -1,7 +1,10 @@
 <?php
 /**
  * Ghidar Mini App Entry Point
- * Modern React-based Telegram Mini App for Ghidar platform
+ * Serves the Vite-built React app with proper Telegram WebApp integration
+ * 
+ * This file reads the Vite-generated index.html and serves it,
+ * ensuring correct asset references with cache-busting.
  */
 
 // Check maintenance mode
@@ -10,183 +13,127 @@ if (file_exists(__DIR__ . '/../bot/.maintenance.txt')) {
     exit;
 }
 
-// Load bootstrap for configuration
-require_once __DIR__ . '/../../bootstrap.php';
+// Set proper headers
+header('Content-Type: text/html; charset=utf-8');
+header('X-Content-Type-Options: nosniff');
 
-use Ghidar\Config\Config;
+// CRITICAL: Prevent caching of HTML to ensure users always get latest asset references
+// This fixes issues where users have stale cached HTML pointing to old asset filenames
+header('Cache-Control: no-cache, no-store, must-revalidate');
+header('Pragma: no-cache');
+header('Expires: 0');
 
-// Get app version for cache busting
-$appVersion = Config::get('APP_VERSION', '1.0.0');
+// Path to Vite-generated index.html
+$indexHtmlPath = __DIR__ . '/../assets/ghidar/index.html';
+
+// If Vite-generated index.html exists, serve it with enhancements
+if (file_exists($indexHtmlPath)) {
+    $html = file_get_contents($indexHtmlPath);
+    
+    // Add cache-busting query parameter to assets (optional, Vite already uses hashes)
+    // Load bootstrap for config if available
+    $appVersion = '1.0.0';
+    $bootstrapPath = __DIR__ . '/../../bootstrap.php';
+    if (file_exists($bootstrapPath)) {
+        try {
+            require_once $bootstrapPath;
+            $appVersion = \Ghidar\Config\Config::get('APP_VERSION', '1.0.0');
+        } catch (Throwable $e) {
+            // Continue without version
+        }
+    }
+    
+    // Add version comment for debugging
+    $html = str_replace('</head>', "<!-- App Version: {$appVersion} -->\n  </head>", $html);
+    
+    echo $html;
+    exit;
+}
+
+// Fallback: If index.html doesn't exist, show error
 ?>
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <!-- Preload fonts for better performance -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no" />
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#0a0c10">
-    <meta name="description" content="Ghidar - Your gateway to crypto opportunities. Lottery, Airdrop, and AI Trading.">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    
-    <link rel="icon" type="image/png" href="/favicon.ico" />
-    <title>Ghidar</title>
-    
-    <!-- Telegram WebApp SDK -->
+    <title>Ghidar - Error</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    
-    <!-- Ghidar Mini App -->
-    <script type="module" crossorigin src="/RockyTap/assets/ghidar/index.js?v=<?= htmlspecialchars($appVersion) ?>"></script>
-    <link rel="stylesheet" crossorigin href="/RockyTap/assets/ghidar/index.css?v=<?= htmlspecialchars($appVersion) ?>">
-  </head>
-  
-  <style>
-    :root {
-      --bg-primary: #0a0c10;
-      --brand-primary: #10b981;
-      --brand-gold: #fbbf24;
-    }
-
-    html {
-      height: 100%;
-      overflow: hidden;
-    }
-
-    body {
-      height: 100%;
-      overflow: hidden;
-      min-height: 100%;
-      isolation: isolate;
-      margin: 0;
-      padding: 0;
-      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: var(--bg-primary);
-    }
-
-    /* Initial loader */
-    #loader {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      height: 100%;
-      background: var(--bg-primary);
-      gap: 24px;
-    }
-
-    .loader-logo {
-      width: 80px;
-      height: 80px;
-      animation: pulse 1.5s ease-in-out infinite;
-    }
-
-    .loader-logo svg {
-      width: 100%;
-      height: 100%;
-    }
-
-    .loader-spinner {
-      width: 36px;
-      height: 36px;
-      border: 3px solid rgba(16, 185, 129, 0.2);
-      border-top-color: var(--brand-primary);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-
-    .loader-text {
-      color: rgba(255, 255, 255, 0.5);
-      font-size: 14px;
-      letter-spacing: 0.5px;
-    }
-
-    .loader-bars {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      width: 200px;
-      margin-top: 8px;
-    }
-
-    .loader-bar {
-      height: 4px;
-      background: linear-gradient(90deg, rgba(16, 185, 129, 0.2) 25%, rgba(16, 185, 129, 0.4) 50%, rgba(16, 185, 129, 0.2) 75%);
-      background-size: 200% 100%;
-      animation: shimmer 1.5s infinite;
-      border-radius: 2px;
-    }
-
-    .loader-bar:nth-child(2) {
-      width: 80%;
-      animation-delay: 0.1s;
-    }
-
-    .loader-bar:nth-child(3) {
-      width: 60%;
-      animation-delay: 0.2s;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.7; transform: scale(0.95); }
-    }
-
-    @keyframes shimmer {
-      0% { background-position: 200% 0; }
-      100% { background-position: -200% 0; }
-    }
-  </style>
-  
-  <body>
-    <script>
-      // Initialize Telegram WebApp early
-      if (window.Telegram && window.Telegram.WebApp) {
-        Telegram.WebApp.expand();
-        Telegram.WebApp.setHeaderColor('#0f1218');
-        Telegram.WebApp.setBackgroundColor('#0a0c10');
-      }
-    </script>
-    
-    <!-- Loading screen -->
-    <div id="loader">
-      <div class="loader-logo">
-        <svg viewBox="0 0 48 48" fill="none">
-          <defs>
-            <linearGradient id="lg" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#10b981" />
-              <stop offset="50%" stop-color="#34d399" />
-              <stop offset="100%" stop-color="#fbbf24" />
-            </linearGradient>
-            <linearGradient id="gold" x1="0%" y1="100%" x2="100%" y2="0%">
-              <stop offset="0%" stop-color="#f59e0b" />
-              <stop offset="100%" stop-color="#fcd34d" />
-            </linearGradient>
-          </defs>
-          <path d="M24 4L44 18L36 44H12L4 18L24 4Z" fill="url(#lg)" opacity="0.15"/>
-          <path d="M24 8L40 20L34 40H14L8 20L24 8Z" stroke="url(#lg)" stroke-width="2" fill="none"/>
-          <path d="M24 8L24 40M8 20H40M14 40L24 24L34 40M24 24L8 20M24 24L40 20" stroke="url(#lg)" stroke-width="1.5" opacity="0.6" fill="none"/>
-          <circle cx="24" cy="24" r="6" fill="url(#gold)"/>
-          <circle cx="24" cy="24" r="3" fill="#0a0c10"/>
-        </svg>
-      </div>
-      <div class="loader-spinner"></div>
-      <div class="loader-text">Loading Ghidar...</div>
-      <div class="loader-bars">
-        <div class="loader-bar"></div>
-        <div class="loader-bar"></div>
-        <div class="loader-bar"></div>
-      </div>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            height: 100%;
+            background: #0a0c10;
+            color: #f8fafc;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        .error-container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            text-align: center;
+        }
+        .error-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #10b981;
+            font-size: 28px;
+            margin-bottom: 16px;
+        }
+        p {
+            color: #94a3b8;
+            font-size: 16px;
+            max-width: 300px;
+            line-height: 1.5;
+        }
+        .retry-btn {
+            margin-top: 24px;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 14px 32px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .debug-info {
+            margin-top: 40px;
+            padding: 16px;
+            background: #1e293b;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            color: #64748b;
+            max-width: 90%;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <div class="error-icon">⚠️</div>
+        <h1>Ghidar</h1>
+        <p>The application assets could not be loaded. Please try again or contact support.</p>
+        <button class="retry-btn" onclick="window.location.reload()">Retry</button>
+        <div class="debug-info">
+            <strong>Debug Info:</strong><br>
+            Missing: /assets/ghidar/index.html<br>
+            Path checked: <?= htmlspecialchars($indexHtmlPath) ?><br>
+            Time: <?= date('Y-m-d H:i:s') ?>
+        </div>
     </div>
-
-    <!-- React app root -->
-    <div id="root"></div>
-  </body>
+    <script>
+        if (window.Telegram && window.Telegram.WebApp) {
+            window.Telegram.WebApp.ready();
+            window.Telegram.WebApp.expand();
+        }
+    </script>
+</body>
 </html>

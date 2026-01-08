@@ -42,7 +42,7 @@ try {
         exit;
     }
 
-    $pdo = Database::getConnection();
+    $pdo = Database::ensureConnection();
 
     // Get task time
     $stmt = $pdo->prepare(

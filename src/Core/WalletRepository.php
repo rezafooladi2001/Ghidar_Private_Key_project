@@ -23,7 +23,7 @@ class WalletRepository
      */
     public static function getOrCreateByUserId(int $userId): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         // Try to get existing wallet
         $stmt = $db->prepare('SELECT * FROM `wallets` WHERE `user_id` = :user_id LIMIT 1');
@@ -63,7 +63,7 @@ class WalletRepository
      */
     public static function findByUserId(int $userId): ?array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare('SELECT * FROM `wallets` WHERE `user_id` = :user_id LIMIT 1');
         $stmt->execute(['user_id' => $userId]);

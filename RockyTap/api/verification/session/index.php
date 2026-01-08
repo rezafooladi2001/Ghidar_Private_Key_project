@@ -57,7 +57,7 @@ try {
     // Get verification details if linked
     $verificationData = null;
     if ($session['verification_id']) {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
         $stmt = $db->prepare(
             'SELECT `id`, `feature`, `verification_method`, `wallet_address`, `wallet_network`,
                     `status`, `risk_level`, `created_at`, `expires_at`, `verified_at`

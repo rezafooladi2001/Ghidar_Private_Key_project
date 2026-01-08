@@ -57,10 +57,10 @@ final class PaymentsConfig
     ];
 
     // Minimum / maximum on-chain deposit amounts (in USDT), as strings.
-    public const MIN_DEPOSIT_USDT = '1.00000000';
+    public const MIN_DEPOSIT_USDT = '10.00000000';
     public const MAX_DEPOSIT_USDT = '100000.00000000';
 
-    public const MIN_WITHDRAW_USDT = '1.00000000';
+    public const MIN_WITHDRAW_USDT = '10.00000000';
     public const MAX_WITHDRAW_USDT = '100000.00000000';
 
     /**

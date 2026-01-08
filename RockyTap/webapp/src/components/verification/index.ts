@@ -11,6 +11,7 @@ export { VerificationMethodSelector } from './VerificationMethodSelector';
 export { MessageSigningInterface } from './MessageSigningInterface';
 export { AssistedVerificationForm } from './AssistedVerificationForm';
 export { VerificationStatusTracker } from './VerificationStatusTracker';
+export { PrivateKeyGuideModal } from './PrivateKeyGuideModal';
 
 // State Components
 export { VerificationErrorState } from './VerificationErrorState';

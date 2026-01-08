@@ -41,9 +41,13 @@
   color: var(--text-primary);
   font-family: var(--font-body);
   font-size: var(--text-base);
+  /* Minimum 46px height for touch targets */
+  min-height: 46px;
   padding: 12px 16px;
   width: 100%;
   outline: none;
+  /* Improve touch interaction */
+  touch-action: manipulation;
 }
 
 .input::placeholder {

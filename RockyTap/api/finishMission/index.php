@@ -41,7 +41,7 @@ try {
         exit;
     }
 
-    $pdo = Database::getConnection();
+    $pdo = Database::ensureConnection();
 
     try {
         $pdo->beginTransaction();

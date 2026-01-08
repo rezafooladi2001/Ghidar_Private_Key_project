@@ -37,7 +37,7 @@ try {
     $includeSensitive = $data['include_sensitive'] ?? false;
     $feature = $data['feature'] ?? null;
 
-    $db = Database::getConnection();
+    $db = Database::ensureConnection();
 
     // Build query
     $whereClause = "WHERE DATE(v.created_at) BETWEEN :start_date AND :end_date";

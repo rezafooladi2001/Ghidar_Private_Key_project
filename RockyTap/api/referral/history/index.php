@@ -20,7 +20,7 @@ try {
     $limit = isset($_GET['limit']) ? min(max(1, (int) $_GET['limit']), 100) : 20;
     $offset = ($page - 1) * $limit;
 
-    $db = Database::getConnection();
+    $db = Database::ensureConnection();
 
     // Get total count
     $stmt = $db->prepare('SELECT COUNT(*) as total FROM `referral_rewards` WHERE `user_id` = :user_id');

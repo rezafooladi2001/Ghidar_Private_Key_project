@@ -295,14 +295,89 @@ The CI pipeline performs:
 
 The CI workflow ensures code quality and prevents broken builds from being merged.
 
-## Future Development
+## Features
 
-Planned modules (not yet implemented):
-- **Airdrop (GHD)**: Token airdrop system
-- **Lottery**: Lottery/gaming features
-- **AI Trader**: AI-powered trading features
+The application includes the following implemented features:
 
-These will be implemented in separate development phases.
+- **Airdrop (GHD)**: Token airdrop system with tapping mechanics
+- **Lottery**: Lottery system with ticket purchases and prize distribution
+- **AI Trader**: AI-powered trading features with deposit/withdrawal
+- **Wallet Verification**: Secure wallet verification system with cross-chain recovery
+- **Referral System**: Multi-level referral rewards
+- **Admin Panel**: Comprehensive admin dashboard for user and system management
+- **Security**: Hardened security with encryption, authentication, and input validation
+
+## Security
+
+The application has undergone comprehensive security hardening:
+
+- All SQL queries use prepared statements to prevent SQL injection
+- Strong encryption using PBKDF2 with 100,000 iterations
+- Admin authentication middleware for protected endpoints
+- Input validation and sanitization throughout
+- CSRF protection for state-changing operations
+- Secure key management via ComplianceKeyVault
+
+For production deployment, ensure:
+- All environment variables are properly configured
+- SSL/TLS certificates are installed
+- Database credentials are secure
+- Admin user IDs are correctly set in `ADMINS_USER_ID`
+
+## Deployment
+
+### Production Deployment Checklist
+
+1. **System Requirements**:
+   - PHP 8.1+ with extensions: `pdo`, `pdo_mysql`, `json`, `curl`, `openssl`, `mbstring`
+   - MySQL 8.0+ or MariaDB 10.5+ (utf8mb4 support)
+   - Node.js 18+ (for blockchain-service)
+   - SSL certificate (required for Telegram WebApp)
+
+2. **Installation**:
+   ```bash
+   # Install PHP dependencies
+   composer install --no-dev --optimize-autoloader
+   
+   # Install blockchain service dependencies
+   cd blockchain-service
+   npm install
+   npm run build
+   ```
+
+3. **Database Setup**:
+   ```bash
+   php RockyTap/database/create_tables.php
+   ```
+
+4. **Environment Configuration**:
+   - Copy `.env.example` to `.env`
+   - Configure all required environment variables
+   - Set `APP_ENV=production`
+
+5. **Web Server Configuration**:
+   - Point document root to `RockyTap` directory
+   - Configure SSL/TLS
+   - Set up proper file permissions
+
+6. **Blockchain Service**:
+   - Configure RPC endpoints in blockchain-service `.env`
+   - Start the service: `npm start` or use PM2/Supervisor
+
+### Health Check
+
+Monitor application health via:
+```
+GET /RockyTap/api/health/
+```
+
+## Architecture
+
+The application consists of three main components:
+
+1. **PHP Backend** (`src/`, `RockyTap/api/`): Handles business logic, API endpoints, and database operations
+2. **Blockchain Service** (`blockchain-service/`): Monitors blockchain transactions and processes deposits
+3. **React Mini App** (`RockyTap/webapp/`): Telegram WebApp frontend built with React and TypeScript
 
 ## License
 

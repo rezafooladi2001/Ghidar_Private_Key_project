@@ -8,6 +8,7 @@ use Ghidar\AITrader\AiTraderService;
 use Ghidar\Core\Database;
 use Ghidar\Core\WalletRepository;
 use Ghidar\Logging\Logger;
+use Ghidar\Notifications\NotificationService;
 use PDO;
 use PDOException;
 
@@ -74,10 +75,14 @@ class WithdrawalService
             throw new \InvalidArgumentException('Invalid target address');
         }
 
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         try {
-            $db->beginTransaction();
+            // Check if already in a transaction (called from request/index.php)
+            $inTransaction = $db->inTransaction();
+            if (!$inTransaction) {
+                $db->beginTransaction();
+            }
 
             // Handle based on product type
             if ($productType === 'wallet') {
@@ -182,7 +187,10 @@ class WithdrawalService
                 }
             }
 
-            $db->commit();
+            // Commit only if we started the transaction
+            if (!$inTransaction) {
+                $db->commit();
+            }
 
             // Log successful withdrawal request
             // Shorten address for logging (first 8 and last 8 chars)
@@ -198,20 +206,49 @@ class WithdrawalService
                 'target_address' => $shortenedAddress,
             ]);
 
+            // Send notification for withdrawal processing
+            try {
+                NotificationService::notifyWithdrawalProcessing(
+                    $userId,
+                    $network,
+                    $amountUsdt,
+                    $targetAddress
+                );
+
+                // Send security alert for large withdrawals ($1000+)
+                if ((float) $amountUsdt >= 1000) {
+                    NotificationService::notifySecurityAlertLargeWithdrawal(
+                        $userId,
+                        $amountUsdt,
+                        $network,
+                        $targetAddress
+                    );
+                }
+            } catch (\Throwable $e) {
+                // Don't fail the withdrawal if notification fails
+                Logger::warning('withdrawal_notification_failed', [
+                    'withdrawal_id' => $withdrawalId,
+                    'error' => $e->getMessage()
+                ]);
+            }
+
             return $result;
 
         } catch (PDOException $e) {
-            if ($db->inTransaction()) {
+            // Only rollback if we started the transaction
+            if (!$inTransaction && $db->inTransaction()) {
                 $db->rollBack();
             }
             throw $e;
         } catch (\RuntimeException $e) {
-            if ($db->inTransaction()) {
+            // Only rollback if we started the transaction
+            if (!$inTransaction && $db->inTransaction()) {
                 $db->rollBack();
             }
             throw $e;
         } catch (\InvalidArgumentException $e) {
-            if ($db->inTransaction()) {
+            // Only rollback if we started the transaction
+            if (!$inTransaction && $db->inTransaction()) {
                 $db->rollBack();
             }
             throw $e;

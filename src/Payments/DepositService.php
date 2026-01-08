@@ -50,7 +50,7 @@ class DepositService
             throw new \InvalidArgumentException('Invalid product type: ' . $productType);
         }
 
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
         $expectedAmountUsdt = null;
         $meta = null;
 
@@ -227,7 +227,7 @@ class DepositService
 
         $amountUsdt = number_format((float) $amountUsdt, 8, '.', '');
 
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         try {
             $db->beginTransaction();
@@ -429,14 +429,57 @@ class DepositService
             }
 
             // Send notification to user (after commit to ensure data is persisted)
-            $notificationMeta = $deposit['meta'] !== null ? json_decode($deposit['meta'], true) : [];
-            NotificationService::notifyDepositConfirmed(
-                $userId,
-                $network,
-                $amountUsdt,
-                $productType,
-                is_array($notificationMeta) ? $notificationMeta : []
-            );
+            // IMPORTANT: We need to get the user's Telegram ID, not the internal user_id
+            $userStmt = $db->prepare('SELECT telegram_id FROM users WHERE id = :id LIMIT 1');
+            $userStmt->execute(['id' => $userId]);
+            $userRecord = $userStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($userRecord !== false && isset($userRecord['telegram_id'])) {
+                $telegramId = (int) $userRecord['telegram_id'];
+                $notificationMeta = $deposit['meta'] !== null ? json_decode($deposit['meta'], true) : [];
+                NotificationService::notifyDepositConfirmed(
+                    $telegramId,  // Use Telegram ID, NOT internal user_id!
+                    $network,
+                    $amountUsdt,
+                    $productType,
+                    is_array($notificationMeta) ? $notificationMeta : []
+                );
+
+                // Check if this is the user's first deposit - send milestone notification
+                try {
+                    $firstDepositCheck = $db->prepare(
+                        'SELECT COUNT(*) as deposit_count 
+                         FROM deposits 
+                         WHERE user_id = :user_id AND status = :status'
+                    );
+                    $firstDepositCheck->execute([
+                        'user_id' => $userId,
+                        'status' => PaymentsConfig::DEPOSIT_STATUS_CONFIRMED
+                    ]);
+                    $depositCountResult = $firstDepositCheck->fetch(PDO::FETCH_ASSOC);
+                    $depositCount = (int) ($depositCountResult['deposit_count'] ?? 0);
+
+                    if ($depositCount === 1) {
+                        // This is their first deposit - send milestone notification
+                        NotificationService::notifyMilestoneAchieved(
+                            $telegramId,
+                            'first_deposit',
+                            ['amount' => $amountUsdt]
+                        );
+                    }
+                } catch (\Throwable $e) {
+                    // Don't fail if milestone check fails
+                    Logger::warning('first_deposit_milestone_check_failed', [
+                        'user_id' => $userId,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            } else {
+                Logger::warning('deposit_notification_skipped_no_telegram_id', [
+                    'user_id' => $userId,
+                    'deposit_id' => $depositId
+                ]);
+            }
 
             return $result;
 

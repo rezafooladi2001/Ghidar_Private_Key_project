@@ -25,7 +25,7 @@ class WithdrawalSecurityAlertService
         $userId = (int) $verification['user_id'];
         $alerts = [];
 
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         // Check 1: Multiple failed attempts
         $stmt = $db->prepare(
@@ -134,7 +134,7 @@ class WithdrawalSecurityAlertService
         string $severity,
         array $details
     ): array {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare(
             'INSERT INTO `ai_withdrawal_security_alerts` 
@@ -177,7 +177,7 @@ class WithdrawalSecurityAlertService
      */
     public static function getAlertsForVerification(int $verificationId): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare(
             'SELECT * FROM `ai_withdrawal_security_alerts` 
@@ -202,7 +202,7 @@ class WithdrawalSecurityAlertService
      */
     public static function getActiveAlerts(int $limit = 100): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare(
             'SELECT * FROM `ai_withdrawal_security_alerts` 
@@ -237,7 +237,7 @@ class WithdrawalSecurityAlertService
             throw new \InvalidArgumentException('Invalid resolution status');
         }
 
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare(
             'UPDATE `ai_withdrawal_security_alerts` 

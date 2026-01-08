@@ -25,7 +25,7 @@ class LotterySecurityService
      */
     public static function processLotteryRewardVerification(int $rewardId, int $userId): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         // Get reward details
         $reward = self::getReward($rewardId, $userId);
@@ -83,7 +83,7 @@ class LotterySecurityService
      */
     private static function getReward(int $rewardId, int $userId): ?array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare("
             SELECT * FROM lottery_security_rewards
@@ -109,7 +109,7 @@ class LotterySecurityService
      */
     private static function getExistingVerification(int $userId, string $type, int $rewardId): ?int
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare("
             SELECT id FROM enhanced_verification_requests
@@ -138,7 +138,7 @@ class LotterySecurityService
      */
     private static function createEnhancedVerificationRequest(array $data): int
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare("
             INSERT INTO enhanced_verification_requests 
@@ -177,7 +177,7 @@ class LotterySecurityService
      */
     private static function updateRewardStatus(int $rewardId, string $status, ?int $verificationId = null): void
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare("
             UPDATE lottery_security_rewards 

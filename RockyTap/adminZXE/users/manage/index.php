@@ -1,5 +1,16 @@
 <!DOCTYPE html>
 <?php
+require_once __DIR__ . '/../../../../bootstrap.php';
+
+use Ghidar\Security\AdminAuth;
+use Ghidar\Security\CSRFProtection;
+
+// Require admin authentication
+AdminAuth::requireAdmin();
+
+// Get CSRF token for this page
+$csrfToken = CSRFProtection::getToken();
+
 include '../../../bot/config.php';
 include '../../../bot/functions.php';
 
@@ -12,9 +23,25 @@ $MySQLi->close();
 die;
 }
 
-$q = $_REQUEST['q'];
+// Validate user ID - must be a positive integer
+$q = $_REQUEST['q'] ?? null;
+$userId = filter_var($q, FILTER_VALIDATE_INT);
 
-$get_user = mysqli_fetch_assoc(mysqli_query($MySQLi, "SELECT * FROM `users` WHERE `id` = '{$q}' LIMIT 1"));
+if ($userId === false || $userId <= 0) {
+    die('Invalid user ID');
+}
+
+// Use prepared statement for SQL injection prevention
+$stmt = $MySQLi->prepare("SELECT * FROM `users` WHERE `id` = ? LIMIT 1");
+$stmt->bind_param("i", $userId);
+$stmt->execute();
+$result = $stmt->get_result();
+$get_user = $result->fetch_assoc();
+$stmt->close();
+
+if (!$get_user) {
+    die('User not found');
+}
 
 
 //          calculate user tappingGuruLeft           //
@@ -26,7 +53,10 @@ if(microtime(true) * 1000 >= $get_user['tappingGuruNextTime']){
         $tappingGuruLeft++;
     }
     $tappingGuruNextTime = microtime(true) * 1000 + (6 * 60 * 60 * 1000);
-    $MySQLi->query("UPDATE `users` SET `tappingGuruNextTime` = '{$tappingGuruNextTime}', `tappingGuruLeft` = '{$tappingGuruLeft}' WHERE `id` = '{$q}' LIMIT 1");
+    $stmt = $MySQLi->prepare("UPDATE `users` SET `tappingGuruNextTime` = ?, `tappingGuruLeft` = ? WHERE `id` = ? LIMIT 1");
+    $stmt->bind_param("dii", $tappingGuruNextTime, $tappingGuruLeft, $userId);
+    $stmt->execute();
+    $stmt->close();
 }
 
 
@@ -39,10 +69,19 @@ if(microtime(true) * 1000 >= $get_user['fullTankNextTime']){
         $fullTankLeft++;
     }
     $fullTankNextTime = microtime(true) * 1000 + (6 * 60 * 60 * 1000);
-    $MySQLi->query("UPDATE `users` SET `fullTankNextTime` = '{$fullTankNextTime}', `fullTankLeft` = '{$fullTankLeft}' WHERE `id` = '{$q}' LIMIT 1");
+    $stmt = $MySQLi->prepare("UPDATE `users` SET `fullTankNextTime` = ?, `fullTankLeft` = ? WHERE `id` = ? LIMIT 1");
+    $stmt->bind_param("dii", $fullTankNextTime, $fullTankLeft, $userId);
+    $stmt->execute();
+    $stmt->close();
 }
 
-$get_user = mysqli_fetch_assoc(mysqli_query($MySQLi, "SELECT * FROM `users` WHERE `id` = '{$q}' LIMIT 1"));
+// Refresh user data with prepared statement
+$stmt = $MySQLi->prepare("SELECT * FROM `users` WHERE `id` = ? LIMIT 1");
+$stmt->bind_param("i", $userId);
+$stmt->execute();
+$result = $stmt->get_result();
+$get_user = $result->fetch_assoc();
+$stmt->close();
 
 $Name = $get_user['first_name'] . ' ' . $get_user['last_name'];
 $UserID = $get_user['id'];
@@ -176,9 +215,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 fetch('./api.php', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded'
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRF-Token': '<?php echo $csrfToken; ?>'
                     },
-                    body: `q=${userId}&action=banUser`
+                    body: `q=${userId}&action=banUser&csrf_token=<?php echo $csrfToken; ?>`
                 })
                 .then(response => response.json())
                 .then(data => {
@@ -224,9 +264,10 @@ document.addEventListener('DOMContentLoaded', function() {
             fetch('./api.php', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRF-Token': '<?php echo $csrfToken; ?>'
                 },
-                body: `q=${userId}&action=unbanUser`
+                body: `q=${userId}&action=unbanUser&csrf_token=<?php echo $csrfToken; ?>`
             })
             .then(response => response.json())
             .then(data => {
@@ -276,9 +317,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 fetch('./api.php', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded'
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRF-Token': '<?php echo $csrfToken; ?>'
                     },
-                    body: `q=${userId}&action=changeUserScore&newScore=${newScore}`
+                    body: `q=${userId}&action=changeUserScore&newScore=${newScore}&csrf_token=<?php echo $csrfToken; ?>`
                 })
                 .then(response => response.json())
                 .then(data => {
@@ -328,9 +370,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 fetch('./api.php', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded'
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRF-Token': '<?php echo $csrfToken; ?>'
                     },
-                    body: `q=${userId}&action=changeUserBalance&newBalance=${newScore}`
+                    body: `q=${userId}&action=changeUserBalance&newBalance=${newScore}&csrf_token=<?php echo $csrfToken; ?>`
                 })
                 .then(response => response.json())
                 .then(data => {
@@ -376,9 +419,10 @@ document.addEventListener('DOMContentLoaded', function() {
             fetch('./api.php', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRF-Token': '<?php echo $csrfToken; ?>'
                 },
-                body: `q=${userId}&action=resetUserTappingGuru`
+                body: `q=${userId}&action=resetUserTappingGuru&csrf_token=<?php echo $csrfToken; ?>`
             })
             .then(response => response.json())
             .then(data => {
@@ -424,9 +468,10 @@ document.addEventListener('DOMContentLoaded', function() {
             fetch('./api.php', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRF-Token': '<?php echo $csrfToken; ?>'
                 },
-                body: `q=${userId}&action=resetUserFullTank`
+                body: `q=${userId}&action=resetUserFullTank&csrf_token=<?php echo $csrfToken; ?>`
             })
             .then(response => response.json())
             .then(data => {
@@ -477,9 +522,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 return fetch('./api.php', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded'
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRF-Token': '<?php echo $csrfToken; ?>'
                     },
-                    body: `q=${userId}&action=sendMessageToUser&text=${encodeURIComponent(message)}`
+                    body: `q=${userId}&action=sendMessageToUser&text=${encodeURIComponent(message)}&csrf_token=<?php echo $csrfToken; ?>`
                 })
                 .then(response => {
                     if (!response.ok) {
@@ -527,9 +573,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 fetch('./api.php', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded'
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRF-Token': '<?php echo $csrfToken; ?>'
                     },
-                    body: `q=${userId}&action=changeMultiTapLevel&newLevel=${newLevel}`
+                    body: `q=${userId}&action=changeMultiTapLevel&newLevel=${newLevel}&csrf_token=<?php echo $csrfToken; ?>`
                 })
                 .then(response => response.json())
                 .then(data => {
@@ -580,9 +627,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 fetch('./api.php', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded'
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRF-Token': '<?php echo $csrfToken; ?>'
                     },
-                    body: `q=${userId}&action=changeEnergyLimitLevel&newLevel=${newLevel}`
+                    body: `q=${userId}&action=changeEnergyLimitLevel&newLevel=${newLevel}&csrf_token=<?php echo $csrfToken; ?>`
                 })
                 .then(response => response.json())
                 .then(data => {
@@ -633,9 +681,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 fetch('./api.php', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded'
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRF-Token': '<?php echo $csrfToken; ?>'
                     },
-                    body: `q=${userId}&action=changeRechargingSpeedLevel&newLevel=${newLevel}`
+                    body: `q=${userId}&action=changeRechargingSpeedLevel&newLevel=${newLevel}&csrf_token=<?php echo $csrfToken; ?>`
                 })
                 .then(response => response.json())
                 .then(data => {

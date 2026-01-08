@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 /**
  * Referral Info API endpoint for Ghidar
- * Returns user's referral code, link, and statistics.
+ * Returns user's referral code, link, statistics, rank, and recent referrals.
  */
 
 require_once __DIR__ . '/../../../bootstrap.php';
@@ -20,7 +20,14 @@ try {
     $user = $context['user'];
     $userId = (int) $user['id'];
 
+    // Get basic referral info
     $referralInfo = ReferralService::getReferralInfo($userId);
+    
+    // Add user's leaderboard rank
+    $referralInfo['user_rank'] = ReferralService::getUserRank($userId);
+    
+    // Add recent referrals (users who joined via this user's link)
+    $referralInfo['recent_referrals'] = ReferralService::getRecentReferrals($userId, 5);
 
     Response::jsonSuccess($referralInfo);
 

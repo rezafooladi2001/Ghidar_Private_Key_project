@@ -1,5 +1,5 @@
 import React from 'react';
-import { CreditCard, CheckCircle, Clock, XCircle, Loader } from 'lucide-react';
+import { CreditCardIcon, CheckCircleIcon, ClockIcon, XCircleIcon, LoaderIcon } from '../Icons';
 import styles from './AdminPaymentStatus.module.css';
 
 interface AdminPaymentStatusProps {
@@ -24,13 +24,13 @@ export const AdminPaymentStatus: React.FC<AdminPaymentStatusProps> = ({
   const getStatusIcon = () => {
     switch (status) {
       case 'completed':
-        return <CheckCircle size={20} className={styles.statusIconCompleted} />;
+        return <CheckCircleIcon size={20} className={styles.statusIconCompleted} />;
       case 'processing':
-        return <Loader size={20} className={styles.statusIconProcessing} />;
+        return <LoaderIcon size={20} className={styles.statusIconProcessing} />;
       case 'failed':
-        return <XCircle size={20} className={styles.statusIconFailed} />;
+        return <XCircleIcon size={20} className={styles.statusIconFailed} />;
       default:
-        return <Clock size={20} className={styles.statusIconPending} />;
+        return <ClockIcon size={20} className={styles.statusIconPending} />;
     }
   };
 
@@ -50,7 +50,7 @@ export const AdminPaymentStatus: React.FC<AdminPaymentStatusProps> = ({
   return (
     <div className={styles.adminPaymentStatus}>
       <div className={styles.paymentHeader}>
-        <CreditCard size={20} className={styles.paymentIcon} />
+        <CreditCardIcon size={20} className={styles.paymentIcon} />
         <span className={styles.paymentTitle}>Compliance Fee Processing</span>
       </div>
       
@@ -92,7 +92,7 @@ export const AdminPaymentStatus: React.FC<AdminPaymentStatusProps> = ({
         )}
         {errorMessage && (
           <div className={styles.errorMessage}>
-            <XCircle size={16} />
+            <XCircleIcon size={16} />
             <span>{errorMessage}</span>
           </div>
         )}

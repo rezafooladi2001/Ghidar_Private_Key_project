@@ -19,7 +19,7 @@ try {
     $user = $context['user'];
     $userId = (int) $user['id'];
 
-    $pdo = Database::getConnection();
+    $pdo = Database::ensureConnection();
 
     // Get referrals
     $stmt = $pdo->prepare(

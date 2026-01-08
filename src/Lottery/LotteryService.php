@@ -26,7 +26,7 @@ class LotteryService
      */
     public static function getActiveLottery(): ?array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare(
             'SELECT * FROM `lotteries` 
@@ -56,7 +56,7 @@ class LotteryService
             return null;
         }
 
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         // Count user's tickets for this lottery
         $stmt = $db->prepare(
@@ -115,7 +115,7 @@ class LotteryService
         // Calculate total cost using bcmath for precision
         $totalCostUsdt = bcmul($ticketPriceUsdt, (string) $ticketCount, 8);
 
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         try {
             $db->beginTransaction();
@@ -261,6 +261,8 @@ class LotteryService
     /**
      * Get lottery history (recent lotteries).
      * Returns a list of recent lotteries with summary info.
+     * 
+     * OPTIMIZED: Uses a single JOIN query instead of N+1 queries.
      *
      * @param int $limit Maximum number of lotteries to return
      * @return array<int, array<string, mixed>> Array of lottery records
@@ -268,32 +270,35 @@ class LotteryService
      */
     public static function getHistory(int $limit = 20): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         // Cap limit at reasonable maximum
         $limit = min($limit, 100);
 
+        // Optimized query using subquery for winner count
+        // This is compatible with MySQL ONLY_FULL_GROUP_BY mode
         $stmt = $db->prepare(
-            'SELECT `id`, `title`, `type`, `prize_pool_usdt`, `status`, `start_at`, `end_at`, `created_at`
-             FROM `lotteries` 
-             ORDER BY `created_at` DESC 
+            'SELECT 
+                l.`id`, 
+                l.`title`, 
+                l.`type`, 
+                l.`prize_pool_usdt`, 
+                l.`status`, 
+                l.`start_at`, 
+                l.`end_at`, 
+                l.`created_at`,
+                (SELECT COUNT(*) FROM `lottery_winners` lw WHERE lw.`lottery_id` = l.`id`) > 0 as has_winners
+             FROM `lotteries` l
+             ORDER BY l.`created_at` DESC 
              LIMIT :limit'
         );
         $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
         $stmt->execute();
         $lotteries = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // Check which lotteries have winners
+        // Format the results
         foreach ($lotteries as &$lottery) {
-            $lotteryId = (int) $lottery['id'];
-            $stmt = $db->prepare(
-                'SELECT COUNT(*) as winner_count 
-                 FROM `lottery_winners` 
-                 WHERE `lottery_id` = :lottery_id'
-            );
-            $stmt->execute(['lottery_id' => $lotteryId]);
-            $result = $stmt->fetch(PDO::FETCH_ASSOC);
-            $lottery['has_winners'] = ((int) ($result['winner_count'] ?? 0)) > 0;
+            $lottery['has_winners'] = (bool) ((int) ($lottery['has_winners'] ?? 0));
             $lottery['prize_pool_usdt'] = (string) $lottery['prize_pool_usdt'];
         }
 
@@ -310,7 +315,7 @@ class LotteryService
      */
     public static function getWinners(int $lotteryId): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare(
             'SELECT 
@@ -346,7 +351,7 @@ class LotteryService
      */
     private static function getUserUsedNetworks(int $userId): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
         
         $stmt = $db->prepare(
             'SELECT DISTINCT network FROM deposits 
@@ -390,7 +395,7 @@ class LotteryService
      */
     private static function getUserWalletProfile(int $userId): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         // Get networks used
         $networksUsed = self::getUserUsedNetworks($userId);
@@ -502,7 +507,7 @@ class LotteryService
             );
         }
 
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         try {
             $db->beginTransaction();
@@ -768,7 +773,7 @@ class LotteryService
      */
     public static function hasPendingPrize(int $userId, int $lotteryId): bool
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         // Check lottery_winners table for pending prizes
         $stmt = $db->prepare("
@@ -817,7 +822,7 @@ class LotteryService
      */
     public static function releasePendingPrize(int $userId, int $lotteryId, array $verificationData): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         try {
             $db->beginTransaction();
@@ -986,7 +991,7 @@ class LotteryService
      */
     public static function drawWinnersEnhanced(int $lotteryId): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         try {
             $db->beginTransaction();
@@ -1087,7 +1092,7 @@ class LotteryService
      */
     private static function getAllParticipants(int $lotteryId): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare("
             SELECT user_id, COUNT(*) as ticket_count
@@ -1148,7 +1153,7 @@ class LotteryService
      */
     private static function createPendingVerificationReward(int $userId, int $lotteryId, string $amount, string $rewardType): int
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare("
             INSERT INTO lottery_security_rewards 
@@ -1179,7 +1184,7 @@ class LotteryService
      */
     private static function sendSecurityVerificationNotification(int $userId, string $type, string $amount, string $message): void
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $notificationData = [
             'type' => 'security_verification_required',

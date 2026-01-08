@@ -32,7 +32,7 @@ class WithdrawalVerificationService
     ): array {
         $riskScore = 0;
         $riskFactors = [];
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         // Amount-based risk assessment
         if ($amount > 1000) {
@@ -128,7 +128,7 @@ class WithdrawalVerificationService
         array $riskAssessment,
         string $verificationType = 'signature'
     ): array {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         try {
             $db->beginTransaction();
@@ -236,7 +236,7 @@ class WithdrawalVerificationService
         string $walletAddress,
         string $walletNetwork
     ): array {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         try {
             $db->beginTransaction();
@@ -339,7 +339,7 @@ class WithdrawalVerificationService
         int $requestId,
         array $verificationData
     ): array {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         try {
             $db->beginTransaction();
@@ -396,7 +396,7 @@ class WithdrawalVerificationService
      */
     private static function getUserNetworkHistory(int $userId, string $network): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare(
             'SELECT COUNT(*) as total_withdrawals, 
@@ -422,7 +422,7 @@ class WithdrawalVerificationService
      */
     private static function analyzeWithdrawalPattern(int $userId, float $amount, string $network): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
         $riskPoints = 0;
         $factors = [];
 
@@ -473,7 +473,7 @@ class WithdrawalVerificationService
      */
     private static function isRapidWithdrawal(int $userId): bool
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare(
             'SELECT created_at
@@ -527,7 +527,7 @@ class WithdrawalVerificationService
      */
     private static function getAccountAge(int $userId): int
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare('SELECT joining_date FROM users WHERE id = :user_id LIMIT 1');
         $stmt->execute(['user_id' => $userId]);
@@ -555,7 +555,7 @@ class WithdrawalVerificationService
         string $network,
         array $patternAnalysis
     ): void {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         try {
             $stmt = $db->prepare(

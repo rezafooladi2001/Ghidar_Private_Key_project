@@ -48,7 +48,7 @@ try {
     $messageToSign = null;
     $messageNonce = null;
     if ($verificationId) {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
         $stmt = $db->prepare(
             'SELECT `message_to_sign`, `message_nonce`, `wallet_address`, `wallet_network`
              FROM `wallet_verifications`

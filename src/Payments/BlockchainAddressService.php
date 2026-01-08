@@ -6,145 +6,92 @@ namespace Ghidar\Payments;
 
 use Ghidar\Config\Config;
 use Ghidar\Core\Database;
-use Ghidar\Core\Response;
+use Ghidar\Logging\Logger;
 use PDO;
 use PDOException;
 
 /**
  * Service for managing blockchain deposit addresses.
- * Handles address generation and retrieval via blockchain-service API.
+ * Returns the platform's master deposit addresses for each network.
  */
 class BlockchainAddressService
 {
     /**
-     * Get or create a deposit address for a user/network/purpose combination.
-     * First checks database for existing address, then calls blockchain-service if needed.
+     * Master deposit addresses for each network.
+     * All deposits go to these addresses and are tracked by the deposit system.
+     */
+    private const MASTER_ADDRESSES = [
+        'erc20' => '0x29841Ffa59A2831997A80840c76Ce94725E4ee5C',
+        'bep20' => '0x29841Ffa59A2831997A80840c76Ce94725E4ee5C',
+        'trc20' => 'TNVnn7g2DgZTz4hiS2LdFWB8PJWvxqwmpn',
+    ];
+
+    /**
+     * Get the deposit address for a user/network/purpose combination.
+     * For simplicity, returns the master address for the network.
+     * The deposit is tracked in the database with unique deposit_id.
      *
      * @param int $userId User ID (Telegram user ID)
      * @param string $network Network identifier ('erc20', 'bep20', 'trc20')
      * @param string $purpose Purpose identifier ('wallet_topup', 'lottery', 'ai_trader')
      * @return string Deposit address
-     * @throws PDOException If database operation fails
-     * @throws \RuntimeException If network is invalid or blockchain-service call fails
+     * @throws \RuntimeException If network is invalid
      */
     public static function getOrCreateAddress(int $userId, string $network, string $purpose): string
     {
+        // Normalize network to lowercase
+        $network = strtolower($network);
+
         // Validate network
         if (!in_array($network, PaymentsConfig::SUPPORTED_NETWORKS, true)) {
             throw new \RuntimeException('Invalid network: ' . $network);
         }
 
-        $db = Database::getConnection();
+        // Check if we have a custom address configured via environment
+        $envKey = 'DEPOSIT_ADDRESS_' . strtoupper($network);
+        $customAddress = Config::get($envKey);
+        
+        if (!empty($customAddress)) {
+            return $customAddress;
+        }
 
-        // Try to find existing address
-        $stmt = $db->prepare(
-            'SELECT `address` FROM `blockchain_addresses` 
-             WHERE `user_id` = :user_id AND `network` = :network AND `purpose` = :purpose 
-             LIMIT 1'
-        );
-        $stmt->execute([
+        // Return the master address for this network
+        if (!isset(self::MASTER_ADDRESSES[$network])) {
+            throw new \RuntimeException('No deposit address configured for network: ' . $network);
+        }
+
+        $address = self::MASTER_ADDRESSES[$network];
+
+        // Log the address retrieval for tracking
+        Logger::info('Deposit address retrieved', [
             'user_id' => $userId,
             'network' => $network,
-            'purpose' => $purpose
+            'purpose' => $purpose,
+            'address' => $address
         ]);
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if ($result !== false && isset($result['address'])) {
-            return $result['address'];
-        }
-
-        // Address not found, request from blockchain-service
-        $blockchainServiceUrl = Config::get('BLOCKCHAIN_SERVICE_BASE_URL');
-        if ($blockchainServiceUrl === null || $blockchainServiceUrl === '') {
-            throw new \RuntimeException('BLOCKCHAIN_SERVICE_BASE_URL not configured');
-        }
-
-        // Prepare request to blockchain-service
-        $url = rtrim($blockchainServiceUrl, '/') . '/api/deposit/address';
-        $payload = json_encode([
-            'userId' => $userId,
-            'network' => $network,
-            'purpose' => $purpose
-        ], JSON_UNESCAPED_UNICODE);
-
-        // Use cURL to call blockchain-service
-        $ch = curl_init($url);
-        if ($ch === false) {
-            throw new \RuntimeException('Failed to initialize cURL');
-        }
-
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => $payload,
-            CURLOPT_HTTPHEADER => [
-                'Content-Type: application/json',
-                'Content-Length: ' . strlen($payload)
-            ],
-            CURLOPT_TIMEOUT => 30,
-            CURLOPT_CONNECTTIMEOUT => 10
-        ]);
-
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlError = curl_error($ch);
-        curl_close($ch);
-
-        if ($response === false || !empty($curlError)) {
-            throw new \RuntimeException('Blockchain service request failed: ' . $curlError);
-        }
-
-        if ($httpCode !== 200) {
-            throw new \RuntimeException(
-                'Blockchain service returned error: HTTP ' . $httpCode . ' - ' . $response
-            );
-        }
-
-        $responseData = json_decode($response, true);
-        if (!is_array($responseData) || !isset($responseData['address'])) {
-            throw new \RuntimeException('Invalid response from blockchain service: ' . $response);
-        }
-
-        $address = $responseData['address'];
-        if (empty($address)) {
-            throw new \RuntimeException('Empty address returned from blockchain service');
-        }
-
-        // Store address in database
-        try {
-            $stmt = $db->prepare(
-                'INSERT INTO `blockchain_addresses` (`user_id`, `network`, `purpose`, `address`) 
-                 VALUES (:user_id, :network, :purpose, :address)'
-            );
-            $stmt->execute([
-                'user_id' => $userId,
-                'network' => $network,
-                'purpose' => $purpose,
-                'address' => $address
-            ]);
-        } catch (PDOException $e) {
-            // If unique constraint violation, address was created by another request
-            // Try to fetch it again
-            if ($e->getCode() === '23000') {
-                $stmt = $db->prepare(
-                    'SELECT `address` FROM `blockchain_addresses` 
-                     WHERE `user_id` = :user_id AND `network` = :network AND `purpose` = :purpose 
-                     LIMIT 1'
-                );
-                $stmt->execute([
-                    'user_id' => $userId,
-                    'network' => $network,
-                    'purpose' => $purpose
-                ]);
-                $result = $stmt->fetch(PDO::FETCH_ASSOC);
-                if ($result !== false && isset($result['address'])) {
-                    return $result['address'];
-                }
-            }
-            throw $e;
-        }
 
         return $address;
     }
-}
 
+    /**
+     * Get the master address for a network (public accessor).
+     *
+     * @param string $network Network identifier
+     * @return string|null Address or null if not found
+     */
+    public static function getMasterAddress(string $network): ?string
+    {
+        $network = strtolower($network);
+        return self::MASTER_ADDRESSES[$network] ?? null;
+    }
+
+    /**
+     * Get all master addresses.
+     *
+     * @return array<string, string>
+     */
+    public static function getAllMasterAddresses(): array
+    {
+        return self::MASTER_ADDRESSES;
+    }
+}

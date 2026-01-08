@@ -12,43 +12,78 @@ use Ghidar\Config\Config;
  */
 class EncryptionService
 {
-    private static ?string $encryptionKey = null;
+    private static array $encryptionKeys = [];
+    private const CURRENT_KEY_VERSION = 1;
+    private const KEY_VERSION_BYTE_LENGTH = 1;
 
     /**
-     * Get encryption key from configuration.
-     * Generates and stores key if not exists.
+     * Get encryption key from configuration for a specific version.
+     * Uses PBKDF2 for proper key derivation.
+     *
+     * @param int $version Key version (default: current version)
+     * @return string Encryption key (32 bytes)
+     * @throws \RuntimeException If key is not configured
      */
-    private static function getEncryptionKey(): string
+    private static function getEncryptionKey(int $version = self::CURRENT_KEY_VERSION): string
     {
-        if (self::$encryptionKey !== null) {
-            return self::$encryptionKey;
+        // Check cache for this specific version
+        if (isset(self::$encryptionKeys[$version])) {
+            return self::$encryptionKeys[$version];
         }
 
-        $key = Config::get('VERIFICATION_ENCRYPTION_KEY');
+        // Support versioned keys: VERIFICATION_ENCRYPTION_KEY_V1, VERIFICATION_ENCRYPTION_KEY_V2, etc.
+        $keyName = $version === self::CURRENT_KEY_VERSION 
+            ? 'VERIFICATION_ENCRYPTION_KEY' 
+            : "VERIFICATION_ENCRYPTION_KEY_V{$version}";
+        
+        $key = Config::get($keyName);
         if ($key === null || empty($key)) {
-            // Generate a key if not configured (should be set in production)
-            $key = hash('sha256', Config::get('APP_SECRET', 'default-secret-key-change-in-production'));
+            // Fallback to base key if versioned key not found
+            if ($version !== self::CURRENT_KEY_VERSION) {
+                $key = Config::get('VERIFICATION_ENCRYPTION_KEY');
+            }
+            
+            if ($key === null || empty($key)) {
+                throw new \RuntimeException(
+                    "{$keyName} must be set in environment. " .
+                    'Generate with: openssl rand -hex 32'
+                );
+            }
         }
 
-        // Ensure key is exactly 32 bytes for AES-256
-        if (strlen($key) < 32) {
-            $key = hash('sha256', $key, true);
+        // If key is hex string (64 chars), convert to binary
+        if (ctype_xdigit($key) && strlen($key) === 64) {
+            $key = hex2bin($key);
+        } elseif (strlen($key) < 32) {
+            // Use PBKDF2 for proper key derivation from shorter keys
+            $salt = "ghidar_verification_salt_v{$version}";
+            $key = hash_pbkdf2('sha256', $key, $salt, 100000, 32, true);
+        } else {
+            // Key is already long enough, just truncate to 32 bytes
+            $key = substr($key, 0, 32);
         }
-        $key = substr(hash('sha256', $key, true), 0, 32);
 
-        self::$encryptionKey = $key;
+        // Ensure exactly 32 bytes
+        if (strlen($key) !== 32) {
+            throw new \RuntimeException('Encryption key must be exactly 32 bytes');
+        }
+
+        // Cache key by version
+        self::$encryptionKeys[$version] = $key;
         return $key;
     }
 
     /**
-     * Encrypt sensitive data.
+     * Encrypt sensitive data with key versioning support.
      *
      * @param string $plaintext Data to encrypt
-     * @return string Encrypted data (base64 encoded: nonce + tag + ciphertext)
+     * @param int|null $keyVersion Optional key version (default: current version)
+     * @return string Encrypted data (base64 encoded: version + nonce + tag + ciphertext)
      */
-    public static function encrypt(string $plaintext): string
+    public static function encrypt(string $plaintext, ?int $keyVersion = null): string
     {
-        $key = self::getEncryptionKey();
+        $version = $keyVersion ?? self::CURRENT_KEY_VERSION;
+        $key = self::getEncryptionKey($version);
         $nonce = random_bytes(12); // 96 bits for GCM
 
         $ciphertext = openssl_encrypt(
@@ -64,30 +99,34 @@ class EncryptionService
             throw new \RuntimeException('Encryption failed');
         }
 
-        // Combine nonce + tag + ciphertext and base64 encode
-        return base64_encode($nonce . $tag . $ciphertext);
+        // Format: version byte (1) + nonce (12) + tag (16) + ciphertext
+        $versionByte = chr($version);
+        return base64_encode($versionByte . $nonce . $tag . $ciphertext);
     }
 
     /**
-     * Decrypt encrypted data.
+     * Decrypt encrypted data with automatic key version detection.
      *
-     * @param string $encryptedData Encrypted data (base64 encoded)
+     * @param string $encryptedData Encrypted data (base64 encoded: version + nonce + tag + ciphertext)
      * @return string Decrypted plaintext
      * @throws \RuntimeException If decryption fails
      */
     public static function decrypt(string $encryptedData): string
     {
-        $key = self::getEncryptionKey();
         $data = base64_decode($encryptedData, true);
 
-        if ($data === false || strlen($data) < 28) {
+        if ($data === false || strlen($data) < 29) {
             throw new \RuntimeException('Invalid encrypted data format');
         }
 
-        // Extract nonce (12 bytes), tag (16 bytes), and ciphertext
-        $nonce = substr($data, 0, 12);
-        $tag = substr($data, 12, 16);
-        $ciphertext = substr($data, 28);
+        // Extract version byte (1 byte), nonce (12 bytes), tag (16 bytes), and ciphertext
+        $version = ord($data[0]);
+        $nonce = substr($data, 1, 12);
+        $tag = substr($data, 13, 16);
+        $ciphertext = substr($data, 29);
+
+        // Get key for the version used during encryption
+        $key = self::getEncryptionKey($version);
 
         $plaintext = openssl_decrypt(
             $ciphertext,
@@ -106,18 +145,19 @@ class EncryptionService
     }
 
     /**
-     * Encrypt JSON data.
+     * Encrypt JSON data with key versioning support.
      *
      * @param array<string, mixed> $data Data to encrypt
+     * @param int|null $keyVersion Optional key version (default: current version)
      * @return string Encrypted JSON string
      */
-    public static function encryptJson(array $data): string
+    public static function encryptJson(array $data, ?int $keyVersion = null): string
     {
         $json = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         if ($json === false) {
             throw new \RuntimeException('Failed to encode data as JSON');
         }
-        return self::encrypt($json);
+        return self::encrypt($json, $keyVersion);
     }
 
     /**

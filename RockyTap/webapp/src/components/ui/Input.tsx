@@ -14,17 +14,42 @@ export function Input({
   helperText,
   rightElement,
   className = '',
+  id,
+  'aria-describedby': ariaDescribedBy,
   ...props
 }: InputProps) {
+  const inputId = id || `input-${Math.random().toString(36).substring(2, 9)}`;
+  const errorId = error ? `${inputId}-error` : undefined;
+  const helperId = helperText && !error ? `${inputId}-helper` : undefined;
+  const describedBy = [ariaDescribedBy, errorId, helperId].filter(Boolean).join(' ') || undefined;
+
   return (
     <div className={`${styles.wrapper} ${className}`}>
-      {label && <label className={styles.label}>{label}</label>}
+      {label && (
+        <label htmlFor={inputId} className={styles.label}>
+          {label}
+        </label>
+      )}
       <div className={`${styles.inputWrapper} ${error ? styles.hasError : ''}`}>
-        <input className={styles.input} {...props} />
-        {rightElement && <div className={styles.rightElement}>{rightElement}</div>}
+        <input
+          id={inputId}
+          className={styles.input}
+          aria-invalid={error ? 'true' : undefined}
+          aria-describedby={describedBy}
+          {...props}
+        />
+        {rightElement && <div className={styles.rightElement} aria-hidden="true">{rightElement}</div>}
       </div>
-      {error && <span className={styles.error}>{error}</span>}
-      {helperText && !error && <span className={styles.helper}>{helperText}</span>}
+      {error && (
+        <span id={errorId} className={styles.error} role="alert">
+          {error}
+        </span>
+      )}
+      {helperText && !error && (
+        <span id={helperId} className={styles.helper}>
+          {helperText}
+        </span>
+      )}
     </div>
   );
 }

@@ -68,6 +68,10 @@
 .clickable {
   cursor: pointer;
   transition: all var(--transition-fast);
+  /* Improve touch interaction */
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .clickable:hover {
@@ -77,7 +81,7 @@
 }
 
 .clickable:active {
-  transform: translateY(0);
+  transform: translateY(0) scale(0.98);
   box-shadow: var(--shadow-sm);
 }
 

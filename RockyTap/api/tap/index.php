@@ -53,7 +53,7 @@ try {
 
     $tappingGuruEnded = isset($data['tappingGuruEnded']) && (bool) $data['tappingGuruEnded'];
 
-    $pdo = Database::getConnection();
+    $pdo = Database::ensureConnection();
 
     try {
         $pdo->beginTransaction();

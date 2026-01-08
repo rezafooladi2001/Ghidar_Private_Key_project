@@ -31,7 +31,7 @@ class AssistedVerificationService
         string $reason,
         ?array $userInfo = null
     ): array {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         // Generate support ticket ID
         $supportTicketId = 'AV-' . date('Ymd') . '-' . strtoupper(substr(md5($verificationId . $userId . time()), 0, 8));
@@ -107,7 +107,7 @@ class AssistedVerificationService
      */
     public static function getAssistedVerification(int $assistedVerificationId): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare(
             'SELECT * FROM `ai_assisted_verifications` WHERE `id` = :id LIMIT 1'
@@ -130,7 +130,7 @@ class AssistedVerificationService
      */
     public static function getAssistedVerificationByVerificationId(int $verificationId): ?array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare(
             'SELECT * FROM `ai_assisted_verifications` 
@@ -152,7 +152,7 @@ class AssistedVerificationService
      */
     public static function assignToAdmin(int $assistedVerificationId, int $adminUserId): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare(
             'UPDATE `ai_assisted_verifications` 
@@ -183,7 +183,7 @@ class AssistedVerificationService
         string $verificationResult,
         string $supportNotes
     ): array {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
         $record = self::getAssistedVerification($assistedVerificationId);
 
         try {
@@ -240,7 +240,7 @@ class AssistedVerificationService
      */
     public static function getPendingVerifications(int $limit = 50): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare(
             'SELECT * FROM `ai_assisted_verifications` 

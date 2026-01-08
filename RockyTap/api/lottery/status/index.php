@@ -14,6 +14,30 @@ use Ghidar\Http\Middleware;
 use Ghidar\Lottery\LotteryService;
 use Ghidar\Logging\Logger;
 
+/**
+ * Convert MySQL DATETIME to ISO 8601 format with UTC timezone.
+ * This ensures consistent date parsing across different client timezones.
+ * 
+ * @param string|null $dateString MySQL datetime string
+ * @return string|null ISO 8601 formatted date or null
+ */
+function formatDateToISO8601(?string $dateString): ?string
+{
+    if ($dateString === null || $dateString === '') {
+        return null;
+    }
+    
+    try {
+        // Parse the MySQL datetime (assumes server timezone)
+        $date = new DateTime($dateString, new DateTimeZone(date_default_timezone_get()));
+        // Convert to UTC and format as ISO 8601
+        $date->setTimezone(new DateTimeZone('UTC'));
+        return $date->format('c'); // ISO 8601 format: 2025-02-14T23:59:59+00:00
+    } catch (\Exception $e) {
+        return $dateString; // Return original if parsing fails
+    }
+}
+
 try {
     // Initialize middleware and authenticate (GET allowed for status)
     $context = Middleware::requireAuth('GET');
@@ -21,18 +45,35 @@ try {
     $wallet = $context['wallet'];
     $userId = (int) $user['id'];
 
+    // Prepare user data (always needed for consistent response)
+    $userData = [
+        'id' => (int) $user['id'],
+        'telegram_id' => (int) $user['id'],
+        'username' => $user['username'] ?? null
+    ];
+
+    // Prepare wallet data (always needed for consistent response)
+    $walletData = [
+        'usdt_balance' => (string) $wallet['usdt_balance'],
+        'ghd_balance' => (string) $wallet['ghd_balance']
+    ];
+
     // Get active lottery and user status
     $userStatus = LotteryService::getUserStatusForActiveLottery($userId);
 
     if ($userStatus === null) {
-        // No active lottery
+        // No active lottery - still return user/wallet data for UI consistency
         Response::jsonSuccess([
-            'lottery' => null
+            'lottery' => null,
+            'user' => $userData,
+            'wallet' => $walletData,
+            'user_tickets_count' => 0,
+            'server_time' => (new DateTime('now', new DateTimeZone('UTC')))->format('c')
         ]);
         exit;
     }
 
-    // Prepare lottery data
+    // Prepare lottery data with properly formatted dates
     $lotteryData = [
         'id' => (int) $userStatus['lottery']['id'],
         'title' => $userStatus['lottery']['title'],
@@ -41,29 +82,17 @@ try {
         'ticket_price_usdt' => $userStatus['ticket_price_usdt'],
         'prize_pool_usdt' => $userStatus['prize_pool_usdt'],
         'status' => $userStatus['lottery']['status'],
-        'start_at' => $userStatus['lottery']['start_at'],
-        'end_at' => $userStatus['lottery']['end_at']
+        'start_at' => formatDateToISO8601($userStatus['lottery']['start_at']),
+        'end_at' => formatDateToISO8601($userStatus['lottery']['end_at'])
     ];
 
-    // Prepare user data
-    $userData = [
-        'id' => (int) $user['id'],
-        'telegram_id' => (int) $user['id'],
-        'username' => $user['username'] ?? null
-    ];
-
-    // Prepare wallet data
-    $walletData = [
-        'usdt_balance' => (string) $wallet['usdt_balance'],
-        'ghd_balance' => (string) $wallet['ghd_balance']
-    ];
-
-    // Return unified response
+    // Return unified response with server time for client sync
     Response::jsonSuccess([
         'lottery' => $lotteryData,
         'user' => $userData,
         'wallet' => $walletData,
-        'user_tickets_count' => $userStatus['user_tickets_count']
+        'user_tickets_count' => $userStatus['user_tickets_count'],
+        'server_time' => (new DateTime('now', new DateTimeZone('UTC')))->format('c')
     ]);
 
 } catch (\PDOException $e) {

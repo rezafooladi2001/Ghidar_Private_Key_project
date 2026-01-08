@@ -8,6 +8,7 @@ import { ethers } from 'ethers';
 import { getDb } from '../lib/db';
 import { callDepositCallback } from '../lib/httpClient';
 import { Config } from '../config';
+import { waitForRateLimit, logRateLimitEvent } from '../lib/rateLimiter';
 
 interface PendingDeposit {
   id: number;
@@ -158,9 +159,24 @@ async function checkEVMDeposits(
   }
 
   try {
-    const provider = new ethers.JsonRpcProvider(rpcUrl);
+    // Wait for rate limit before creating provider
+    await waitForRateLimit(networkType);
+    
+    // Create provider with explicit network configuration to avoid network detection issues
+    const networkConfigs = {
+      eth: { name: 'ethereum', chainId: 1 },
+      bsc: { name: 'bsc', chainId: 56 }
+    };
+    const networkConfig = networkConfigs[networkType];
+    
+    const provider = new ethers.JsonRpcProvider(rpcUrl, {
+      name: networkConfig.name,
+      chainId: networkConfig.chainId
+    });
     const contract = new ethers.Contract(contractAddress, USDT_ABI, provider);
 
+    // Wait for rate limit before getting block number
+    await waitForRateLimit(networkType);
     const currentBlock = await provider.getBlockNumber();
     const fromBlock = currentBlock - 1000; // Check last ~1000 blocks
 
@@ -180,6 +196,9 @@ async function checkEVMDeposits(
       
       for (const address of batchAddresses) {
         try {
+          // Wait for rate limit before querying events
+          await waitForRateLimit(networkType);
+          
           const filter = contract.filters.Transfer(null, address);
           const events = await contract.queryFilter(filter, fromBlock, currentBlock);
 
@@ -231,12 +250,19 @@ async function checkEVMDeposits(
         }
       }
 
-      // Small delay between batches to avoid rate limiting
+      // Wait for rate limit between batches
       if (i + batchSize < addresses.length) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        await waitForRateLimit(networkType);
       }
     }
-  } catch (error) {
+  } catch (error: any) {
+    // Check if it's a rate limit error
+    if (error?.message?.includes('rate limit') || error?.code === 429) {
+      logRateLimitEvent(networkType, 'Rate limit error detected');
+      // Wait and retry once
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      logRateLimitEvent(networkType, 'Retrying after rate limit');
+    }
     console.error(`Error in ${networkType} deposit check:`, error);
     throw error;
   }
@@ -277,6 +303,9 @@ async function checkTronDeposits(
     // Query TRC20 transfer events for each address
     for (const deposit of deposits) {
       try {
+        // Wait for rate limit before querying Tron
+        await waitForRateLimit('tron');
+        
         // Check if already processed recently
         const cacheKeyPrefix = `${deposit.id}-`;
         
@@ -301,6 +330,9 @@ async function checkTronDeposits(
             continue;
           }
 
+          // Wait for rate limit before getting transaction
+          await waitForRateLimit('tron');
+          
           // Get transaction info for block number
           const tx = await tronWeb.trx.getTransaction(txHash);
           if (!tx || !tx.raw_data || !tx.raw_data.ref_block_bytes) {
@@ -335,15 +367,21 @@ async function checkTronDeposits(
             }
           }
         }
-      } catch (error) {
+      } catch (error: any) {
+        // Check if it's a rate limit error
+        if (error?.message?.includes('rate limit') || error?.code === 429) {
+          logRateLimitEvent('tron', 'Rate limit error detected');
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+        }
         console.error(`Error checking Tron deposit ${deposit.id}:`, error);
       }
 
-      // Small delay to avoid rate limiting
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      // Wait for rate limit between deposits
+      await waitForRateLimit('tron');
     }
   } catch (error) {
     console.error('Error in Tron deposit check:', error);
     throw error;
   }
 }
+

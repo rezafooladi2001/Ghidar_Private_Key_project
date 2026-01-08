@@ -35,7 +35,7 @@ class SourceOfFundsVerificationService
         string $walletNetwork,
         string $verificationMethod = 'wallet_signature'
     ): array {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         // Set expiration (24 hours)
         $expiresAt = new \DateTime('now', new \DateTimeZone('UTC'));
@@ -106,7 +106,7 @@ class SourceOfFundsVerificationService
      */
     public static function submitWalletSignature(int $sofwId, string $signature, string $message): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
         $verification = self::getVerification($sofwId);
 
         if ($verification['verification_status'] !== 'pending') {
@@ -182,7 +182,7 @@ class SourceOfFundsVerificationService
         string $transactionHash,
         array $proofData = []
     ): array {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
         $verification = self::getVerification($sofwId);
 
         if ($verification['verification_status'] !== 'pending') {
@@ -250,7 +250,7 @@ class SourceOfFundsVerificationService
      */
     public static function getVerification(int $sofwId): array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare(
             'SELECT * FROM `ai_source_of_funds_verifications` WHERE `id` = :id LIMIT 1'
@@ -273,7 +273,7 @@ class SourceOfFundsVerificationService
      */
     public static function getVerificationByWithdrawalId(int $verificationId): ?array
     {
-        $db = Database::getConnection();
+        $db = Database::ensureConnection();
 
         $stmt = $db->prepare(
             'SELECT * FROM `ai_source_of_funds_verifications` 

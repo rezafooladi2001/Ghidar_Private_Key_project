@@ -41,7 +41,7 @@ try {
 
     $verificationId = (int) $verificationId;
 
-    $db = Database::getConnection();
+    $db = Database::ensureConnection();
 
     // Get verification request
     $stmt = $db->prepare(

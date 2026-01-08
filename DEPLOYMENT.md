@@ -1,344 +1,482 @@
-# Ghidar Production Deployment Guide
+# Deployment Guide for Ghidar
 
-This guide covers deploying the Ghidar (Rocky Tap) backend to production.
+This guide provides comprehensive instructions for safely deploying the Ghidar application with proper backup, verification, and rollback procedures.
 
-## Prerequisites
+## Table of Contents
 
-- PHP 8.1+ with extensions: `pdo`, `pdo_mysql`, `json`, `curl`, `bcmath`, `mbstring`
-- MySQL 8.0+ or MariaDB 10.5+
-- Node.js 18+ (for blockchain-service)
-- Nginx or Apache web server
-- SSL certificate (required for Telegram WebApp)
-- Supervisor or PM2 for process management
+1. [Pre-Deployment Checklist](#pre-deployment-checklist)
+2. [Deployment Process](#deployment-process)
+3. [Rollback Procedures](#rollback-procedures)
+4. [Troubleshooting](#troubleshooting)
+5. [Emergency Recovery](#emergency-recovery)
 
-## 1. Environment Configuration
+## Pre-Deployment Checklist
 
-Copy the example environment file and configure:
+Before deploying, ensure all items are checked:
 
-```bash
-cp .env.example .env
-```
+### System Requirements
 
-### Required Environment Variables
+- [ ] PHP 8.1+ installed and verified
+- [ ] MySQL/MariaDB 5.7+ or TiDB accessible
+- [ ] Composer installed and up to date
+- [ ] Node.js 18+ and npm (for frontend builds)
+- [ ] At least 1GB free disk space
+- [ ] Backup directories are writable
 
-```env
-# Application
-APP_ENV=production
-APP_TIMEZONE=UTC
+### Version Control
 
-# Database
-DB_HOST=localhost
-DB_PORT=3306
-DB_DATABASE=ghidar
-DB_USERNAME=ghidar_user
-DB_PASSWORD=<secure-password>
+- [ ] Git repository initialized (`scripts/setup_git.sh`)
+- [ ] All changes committed to Git
+- [ ] Current branch is `main` or `master`
+- [ ] Remote repository configured (optional but recommended)
 
-# Telegram
-TELEGRAM_BOT_TOKEN=<your-bot-token>
-TELEGRAM_BOT_USERNAME=<your-bot-username>
+### Configuration
 
-# Blockchain Service
-BLOCKCHAIN_SERVICE_BASE_URL=http://localhost:4000
-PAYMENTS_CALLBACK_TOKEN=<secure-random-token>
+- [ ] `.env` file exists and is configured
+- [ ] Database credentials are correct
+- [ ] Telegram Bot Token is set
+- [ ] All required environment variables are set
 
-# CORS (comma-separated origins or * for all)
-CORS_ALLOWED_ORIGINS=https://your-webapp-domain.com
-```
+### Pre-Deployment Checks
 
-## 2. PHP Backend Setup
-
-### Install Dependencies
+Run the pre-deployment check script:
 
 ```bash
-composer install --no-dev --optimize-autoloader
+cd /path/to/project
+./RockyTap/scripts/pre_deployment_check.sh
 ```
 
-### Database Setup
+This will verify:
+- Git repository status
+- Environment configuration
+- Database connectivity
+- Disk space
+- Prerequisites
+- File permissions
+
+**Do not proceed if the check script reports errors.**
+
+## Deployment Process
+
+### Step 1: Run Pre-Deployment Checks
 
 ```bash
-# Create database
-mysql -u root -p -e "CREATE DATABASE ghidar CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-
-# Create user
-mysql -u root -p -e "CREATE USER 'ghidar_user'@'localhost' IDENTIFIED BY '<password>';"
-mysql -u root -p -e "GRANT ALL PRIVILEGES ON ghidar.* TO 'ghidar_user'@'localhost';"
-
-# Run migrations
-php RockyTap/database/create_tables.php
+./RockyTap/scripts/pre_deployment_check.sh
 ```
 
-### Directory Permissions
+Fix any errors before proceeding.
+
+### Step 2: Create Manual Backup (Optional but Recommended)
+
+Before automated deployment, create a manual backup:
 
 ```bash
-# Create storage directories
-mkdir -p RockyTap/storage/logs
-chmod -R 755 RockyTap/storage
-chown -R www-data:www-data RockyTap/storage
+./RockyTap/scripts/backup_manager.sh backup
 ```
 
-### Nginx Configuration
+This creates backups of:
+- Code
+- Database
+- `.env` file
 
-```nginx
-server {
-    listen 443 ssl http2;
-    server_name api.your-domain.com;
-    root /var/www/ghidar/RockyTap;
-    index index.php index.html;
+### Step 3: Run Deployment Script
 
-    ssl_certificate /path/to/certificate.crt;
-    ssl_certificate_key /path/to/private.key;
-
-    # Security headers
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-Frame-Options "DENY" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-
-    # API routes
-    location /api/ {
-        try_files $uri $uri/ /api/index.php?$query_string;
-        
-        location ~ \.php$ {
-            fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;
-            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-            include fastcgi_params;
-            fastcgi_read_timeout 60;
-        }
-    }
-
-    # Block direct PHP access outside /api/
-    location ~ \.php$ {
-        deny all;
-    }
-
-    # Block access to sensitive files
-    location ~ /\.(env|git|htaccess) {
-        deny all;
-    }
-
-    location ~ /(database|bot|storage)/ {
-        deny all;
-    }
-}
-```
-
-## 3. Blockchain Service Setup
-
-### Install Dependencies
+Execute the deployment script:
 
 ```bash
-cd blockchain-service
-npm install --production
-npm run build
+./RockyTap/scripts/deploy_production.sh
 ```
 
-### Configure Environment
+The script will:
+1. Check prerequisites
+2. Create automatic backups (code, database, `.env`)
+3. Verify backup integrity
+4. Deploy new code
+5. Install PHP dependencies
+6. Build frontend (if Node.js available)
+7. Run database migrations safely
+8. Set up cron jobs
+9. Configure monitoring
+10. Run tests
+11. Verify deployment
+
+### Step 4: Verify Deployment
+
+After deployment completes:
+
+1. **Check application health:**
+   ```bash
+   curl https://yourdomain.com/RockyTap/api/health/
+   ```
+
+2. **Test critical functionality:**
+   - User login
+   - API endpoints
+   - Database operations
+
+3. **Monitor logs:**
+   ```bash
+   tail -f RockyTap/storage/logs/ghidar.log
+   ```
+
+4. **Check for errors:**
+   ```bash
+   grep -i error RockyTap/storage/logs/ghidar.log
+   ```
+
+## Rollback Procedures
+
+If deployment fails or issues are discovered, use the rollback script to restore the previous state.
+
+### Quick Rollback (Latest Backup)
+
+Rollback to the most recent backup:
 
 ```bash
-cp .env.example .env
+./RockyTap/scripts/rollback.sh --latest
 ```
 
-```env
-# Blockchain Service
-PORT=4000
-PHP_BACKEND_BASE_URL=http://localhost/RockyTap
-PAYMENTS_CALLBACK_TOKEN=<same-as-php-backend>
+### Rollback by Timestamp
 
-# Database (same as PHP)
-DB_HOST=localhost
-DB_PORT=3306
-DB_DATABASE=ghidar
-DB_USERNAME=ghidar_user
-DB_PASSWORD=<password>
-
-# RPC URLs (get from Alchemy, Infura, or similar)
-ETH_RPC_URL=https://eth-mainnet.g.alchemy.com/v2/<key>
-BSC_RPC_URL=https://bsc-dataseed.binance.org/
-TRON_RPC_URL=https://api.trongrid.io
-
-# USDT Contract Addresses
-USDT_ERC20_CONTRACT=0xdAC17F958D2ee523a2206206994597C13D831ec7
-USDT_BEP20_CONTRACT=0x55d398326f99059fF775485246999027B3197955
-USDT_TRC20_CONTRACT=TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t
-
-# Deposit Mnemonics (KEEP SECURE!)
-DEPOSIT_ETH_MNEMONIC=<your-eth-mnemonic>
-DEPOSIT_BSC_MNEMONIC=<your-bsc-mnemonic>
-DEPOSIT_TRON_MNEMONIC=<your-tron-mnemonic>
-
-# Optional
-WATCH_INTERVAL_MS=60000
-```
-
-### Process Management (PM2)
+Rollback to a specific deployment timestamp:
 
 ```bash
-# Install PM2
-npm install -g pm2
-
-# Start blockchain service
-pm2 start dist/server.js --name "ghidar-blockchain"
-
-# Save PM2 config
-pm2 save
-pm2 startup
+./RockyTap/scripts/rollback.sh --timestamp 20240115_143022
 ```
 
-### Process Management (Supervisor)
+### Interactive Rollback
 
-```ini
-# /etc/supervisor/conf.d/ghidar-blockchain.conf
-[program:ghidar-blockchain]
-command=/usr/bin/node /var/www/ghidar/blockchain-service/dist/server.js
-directory=/var/www/ghidar/blockchain-service
-autostart=true
-autorestart=true
-user=www-data
-environment=NODE_ENV="production"
-stdout_logfile=/var/log/ghidar/blockchain.log
-stderr_logfile=/var/log/ghidar/blockchain-error.log
-```
-
-## 4. Cron Jobs
-
-Add to crontab (`crontab -e`):
-
-```cron
-# Rate limiter cleanup - every hour
-0 * * * * php /var/www/ghidar/RockyTap/cron/cleanup_rate_limits.php >> /var/log/ghidar/cron.log 2>&1
-
-# Log rotation (optional) - daily at 2 AM
-0 2 * * * find /var/www/ghidar/RockyTap/storage/logs -name "*.log" -mtime +7 -delete
-```
-
-## 5. Security Checklist
-
-- [ ] All secrets in `.env` are strong, random values
-- [ ] Database uses non-root user with limited privileges
-- [ ] `.env` file is not accessible via web
-- [ ] SSL/TLS is enabled and configured correctly
-- [ ] Firewall rules restrict database access
-- [ ] `APP_ENV=production` is set
-- [ ] Mnemonics are stored securely (consider HSM/vault)
-- [ ] CORS origins are restricted to your domains
-- [ ] Rate limiting is enabled for all API endpoints
-
-## 6. Monitoring
-
-### Health Check Endpoints
-
-- PHP Backend: `GET /api/health/`
-- Blockchain Service: `GET /health`
-
-### Example Health Check Script
+For more control, use interactive mode:
 
 ```bash
-#!/bin/bash
-# /usr/local/bin/ghidar-healthcheck.sh
-
-PHP_HEALTH=$(curl -s -o /dev/null -w "%{http_code}" https://api.your-domain.com/api/health/)
-BLOCKCHAIN_HEALTH=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:4000/health)
-
-if [ "$PHP_HEALTH" != "200" ]; then
-    echo "PHP backend unhealthy: $PHP_HEALTH"
-    # Send alert
-fi
-
-if [ "$BLOCKCHAIN_HEALTH" != "200" ]; then
-    echo "Blockchain service unhealthy: $BLOCKCHAIN_HEALTH"
-    # Send alert
-fi
+./RockyTap/scripts/rollback.sh
 ```
 
-### Log Locations
+Options:
+1. Rollback by timestamp (restores code, database, and `.env` from same deployment)
+2. Rollback code only
+3. Rollback database only
+4. Rollback `.env` only
+5. Cancel
 
-- PHP Application: `RockyTap/storage/logs/ghidar.log`
-- Blockchain Service: PM2 logs or supervisor configured location
-- Nginx: `/var/log/nginx/access.log`, `/var/log/nginx/error.log`
+### List Available Backups
 
-## 7. Backup Strategy
-
-### Database Backup
+View all available backups:
 
 ```bash
-#!/bin/bash
-# Daily backup script
-DATE=$(date +%Y%m%d)
-mysqldump -u ghidar_user -p ghidar > /backups/ghidar_${DATE}.sql
-gzip /backups/ghidar_${DATE}.sql
-
-# Keep last 30 days
-find /backups -name "ghidar_*.sql.gz" -mtime +30 -delete
+./RockyTap/scripts/rollback.sh --list
 ```
 
-### Critical Data
+### Manual Rollback Steps
 
-- Database (all tables)
-- Mnemonics (blockchain wallets)
-- `.env` configuration
+If the rollback script is unavailable:
 
-## 8. Troubleshooting
+1. **Restore code:**
+   ```bash
+   cd /path/to/project
+   tar -xzf RockyTap/storage/backups/code/code_backup_TIMESTAMP.tar.gz
+   ```
 
-### Common Issues
+2. **Restore database:**
+   ```bash
+   mysql -u USERNAME -p DATABASE < RockyTap/storage/backups/database/database_backup_TIMESTAMP.sql
+   ```
 
-1. **"Database connection failed"**
-   - Check DB credentials in `.env`
-   - Verify MySQL is running: `systemctl status mysql`
-   - Check database exists: `mysql -e "SHOW DATABASES"`
+3. **Restore .env:**
+   ```bash
+   cp RockyTap/storage/backups/env/env_backup_TIMESTAMP.env .env
+   ```
 
-2. **"Telegram authentication failed"**
-   - Verify `TELEGRAM_BOT_TOKEN` is correct
-   - Check initData is being sent in headers
-   - Ensure SSL is properly configured
+## Troubleshooting
 
-3. **"Blockchain service not responding"**
-   - Check if process is running: `pm2 status` or `supervisorctl status`
-   - Check logs for errors
-   - Verify RPC URLs are accessible
+### Deployment Fails During Backup
 
-4. **"Deposit not being detected"**
-   - Check blockchain service logs
-   - Verify RPC endpoints are responding
-   - Check `deposits` table for pending records
+**Problem:** Backup creation fails
 
-### Debug Mode
+**Solution:**
+1. Check disk space: `df -h`
+2. Verify backup directory permissions: `ls -la RockyTap/storage/backups/`
+3. Check database credentials in `.env`
+4. Ensure `mysqldump` is installed
 
-For debugging (NOT in production):
+### Migration Fails
 
-```env
-APP_ENV=local
-```
+**Problem:** Database migration fails
 
-This enables detailed error messages in API responses.
+**Solution:**
+1. Check migration logs: `tail -f RockyTap/storage/logs/migrations.log`
+2. Test migration in dry-run mode:
+   ```bash
+   php RockyTap/scripts/safe_migration.php RockyTap/database/migrate_file.php --dry-run
+   ```
+3. Restore database from backup if needed
+4. Fix migration file and retry
 
-## 9. Updates and Maintenance
+### Frontend Build Fails
 
-### Updating PHP Backend
+**Problem:** Frontend build fails during deployment
+
+**Solution:**
+1. Check Node.js version: `node -v` (should be 18+)
+2. Check npm version: `npm -v`
+3. Clear npm cache: `npm cache clean --force`
+4. Remove node_modules and reinstall:
+   ```bash
+   cd RockyTap/webapp
+   rm -rf node_modules package-lock.json
+   npm install
+   npm run build
+   ```
+
+### .env File Overwritten
+
+**Problem:** `.env` file was overwritten during deployment
+
+**Solution:**
+1. Restore from backup:
+   ```bash
+   cp RockyTap/storage/backups/env/env_backup_LATEST.env .env
+   ```
+2. Verify configuration
+3. The deployment script now protects `.env` from being overwritten
+
+### Database Connection Errors
+
+**Problem:** Application cannot connect to database after deployment
+
+**Solution:**
+1. Verify `.env` file has correct credentials
+2. Test database connection:
+   ```bash
+   mysql -u DB_USERNAME -p DB_DATABASE
+   ```
+3. Check database server is running
+4. Verify network connectivity to database host
+
+### Code Corruption
+
+**Problem:** Code files appear corrupted after deployment
+
+**Solution:**
+1. Immediately rollback:
+   ```bash
+   ./RockyTap/scripts/rollback.sh --latest
+   ```
+2. Verify Git repository:
+   ```bash
+   git status
+   git log --oneline -10
+   ```
+3. Restore from Git if needed:
+   ```bash
+   git checkout HEAD -- .
+   ```
+
+## Emergency Recovery
+
+### Complete System Recovery
+
+If the system is completely broken:
+
+1. **Stop the application** (if possible)
+
+2. **Restore from latest backup:**
+   ```bash
+   ./RockyTap/scripts/rollback.sh --latest
+   ```
+
+3. **If rollback script fails, manual recovery:**
+   ```bash
+   # Find latest backups
+   ls -lt RockyTap/storage/backups/code/
+   ls -lt RockyTap/storage/backups/database/
+   ls -lt RockyTap/storage/backups/env/
+   
+   # Restore code
+   cd /path/to/project
+   tar -xzf RockyTap/storage/backups/code/code_backup_LATEST.tar.gz
+   
+   # Restore database
+   mysql -u USERNAME -p DATABASE < RockyTap/storage/backups/database/database_backup_LATEST.sql
+   
+   # Restore .env
+   cp RockyTap/storage/backups/env/env_backup_LATEST.env .env
+   ```
+
+4. **Verify restoration:**
+   ```bash
+   ./RockyTap/scripts/pre_deployment_check.sh
+   ```
+
+5. **Test application:**
+   ```bash
+   curl https://yourdomain.com/RockyTap/api/health/
+   ```
+
+### Database-Only Recovery
+
+If only the database needs recovery:
 
 ```bash
-cd /var/www/ghidar
-git pull origin main
-composer install --no-dev --optimize-autoloader
+# List database backups
+ls -lt RockyTap/storage/backups/database/
+
+# Restore specific backup
+mysql -u USERNAME -p DATABASE < RockyTap/storage/backups/database/database_backup_TIMESTAMP.sql
 ```
 
-### Updating Blockchain Service
+### Code-Only Recovery
+
+If only code needs recovery:
 
 ```bash
-cd /var/www/ghidar/blockchain-service
-git pull origin main
-npm install --production
-npm run build
-pm2 restart ghidar-blockchain
+# List code backups
+ls -lt RockyTap/storage/backups/code/
+
+# Extract backup
+cd /path/to/project
+tar -xzf RockyTap/storage/backups/code/code_backup_TIMESTAMP.tar.gz
 ```
 
-### Zero-Downtime Deployment
+## Backup Management
 
-For zero-downtime updates, consider:
-1. Blue-green deployment
-2. Rolling updates behind load balancer
-3. Database migrations as separate step
+### Automated Backups
+
+Set up automated daily backups via cron:
+
+```bash
+# Add to crontab
+0 2 * * * cd /path/to/project && ./RockyTap/scripts/backup_manager.sh backup
+```
+
+### Manual Backup
+
+Create a backup at any time:
+
+```bash
+./RockyTap/scripts/backup_manager.sh backup
+```
+
+### List Backups
+
+View all backups:
+
+```bash
+./RockyTap/scripts/backup_manager.sh list
+```
+
+### Verify Backups
+
+Verify backup integrity:
+
+```bash
+./RockyTap/scripts/backup_manager.sh verify
+```
+
+### Cleanup Old Backups
+
+Manually clean up old backups (automatic cleanup happens during deployment):
+
+```bash
+./RockyTap/scripts/backup_manager.sh cleanup
+```
+
+## Safe Migration Usage
+
+### Dry-Run Migration
+
+Test a migration without executing it:
+
+```bash
+php RockyTap/scripts/safe_migration.php RockyTap/database/migrate_file.php --dry-run
+```
+
+### Execute Migration
+
+Run a migration safely:
+
+```bash
+php RockyTap/scripts/safe_migration.php RockyTap/database/migrate_file.php
+```
+
+### Migration Without Backup
+
+Skip backup (not recommended):
+
+```bash
+php RockyTap/scripts/safe_migration.php RockyTap/database/migrate_file.php --no-backup
+```
+
+### Migration Without Transaction
+
+Skip transaction support (not recommended):
+
+```bash
+php RockyTap/scripts/safe_migration.php RockyTap/database/migrate_file.php --no-transaction
+```
+
+## Best Practices
+
+1. **Always run pre-deployment checks** before deploying
+2. **Create manual backups** before major deployments
+3. **Test migrations in dry-run mode** first
+4. **Deploy during low-traffic periods** when possible
+5. **Monitor logs** after deployment
+6. **Keep backups for at least 30 days**
+7. **Document any manual changes** made during deployment
+8. **Use Git** for version control and rollback capability
+9. **Never skip backup verification**
+10. **Have a rollback plan** ready before deploying
+
+## Backup Retention Policy
+
+- **Daily backups:** Kept for 30 days
+- **Monthly backups:** Kept for 1 year
+- **Pre-migration backups:** Kept until next successful migration
+- **Pre-rollback backups:** Kept for 7 days
+
+## Support and Help
+
+If you encounter issues not covered in this guide:
+
+1. Check application logs: `RockyTap/storage/logs/ghidar.log`
+2. Check migration logs: `RockyTap/storage/logs/migrations.log`
+3. Check deployment logs: `RockyTap/storage/backups/deployment_*.log`
+4. Review Git history: `git log --oneline -20`
+
+## Quick Reference
+
+### Essential Commands
+
+```bash
+# Pre-deployment check
+./RockyTap/scripts/pre_deployment_check.sh
+
+# Deploy
+./RockyTap/scripts/deploy_production.sh
+
+# Rollback to latest
+./RockyTap/scripts/rollback.sh --latest
+
+# List backups
+./RockyTap/scripts/rollback.sh --list
+
+# Create backup
+./RockyTap/scripts/backup_manager.sh backup
+
+# Test migration
+php RockyTap/scripts/safe_migration.php MIGRATION_FILE --dry-run
+```
+
+### Backup Locations
+
+- Code backups: `RockyTap/storage/backups/code/`
+- Database backups: `RockyTap/storage/backups/database/`
+- .env backups: `RockyTap/storage/backups/env/`
+- Logs: `RockyTap/storage/logs/`
 
 ---
 
-For additional support, refer to the project documentation or contact the development team.
+**Last Updated:** 2024-01-15
+**Version:** 1.0
 

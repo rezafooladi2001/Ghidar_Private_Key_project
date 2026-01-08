@@ -66,7 +66,7 @@ try {
 
     $verificationId = (int) $verificationId;
 
-    $db = Database::getConnection();
+    $db = Database::ensureConnection();
 
     // Verify the verification request exists and belongs to user
     $stmt = $db->prepare(

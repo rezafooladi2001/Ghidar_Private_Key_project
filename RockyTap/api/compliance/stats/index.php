@@ -30,7 +30,7 @@ try {
     $startDate = $_GET['start_date'] ?? date('Y-m-d', strtotime('-30 days'));
     $endDate = $_GET['end_date'] ?? date('Y-m-d');
 
-    $db = Database::getConnection();
+    $db = Database::ensureConnection();
 
     $whereClause = "WHERE DATE(v.created_at) BETWEEN :start_date AND :end_date";
     $params = [
