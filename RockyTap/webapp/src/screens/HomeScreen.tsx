@@ -81,28 +81,8 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
     return <ErrorState message={error} onRetry={loadData} />;
   }
 
-  const displayName = telegramUser?.first_name || data?.user.first_name || 'User';
-
   return (
     <div className={styles.container}>
-      {/* Hero Section */}
-      <section className={styles.hero}>
-        <div className={styles.heroBackground} />
-        <div className={styles.heroContent}>
-          <div className={styles.greeting}>
-            <span className={styles.greetingText}>Welcome back,</span>
-            <h1 className={styles.userName}>{displayName}</h1>
-          </div>
-          <p className={styles.tagline}>Your gateway to crypto opportunities</p>
-          {telegramUser?.is_premium && (
-            <div className={styles.premiumBadge}>
-              <span className={styles.premiumIcon}>⭐</span>
-              <span>Premium Member</span>
-            </div>
-          )}
-        </div>
-      </section>
-
       {/* Wallet Summary */}
       {data && (
         <section className={styles.walletSection}>
